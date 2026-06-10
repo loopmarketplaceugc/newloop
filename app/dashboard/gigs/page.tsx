@@ -28,8 +28,8 @@ export default function GigsPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="font-serif text-2xl font-semibold">Gigs</h1>
-        <p className="mt-0.5 text-sm text-text-secondary">
+        <h1 className="font-serif text-4xl sm:text-5xl font-extrabold leading-[0.95]">Gigs</h1>
+        <p className="mt-2 text-sm font-bold text-text-secondary">
           Every deal, from first offer to payout.
         </p>
       </div>

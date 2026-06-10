@@ -42,8 +42,8 @@ export default function ProfilePage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-serif text-2xl font-semibold">Profile</h1>
-          <p className="mt-0.5 text-sm text-text-secondary">What brands see on Discover and your public page.</p>
+          <h1 className="font-serif text-4xl sm:text-5xl font-extrabold leading-[0.95]">Profile</h1>
+          <p className="mt-2 text-sm font-bold text-text-secondary">What brands see on Discover and your public page.</p>
         </div>
         <Button asChild variant="outline" size="sm">
           <Link href={`/creator/${me.handle}`}>

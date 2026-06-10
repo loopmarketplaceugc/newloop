@@ -1,12 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { Briefcase, Clock, FileWarning, Star } from "lucide-react";
+import { Briefcase, FileWarning, Star } from "lucide-react";
 import { useApp } from "@/lib/store/app";
 import { useSession } from "@/lib/store/session";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { StatusPill } from "@/components/ui/status-pill";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Avatar } from "@/components/ui/avatar";
 import { StarRating } from "@/components/shared/star-rating";
@@ -40,7 +38,6 @@ export function CreatorDashboard() {
   const completedGigs = myGigs.filter((g) => ["PAID_OUT", "COMPLETED"].includes(g.status));
   const activeCount = myGigs.filter((g) => ACTIVE_STATUSES.includes(g.status)).length;
 
-  // Profile completeness drives data quality
   const completeness = [
     { label: "Add a bio", done: me.bio.length > 20 },
     { label: "Link a platform", done: me.platforms.length > 0 },
@@ -51,54 +48,57 @@ export function CreatorDashboard() {
   const doneCount = completeness.filter((c) => c.done).length;
   const pct = Math.round((doneCount / completeness.length) * 100);
 
-  const slotsPct = Math.min(100, (me.slotsBooked / me.capacityPerWeek) * 100);
+  const slotsPct = me.capacityPerWeek > 0 ? Math.min(100, (me.slotsBooked / me.capacityPerWeek) * 100) : 0;
   const expiring = myGigs
     .filter((g) => g.usageExpiresAt && daysUntil(g.usageExpiresAt) > 0)
     .sort((a, b) => daysUntil(a.usageExpiresAt!) - daysUntil(b.usageExpiresAt!))[0];
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-end justify-between">
+    <div className="space-y-5">
+      {/* Hero greeting */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-serif text-2xl font-semibold">Good to see you, {me.name.split(" ")[0]}</h1>
-          <p className="mt-0.5 text-sm text-text-secondary">
+          <h1 className="font-serif text-4xl font-extrabold leading-[0.95] sm:text-6xl">
+            Hey, {me.name.split(" ")[0] || "you"}
+            <span className="text-[#d6409f]">.</span>
+          </h1>
+          <p className="mt-2 font-bold text-text-secondary">
             <span className="num">{activeCount}</span> active gig{activeCount === 1 ? "" : "s"} ·{" "}
-            <span className="num">{me.slotsBooked}</span> of <span className="num">{me.capacityPerWeek}</span> weekly slots booked
+            <span className="num">{me.slotsBooked}</span>/<span className="num">{me.capacityPerWeek}</span> weekly slots booked
+            {me.status === "open" && (
+              <span className="sticker ml-3 bg-[#a8d98a] text-xs text-ink">open to work</span>
+            )}
           </p>
         </div>
       </div>
 
       {/* Bento grid */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-3">
         <EarningsCard releases={releaseTxs} />
 
-        {/* Escrow card */}
-        <Card>
-          <CardContent className="flex h-full flex-col justify-between gap-4">
+        {/* Escrow card — pink */}
+        <Card className="bg-[#f2a3df]">
+          <CardContent className="flex h-full flex-col justify-between gap-4 text-ink">
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Escrow</p>
-              <div className="mt-3 space-y-4">
+              <p className="font-serif text-lg font-extrabold">Escrow</p>
+              <div className="mt-4 space-y-5">
                 <div>
-                  <div className="flex items-baseline justify-between">
-                    <span className="num text-2xl font-semibold">{formatMoney(pendingEscrow)}</span>
-                    <Badge variant="amber">Pending</Badge>
-                  </div>
-                  <p className="mt-0.5 text-xs text-text-tertiary">Held until brands approve</p>
+                  <span className="sticker bg-ink text-[11px] text-[#f2a3df]">pending</span>
+                  <p className="num mt-1.5 font-serif text-3xl font-extrabold">{formatMoney(pendingEscrow)}</p>
+                  <p className="text-xs font-bold opacity-60">held until brands approve</p>
                 </div>
                 <div>
-                  <div className="flex items-baseline justify-between">
-                    <span className="num text-2xl font-semibold text-money">{formatMoney(released)}</span>
-                    <Badge variant="money">Released</Badge>
-                  </div>
-                  <p className="mt-0.5 text-xs text-text-tertiary">Paid out this period · 10% fee deducted</p>
+                  <span className="sticker bg-money text-[11px] text-white">released</span>
+                  <p className="num mt-1.5 font-serif text-3xl font-extrabold">{formatMoney(released)}</p>
+                  <p className="text-xs font-bold opacity-60">you keep 90% of every gig</p>
                 </div>
               </div>
             </div>
             {expiring?.usageExpiresAt && (
-              <p className="rounded-[8px] border border-border bg-surface-2 px-3 py-2 text-xs leading-relaxed text-text-secondary">
-                <FileWarning className="mr-1 inline h-3.5 w-3.5 text-amber" />
-                Usage rights on “{expiring.title}” expire in{" "}
-                <span className="num font-semibold">{daysUntil(expiring.usageExpiresAt)}d</span>
+              <p className="rounded-[14px] border-2 border-ink bg-bg px-3 py-2 text-xs font-bold leading-relaxed">
+                <FileWarning className="mr-1 inline h-3.5 w-3.5" />
+                Usage rights on “{expiring.title.slice(0, 26)}…” expire in{" "}
+                <span className="num">{daysUntil(expiring.usageExpiresAt)}d</span>
               </p>
             )}
           </CardContent>
@@ -108,9 +108,9 @@ export function CreatorDashboard() {
         <Card className="md:col-span-2">
           <CardContent>
             <div className="mb-4 flex items-center justify-between">
-              <p className="text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Active gigs</p>
-              <Link href="/dashboard/gigs" className="text-xs font-medium text-text-secondary hover:text-text-primary">
-                View all →
+              <p className="font-serif text-lg font-extrabold">Active gigs</p>
+              <Link href="/dashboard/gigs" className="rounded-full border-2 border-ink px-3.5 py-1 text-xs font-bold transition-all hover:scale-105 hover:bg-ink hover:text-[#a8d98a]">
+                view all →
               </Link>
             </div>
             {activeCount === 0 ? (
@@ -120,23 +120,30 @@ export function CreatorDashboard() {
                 body="When a brand sends you an offer, it lands here. Keep your profile fresh to get matched."
               />
             ) : (
-              <div className="-mx-1 flex gap-2 overflow-x-auto pb-1">
-                {KANBAN_LANES.map((lane) => {
+              <div className="-mx-1 flex gap-2.5 overflow-x-auto pb-1">
+                {KANBAN_LANES.map((lane, li) => {
                   const laneGigs = myGigs.filter((g) => lane.statuses.includes(g.status) && g.status !== "COMPLETED");
+                  const laneTints = ["#f2a3df", "#a8d98a", "#101805", "#f2a3df", "#a8d98a"];
                   return (
-                    <div key={lane.label} className="w-36 shrink-0 rounded-[8px] bg-surface-2/60 p-2">
-                      <p className="mb-2 flex items-center justify-between px-1 text-[11px] font-medium text-text-tertiary">
+                    <div key={lane.label} className="w-40 shrink-0">
+                      <p
+                        className="mb-2 flex items-center justify-between rounded-full border-2 border-ink px-3 py-1 text-[11px] font-bold"
+                        style={{
+                          background: laneTints[li],
+                          color: laneTints[li] === "#101805" ? "#faf6ef" : "#101805",
+                        }}
+                      >
                         {lane.label} <span className="num">{laneGigs.length}</span>
                       </p>
-                      <div className="space-y-1.5">
+                      <div className="space-y-2">
                         {laneGigs.map((g) => (
                           <Link
                             key={g.id}
                             href={`/gig/${g.id}`}
-                            className="block rounded-[8px] border border-border bg-surface p-2.5 transition-colors hover:border-border-bright"
+                            className="block rounded-[14px] border-2 border-ink bg-bg p-3 transition-all hover:-translate-y-0.5 hover:shadow-[3px_3px_0_0_#101805]"
                           >
-                            <p className="line-clamp-2 text-xs font-medium leading-snug">{g.title}</p>
-                            <p className="num mt-1.5 text-xs font-semibold text-money">
+                            <p className="line-clamp-2 text-xs font-bold leading-snug">{g.title}</p>
+                            <p className="num mt-1.5 text-sm font-extrabold text-money">
                               {formatMoney(creatorPayoutCents(g.priceCents))}
                             </p>
                           </Link>
@@ -150,32 +157,30 @@ export function CreatorDashboard() {
           </CardContent>
         </Card>
 
-        {/* Capacity meter */}
-        <Card>
-          <CardContent className="flex h-full flex-col items-center justify-center gap-3 text-center">
-            <p className="self-start text-[11px] font-medium uppercase tracking-wider text-text-tertiary">
-              Weekly capacity
-            </p>
-            <div className="relative flex h-28 w-28 items-center justify-center">
-              <svg viewBox="0 0 100 100" className="h-28 w-28 -rotate-90">
-                <circle cx="50" cy="50" r="42" fill="none" stroke="var(--color-surface-2)" strokeWidth="10" />
+        {/* Capacity meter — lime */}
+        <Card className="bg-[#a8d98a]">
+          <CardContent className="flex h-full flex-col items-center justify-center gap-3 text-center text-ink">
+            <p className="self-start font-serif text-lg font-extrabold">This week</p>
+            <div className="relative flex h-32 w-32 items-center justify-center">
+              <svg viewBox="0 0 100 100" className="h-32 w-32 -rotate-90">
+                <circle cx="50" cy="50" r="42" fill="none" stroke="#101805" strokeOpacity="0.15" strokeWidth="11" />
                 <circle
                   cx="50" cy="50" r="42" fill="none"
-                  stroke="var(--color-money)" strokeWidth="10" strokeLinecap="round"
+                  stroke="#101805" strokeWidth="11" strokeLinecap="round"
                   strokeDasharray={`${(slotsPct / 100) * 263.9} 263.9`}
                 />
               </svg>
               <div className="absolute text-center">
-                <p className="num text-xl font-semibold">
-                  {me.slotsBooked}<span className="text-text-tertiary">/{me.capacityPerWeek}</span>
+                <p className="num font-serif text-2xl font-extrabold">
+                  {me.slotsBooked}<span className="opacity-50">/{me.capacityPerWeek}</span>
                 </p>
-                <p className="text-[10px] uppercase tracking-wider text-text-tertiary">slots</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider opacity-60">slots</p>
               </div>
             </div>
-            <p className="text-xs text-text-secondary">
+            <p className="text-xs font-bold opacity-70">
               {me.slotsBooked >= me.capacityPerWeek
-                ? "Fully booked this week — brands see you as Busy."
-                : `${me.capacityPerWeek - me.slotsBooked} slot${me.capacityPerWeek - me.slotsBooked === 1 ? "" : "s"} open this week`}
+                ? "Fully booked — brands see you as Busy."
+                : `${me.capacityPerWeek - me.slotsBooked} slot${me.capacityPerWeek - me.slotsBooked === 1 ? "" : "s"} open for new gigs`}
             </p>
           </CardContent>
         </Card>
@@ -183,9 +188,7 @@ export function CreatorDashboard() {
         {/* Partnership history */}
         <Card className={cn(pct === 100 ? "md:col-span-3" : "md:col-span-2")}>
           <CardContent>
-            <p className="mb-4 text-[11px] font-medium uppercase tracking-wider text-text-tertiary">
-              Partnership history
-            </p>
+            <p className="mb-4 font-serif text-lg font-extrabold">Partnership history</p>
             {completedGigs.length === 0 ? (
               <EmptyState
                 icon={Star}
@@ -193,7 +196,7 @@ export function CreatorDashboard() {
                 body="Finish your first gig and your brand history — with ratings — shows up here."
               />
             ) : (
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-2.5 sm:grid-cols-2">
                 {completedGigs.map((g) => {
                   const co = companyById(g.companyId);
                   const review = myReviews.find((r) => r.gigId === g.id);
@@ -201,24 +204,24 @@ export function CreatorDashboard() {
                     <Link
                       key={g.id}
                       href={`/gig/${g.id}`}
-                      className="group flex items-center gap-3 rounded-[8px] border border-border p-3 transition-colors hover:border-border-bright hover:bg-surface-2/40"
+                      className="flex items-center gap-3 rounded-[14px] border-2 border-ink p-3 transition-all hover:-translate-y-0.5 hover:shadow-[3px_3px_0_0_#101805]"
                     >
                       <Avatar name={co?.name ?? "?"} hue={co?.logoHue ?? 0} size="sm" />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[13px] font-medium">{co?.name}</p>
-                        <p className="flex items-center gap-1.5 text-xs text-text-tertiary">
+                        <p className="truncate text-[13px] font-bold">{co?.name}</p>
+                        <p className="flex items-center gap-1.5 text-xs font-medium text-text-tertiary">
                           <PlatformIcon platform={g.platform} className="h-3 w-3" />
-                          {g.title.length > 28 ? g.title.slice(0, 28) + "…" : g.title}
+                          {g.title.length > 26 ? g.title.slice(0, 26) + "…" : g.title}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="num text-[13px] font-semibold text-money">
+                        <p className="num text-sm font-extrabold text-money">
                           {formatMoney(creatorPayoutCents(g.priceCents))}
                         </p>
                         {review ? (
                           <StarRating rating={review.rating} />
                         ) : (
-                          <span className="text-[11px] text-text-tertiary">awaiting review</span>
+                          <span className="text-[11px] font-bold text-text-tertiary">awaiting review</span>
                         )}
                       </div>
                     </Link>
@@ -229,33 +232,29 @@ export function CreatorDashboard() {
           </CardContent>
         </Card>
 
-        {/* Profile completeness */}
+        {/* Profile strength — ink */}
         {pct < 100 && (
-          <Card>
+          <Card className="border-ink bg-ink text-[#faf6ef]">
             <CardContent>
               <div className="mb-3 flex items-center justify-between">
-                <p className="text-[11px] font-medium uppercase tracking-wider text-text-tertiary">
-                  Profile strength
-                </p>
-                <span className="num text-sm font-semibold">{pct}%</span>
+                <p className="font-serif text-lg font-extrabold text-[#f2a3df]">Profile strength</p>
+                <span className="num font-serif text-xl font-extrabold text-[#a8d98a]">{pct}%</span>
               </div>
-              <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-surface-2">
-                <div className="h-full rounded-full bg-text-primary transition-all" style={{ width: `${pct}%` }} />
+              <div className="mb-5 h-2.5 overflow-hidden rounded-full bg-[#faf6ef]/15">
+                <div className="h-full rounded-full bg-[#a8d98a] transition-all" style={{ width: `${pct}%` }} />
               </div>
-              <ul className="space-y-2">
+              <ul className="space-y-2.5">
                 {completeness.map((c) => (
-                  <li key={c.label} className="flex items-center gap-2 text-[13px]">
+                  <li key={c.label} className="flex items-center gap-2.5 text-[13px] font-bold">
                     <span
                       className={cn(
-                        "flex h-4 w-4 items-center justify-center rounded-full border text-[9px]",
-                        c.done
-                          ? "border-money bg-money text-white"
-                          : "border-border-bright text-transparent",
+                        "flex h-5 w-5 items-center justify-center rounded-full text-[10px]",
+                        c.done ? "bg-[#a8d98a] text-ink" : "border-2 border-[#faf6ef]/25 text-transparent",
                       )}
                     >
                       ✓
                     </span>
-                    <span className={c.done ? "text-text-tertiary line-through" : "text-text-secondary"}>
+                    <span className={c.done ? "text-[#faf6ef]/40 line-through" : "text-[#faf6ef]/90"}>
                       {c.label}
                     </span>
                   </li>
@@ -263,9 +262,9 @@ export function CreatorDashboard() {
               </ul>
               <Link
                 href="/dashboard/profile"
-                className="mt-4 inline-block text-xs font-medium text-text-primary underline underline-offset-2"
+                className="mt-5 inline-block rounded-full bg-[#f2a3df] px-5 py-2 text-sm font-bold text-ink transition-transform hover:scale-105"
               >
-                Complete your profile →
+                Finish your profile →
               </Link>
             </CardContent>
           </Card>

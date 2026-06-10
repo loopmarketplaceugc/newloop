@@ -33,8 +33,8 @@ export default function MessagesPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="font-serif text-2xl font-semibold">Messages</h1>
-        <p className="mt-0.5 text-sm text-text-secondary">
+        <h1 className="font-serif text-4xl sm:text-5xl font-extrabold leading-[0.95]">Messages</h1>
+        <p className="mt-2 text-sm font-bold text-text-secondary">
           Every negotiation stays on-platform — offers, scripts, and files in one thread.
         </p>
       </div>

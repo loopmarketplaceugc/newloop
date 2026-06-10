@@ -174,8 +174,8 @@ export default function DiscoverPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-serif text-2xl font-semibold">Discover creators</h1>
-          <p className="mt-0.5 text-sm text-text-secondary">
+          <h1 className="font-serif text-4xl sm:text-5xl font-extrabold leading-[0.95]">Discover creators</h1>
+          <p className="mt-2 text-sm font-bold text-text-secondary">
             <span className="num">{filtered.length}</span> of <span className="num">{creators.length}</span> creators ·
             press <kbd className="num rounded border border-border bg-surface-2 px-1 text-[11px]">⌘K</kbd> to search
           </p>

@@ -43,21 +43,19 @@ export function EarningsCard({ releases }: { releases: Transaction[] }) {
   }, [releases, range.days]);
 
   return (
-    <Card className="md:col-span-2">
+    <Card className="border-ink bg-ink text-[#faf6ef] md:col-span-2">
       <CardContent className="flex h-full flex-col">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-text-tertiary">
-              Total earned
-            </p>
-            <CountUpMoney cents={totalEarnedCents} className="font-serif text-4xl font-extrabold sm:text-5xl" />
+            <span className="sticker bg-[#a8d98a] text-[11px] text-ink">total earned</span>
+            <CountUpMoney cents={totalEarnedCents} className="mt-2 block font-serif text-4xl font-extrabold text-[#a8d98a] sm:text-6xl" />
             {totalEarnedCents === 0 && (
-              <p className="mt-1 text-xs font-medium text-text-tertiary">
+              <p className="mt-1 text-xs font-bold text-[#faf6ef]/50">
                 Your first escrow release lands here.
               </p>
             )}
           </div>
-          <div className="flex rounded-full border-2 border-ink/15 p-0.5">
+          <div className="flex rounded-full border-2 border-[#faf6ef]/20 p-0.5">
             {RANGES.map((r) => (
               <button
                 key={r.label}
@@ -65,8 +63,8 @@ export function EarningsCard({ releases }: { releases: Transaction[] }) {
                 className={cn(
                   "num rounded-full px-3 py-1 text-xs font-bold transition-colors cursor-pointer",
                   range.label === r.label
-                    ? "bg-ink text-[#a8d98a]"
-                    : "text-text-tertiary hover:text-text-primary",
+                    ? "bg-[#f2a3df] text-ink"
+                    : "text-[#faf6ef]/40 hover:text-[#faf6ef]",
                 )}
               >
                 {r.label}
@@ -79,25 +77,25 @@ export function EarningsCard({ releases }: { releases: Transaction[] }) {
             <AreaChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="earningsFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#3e7b3f" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="#a8d98a" stopOpacity={0.05} />
+                  <stop offset="0%" stopColor="#a8d98a" stopOpacity={0.45} />
+                  <stop offset="100%" stopColor="#a8d98a" stopOpacity={0.02} />
                 </linearGradient>
               </defs>
               <XAxis
                 dataKey="date"
                 tickLine={false}
                 axisLine={false}
-                tick={{ fontSize: 11, fill: "#8b8f7e" }}
+                tick={{ fontSize: 11, fill: "#faf6ef99" }}
                 minTickGap={48}
               />
               <YAxis hide domain={[0, "dataMax + 100"]} />
               <Tooltip
-                cursor={{ stroke: "#101805", strokeDasharray: "3 3" }}
+                cursor={{ stroke: "#f2a3df", strokeDasharray: "3 3" }}
                 content={({ active, payload, label }) =>
                   active && payload?.length ? (
-                    <div className="rounded-[12px] border-2 border-ink bg-surface px-3 py-2 text-xs shadow-[3px_3px_0_0_#101805]">
-                      <p className="font-bold text-text-tertiary">{label}</p>
-                      <p className="num mt-0.5 font-bold text-money">
+                    <div className="rounded-[12px] border-2 border-[#a8d98a] bg-ink px-3 py-2 text-xs">
+                      <p className="font-bold text-[#faf6ef]/60">{label}</p>
+                      <p className="num mt-0.5 font-bold text-[#a8d98a]">
                         {formatMoney(Math.round((payload[0].value as number) * 100))}
                       </p>
                     </div>
@@ -107,7 +105,7 @@ export function EarningsCard({ releases }: { releases: Transaction[] }) {
               <Area
                 type="monotone"
                 dataKey="dollars"
-                stroke="#3e7b3f"
+                stroke="#a8d98a"
                 strokeWidth={3}
                 fill="url(#earningsFill)"
               />

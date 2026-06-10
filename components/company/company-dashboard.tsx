@@ -5,7 +5,6 @@ import { Briefcase, Compass, FileText, Hourglass, Sparkles } from "lucide-react"
 import { useApp } from "@/lib/store/app";
 import { useSession } from "@/lib/store/session";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/ui/status-pill";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Avatar } from "@/components/ui/avatar";
@@ -16,8 +15,11 @@ import { daysUntil, formatMoney } from "@/lib/format";
 
 export function CompanyDashboard() {
   const userId = useSession((s) => s.userId)!;
+  const sessionName = useSession((s) => s.name);
+  const isDemo = useSession((s) => s.isDemo);
   const { gigs, creators, transactions, scripts } = useApp();
-  const company = companyById(userId);
+  const company = isDemo ? companyById(userId) : undefined;
+  const brandName = sessionName || company?.name || "Your brand";
 
   const myGigs = gigs.filter((g) => g.companyId === userId);
   const active = myGigs.filter((g) => ACTIVE_STATUSES.includes(g.status));
@@ -31,104 +33,120 @@ export function CompanyDashboard() {
   const myScripts = scripts.filter((s) => s.companyId === userId);
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="space-y-5">
+      {/* Hero greeting */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-serif text-2xl font-semibold">{company?.name ?? "Your brand"}</h1>
-          <p className="mt-0.5 text-sm text-text-secondary">
+          <h1 className="font-serif text-4xl font-extrabold leading-[0.95] sm:text-6xl">
+            {brandName}
+            <span className="text-[#d6409f]">.</span>
+          </h1>
+          <p className="mt-2 font-bold text-text-secondary">
             <span className="num">{active.length}</span> active gig{active.length === 1 ? "" : "s"} ·{" "}
             <span className="num">{formatMoney(inEscrow)}</span> in escrow
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button asChild variant="aiOutline" size="sm">
-            <Link href="/dashboard/scripts?new=1">
-              <Sparkles className="h-4 w-4" /> New AI script
-            </Link>
-          </Button>
-          <Button asChild size="sm">
-            <Link href="/dashboard/discover">
-              <Compass className="h-4 w-4" /> Find creators
-            </Link>
-          </Button>
+        <div className="flex gap-2.5">
+          <Link
+            href="/dashboard/scripts?new=1"
+            className="flex items-center gap-2 rounded-full border-2 border-ink px-5 py-2.5 font-serif text-sm font-bold text-[#d6409f] transition-all hover:scale-105 hover:bg-ai-soft"
+          >
+            <Sparkles className="h-4 w-4" /> New AI script
+          </Link>
+          <Link
+            href="/dashboard/discover"
+            className="flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 font-serif text-sm font-bold text-[#a8d98a] transition-all hover:scale-105"
+          >
+            <Compass className="h-4 w-4" /> Find creators
+          </Link>
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardContent>
-            <p className="text-[11px] font-medium uppercase tracking-wider text-text-tertiary">In escrow</p>
-            <p className="num mt-1 text-3xl font-semibold">{formatMoney(inEscrow)}</p>
-            <p className="mt-1 text-xs text-text-tertiary">Released only when you approve</p>
+      {/* Stat cards — pink / ink / lime */}
+      <div className="grid gap-5 sm:grid-cols-3">
+        <Card className="bg-[#f2a3df]">
+          <CardContent className="text-ink">
+            <span className="sticker bg-ink text-[11px] text-[#f2a3df]">in escrow</span>
+            <p className="num mt-2 font-serif text-4xl font-extrabold">{formatMoney(inEscrow)}</p>
+            <p className="mt-1 text-xs font-bold opacity-60">released only when you approve</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent>
-            <p className="text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Total funded</p>
-            <p className="num mt-1 text-3xl font-semibold">{formatMoney(spent)}</p>
-            <p className="mt-1 text-xs text-text-tertiary">Across {myGigs.length} gigs</p>
+        <Card className="border-ink bg-ink">
+          <CardContent className="text-[#faf6ef]">
+            <span className="sticker bg-[#a8d98a] text-[11px] text-ink">total funded</span>
+            <p className="num mt-2 font-serif text-4xl font-extrabold text-[#a8d98a]">{formatMoney(spent)}</p>
+            <p className="mt-1 text-xs font-bold text-[#faf6ef]/50">
+              across <span className="num">{myGigs.length}</span> gig{myGigs.length === 1 ? "" : "s"}
+            </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent>
-            <p className="text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Scripts generated</p>
-            <p className="num mt-1 text-3xl font-semibold">{myScripts.length}</p>
-            <p className="mt-1 text-xs text-text-tertiary">
-              <Link href="/dashboard/scripts" className="underline underline-offset-2">Open library</Link>
+        <Card className="bg-[#a8d98a]">
+          <CardContent className="text-ink">
+            <span className="sticker bg-ink text-[11px] text-[#a8d98a]">scripts</span>
+            <p className="num mt-2 font-serif text-4xl font-extrabold">{myScripts.length}</p>
+            <p className="mt-1 text-xs font-bold opacity-60">
+              <Link href="/dashboard/scripts" className="underline underline-offset-2">open the library →</Link>
             </p>
           </CardContent>
         </Card>
       </div>
 
+      {/* Review nudge */}
       {awaitingReview.length > 0 && (
-        <Card className="border-amber/30">
+        <Card className="bg-bg">
           <CardContent className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <Hourglass className="h-5 w-5 text-amber" />
+              <span className="flex h-10 w-10 animate-wiggle items-center justify-center rounded-full bg-[#f2a3df] text-ink">
+                <Hourglass className="h-5 w-5" />
+              </span>
               <div>
-                <p className="text-sm font-medium">
-                  {awaitingReview.length} deliverable{awaitingReview.length === 1 ? "" : "s"} waiting on your review
+                <p className="font-serif text-base font-extrabold">
+                  {awaitingReview.length} deliverable{awaitingReview.length === 1 ? "" : "s"} waiting on you
                 </p>
-                <p className="text-xs text-text-secondary">
-                  Unreviewed work auto-approves {AUTO_APPROVE_DAYS} days after delivery — creators don&apos;t wait on silence.
+                <p className="text-xs font-bold text-text-secondary">
+                  silence auto-approves in {AUTO_APPROVE_DAYS} days — creators don&apos;t wait on ghosts
                 </p>
               </div>
             </div>
-            <Button asChild size="sm">
-              <Link href={`/gig/${awaitingReview[0].id}`}>Review now</Link>
-            </Button>
+            <Link
+              href={`/gig/${awaitingReview[0].id}`}
+              className="rounded-full bg-ink px-5 py-2.5 font-serif text-sm font-bold text-[#f2a3df] transition-transform hover:scale-105"
+            >
+              Review now →
+            </Link>
           </CardContent>
         </Card>
       )}
 
+      {/* Active gigs */}
       <Card>
         <CardContent>
-          <p className="mb-4 text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Active gigs</p>
+          <p className="mb-4 font-serif text-lg font-extrabold">Active gigs</p>
           {active.length === 0 ? (
             <EmptyState
               icon={Briefcase}
               title="No active gigs"
-              body="Find a creator, send an offer, and your gigs will line up here with live escrow status."
+              body="Find a creator, send an offer, and your gigs line up here with live escrow status."
               action={
-                <Button asChild size="sm">
-                  <Link href="/dashboard/discover">Browse creators</Link>
-                </Button>
+                <Link href="/dashboard/discover" className="rounded-full bg-ink px-5 py-2.5 font-serif text-sm font-bold text-[#a8d98a] transition-transform hover:scale-105">
+                  Browse creators →
+                </Link>
               }
             />
           ) : (
-            <div className="divide-y divide-border">
+            <div className="space-y-2.5">
               {active.map((g) => {
                 const creator = creators.find((c) => c.id === g.creatorId);
                 return (
                   <Link
                     key={g.id}
                     href={`/gig/${g.id}`}
-                    className="flex items-center gap-3 py-3 transition-colors first:pt-0 last:pb-0 hover:bg-surface-2/30"
+                    className="flex items-center gap-3 rounded-[14px] border-2 border-ink p-3.5 transition-all hover:-translate-y-0.5 hover:shadow-[3px_3px_0_0_#101805]"
                   >
                     <Avatar name={creator?.name ?? "?"} hue={creator?.avatarHue ?? 0} size="sm" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{g.title}</p>
-                      <p className="flex items-center gap-1.5 text-xs text-text-tertiary">
+                      <p className="truncate text-sm font-bold">{g.title}</p>
+                      <p className="flex items-center gap-1.5 text-xs font-medium text-text-tertiary">
                         <PlatformIcon platform={g.platform} className="h-3 w-3" />
                         {creator?.name}
                         {g.deadline && daysUntil(g.deadline) > 0 && (
@@ -136,7 +154,7 @@ export function CompanyDashboard() {
                         )}
                       </p>
                     </div>
-                    <span className="num hidden text-sm font-semibold sm:block">{formatMoney(g.priceCents)}</span>
+                    <span className="num hidden font-serif text-base font-extrabold sm:block">{formatMoney(g.priceCents)}</span>
                     <StatusPill status={g.status} />
                   </Link>
                 );
@@ -146,26 +164,28 @@ export function CompanyDashboard() {
         </CardContent>
       </Card>
 
+      {/* Recent scripts */}
       {myScripts.length > 0 && (
         <Card>
           <CardContent>
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Recent scripts</p>
-              <Link href="/dashboard/scripts" className="text-xs font-medium text-text-secondary hover:text-text-primary">
-                View all →
+            <div className="mb-4 flex items-center justify-between">
+              <p className="font-serif text-lg font-extrabold">Recent scripts</p>
+              <Link href="/dashboard/scripts" className="rounded-full border-2 border-ink px-3.5 py-1 text-xs font-bold transition-all hover:scale-105 hover:bg-ink hover:text-[#f2a3df]">
+                view all →
               </Link>
             </div>
-            <div className="grid gap-2 sm:grid-cols-3">
-              {myScripts.slice(0, 3).map((s) => (
+            <div className="grid gap-3 sm:grid-cols-3">
+              {myScripts.slice(0, 3).map((s, i) => (
                 <Link
                   key={s.id}
                   href="/dashboard/scripts"
-                  className="rounded-[8px] border border-border p-3 transition-colors hover:border-ai/40"
+                  className="rounded-[14px] border-2 border-ink p-4 transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#101805]"
+                  style={{ background: ["#fae5f3", "#e4f2da", "#faf6ef"][i % 3] }}
                 >
-                  <FileText className="h-4 w-4 text-ai" />
-                  <p className="mt-2 line-clamp-1 text-[13px] font-medium">{s.output.title}</p>
-                  <p className="mt-0.5 text-xs capitalize text-text-tertiary">
-                    {s.inputs.tone} · {s.output.kind === "script" ? "Full script" : "Brief"}
+                  <FileText className="h-5 w-5 text-[#d6409f]" />
+                  <p className="mt-2 line-clamp-1 font-serif text-sm font-extrabold">{s.output.title}</p>
+                  <p className="mt-0.5 text-xs font-bold capitalize text-text-tertiary">
+                    {s.inputs.tone} · {s.output.kind === "script" ? "full script" : "brief"}
                   </p>
                 </Link>
               ))}
