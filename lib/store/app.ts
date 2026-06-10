@@ -8,6 +8,13 @@ import {
   MAX_REVISIONS,
   platformFeeCents,
 } from "@/lib/gig-machine";
+import {
+  dbInsertContract,
+  dbInsertDeliverable,
+  dbSendMessage,
+  dbUpdateGig,
+  dbUpdateOfferState,
+} from "@/lib/sync";
 import * as seed from "@/lib/seed";
 import type {
   Contract,
@@ -26,7 +33,37 @@ import type {
 
 let idCounter = 1000;
 const uid = (p: string) => `${p}${idCounter++}_${Date.now().toString(36)}`;
+const uuid = () =>
+  typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : uid("m");
 const now = () => new Date().toISOString();
+
+interface LiveWorld {
+  creators: Creator[];
+  gigs: Gig[];
+  messages: Message[];
+  deliverables: Deliverable[];
+  transactions: Transaction[];
+}
+
+const emptyLiveState = () => ({
+  creators: [] as Creator[],
+  gigs: [] as Gig[],
+  messages: [] as Message[],
+  contracts: [] as Contract[],
+  deliverables: [] as Deliverable[],
+  transactions: [] as Transaction[],
+  reviews: [] as Review[],
+  scripts: [] as ScriptDoc[],
+  notifications: [] as Notification[],
+});
+
+function mergeById<T extends { id: string }>(current: T[], incoming: T[]) {
+  const map = new Map(current.map((item) => [item.id, item]));
+  for (const item of incoming) map.set(item.id, item);
+  return Array.from(map.values());
+}
 
 interface AppState {
   creators: Creator[];
@@ -39,6 +76,11 @@ interface AppState {
   scripts: ScriptDoc[];
   notifications: Notification[];
 
+  enterLiveMode: () => void;
+  setCreatorsFromDb: (creators: Creator[]) => void;
+  setLiveWorld: (world: LiveWorld) => void;
+  upsertGig: (gig: Gig) => void;
+  upsertMessage: (message: Message) => void;
   updateCreator: (id: string, partial: Partial<Creator>) => void;
   /** Real (authed) users get a clean, zeroed creator record — no fake numbers. */
   ensureCreator: (id: string, partial?: Partial<Creator>) => void;
@@ -73,7 +115,32 @@ const seedState = () => ({
 export const useApp = create<AppState>()(
   persist(
     (set, get) => ({
-      ...seedState(),
+      ...emptyLiveState(),
+
+      enterLiveMode: () => set(emptyLiveState()),
+
+      setCreatorsFromDb: (creators) => set({ creators }),
+
+      setLiveWorld: (world) =>
+        set((s) => ({
+          gigs: world.gigs,
+          messages: world.messages,
+          deliverables: world.deliverables,
+          transactions: world.transactions,
+          creators: mergeById(s.creators, world.creators),
+        })),
+
+      upsertGig: (gig) =>
+        set((s) => ({
+          gigs: mergeById(s.gigs, [gig]),
+        })),
+
+      upsertMessage: (message) =>
+        set((s) => ({
+          messages: mergeById(s.messages, [message]).sort((a, b) =>
+            a.createdAt.localeCompare(b.createdAt),
+          ),
+        })),
 
       updateCreator: (id, partial) =>
         set((s) => ({
@@ -114,21 +181,26 @@ export const useApp = create<AppState>()(
           return { creators: [...s.creators, blank] };
         }),
 
-      sendMessage: (m) =>
-        set((s) => ({
-          messages: [...s.messages, { ...m, id: uid("m"), createdAt: now() }],
-        })),
+      sendMessage: (m) => {
+        const message: Message = { ...m, id: uuid(), createdAt: now() };
+        get().upsertMessage(message);
+        void dbSendMessage(message).then((saved) => {
+          if (saved) get().upsertMessage(saved);
+        });
+      },
 
       respondToOffer: (messageId, accept) => {
         const msg = get().messages.find((m) => m.id === messageId);
         if (!msg?.offer) return;
+        const updatedOffer: OfferBody = { ...msg.offer, state: accept ? "accepted" : "declined" };
         set((s) => ({
           messages: s.messages.map((m) =>
             m.id === messageId && m.offer
-              ? { ...m, offer: { ...m.offer, state: accept ? "accepted" : "declined" } }
+              ? { ...m, offer: updatedOffer }
               : m,
           ),
         }));
+        void dbUpdateOfferState(messageId, updatedOffer);
         if (accept) {
           const gig = get().gigs.find((g) => g.id === msg.gigId);
           if (gig && canTransition(gig.status, "OFFER_ACCEPTED")) {
@@ -153,6 +225,11 @@ export const useApp = create<AppState>()(
               ),
               contracts: [...s.contracts.filter((c) => c.gigId !== gig.id), contract],
             }));
+            void dbUpdateGig(gig.id, {
+              status: "OFFER_ACCEPTED",
+              priceCents: msg.offer.priceCents,
+            });
+            void dbInsertContract(gig.id, contract.terms);
             get().notify({ userId: gig.companyId, title: "Offer accepted", body: "Contract generated — fund escrow to start production.", href: `/gig/${gig.id}` });
           }
         }
@@ -164,6 +241,7 @@ export const useApp = create<AppState>()(
         set((s) => ({
           gigs: s.gigs.map((g) => (g.id === gigId ? { ...g, ...patch, status: to } : g)),
         }));
+        void dbUpdateGig(gigId, { ...patch, status: to });
         return true;
       },
 
@@ -180,6 +258,7 @@ export const useApp = create<AppState>()(
             { id: uid("t"), gigId, type: "fund", amountCents: gig.priceCents, stripeRef: `pi_demo_${gigId}`, createdAt: now() },
           ],
         }));
+        void dbUpdateGig(gigId, { status: "FUNDED_IN_ESCROW", usageExpiresAt });
         get().notify({ userId: gig.creatorId, title: "Escrow funded", body: `${"Funds are held"} — you're cleared to start.`, href: `/gig/${gigId}` });
       },
 
@@ -187,15 +266,18 @@ export const useApp = create<AppState>()(
         const gig = get().gigs.find((g) => g.id === gigId);
         if (!gig || !canTransition(gig.status, "DELIVERED")) return;
         const version = get().deliverables.filter((d) => d.gigId === gigId).length + 1;
+        const submittedAt = now();
         set((s) => ({
           gigs: s.gigs.map((g) =>
-            g.id === gigId ? { ...g, status: "DELIVERED" as GigStatus, deliveredAt: now() } : g,
+            g.id === gigId ? { ...g, status: "DELIVERED" as GigStatus, deliveredAt: submittedAt } : g,
           ),
           deliverables: [
             ...s.deliverables,
-            { id: uid("d"), gigId, fileName, version, watermarked: true, submittedAt: now(), sizeMb },
+            { id: uid("d"), gigId, fileName, version, watermarked: true, submittedAt, sizeMb },
           ],
         }));
+        void dbUpdateGig(gigId, { status: "DELIVERED", deliveredAt: submittedAt });
+        void dbInsertDeliverable({ gigId, fileName, version });
         get().notify({ userId: gig.companyId, title: "Deliverable received", body: `${fileName} is ready for review. Auto-approves in 14 days.`, href: `/gig/${gigId}` });
       },
 
@@ -207,6 +289,7 @@ export const useApp = create<AppState>()(
           set((s) => ({
             gigs: s.gigs.map((g) => (g.id === gigId ? { ...g, status: "DISPUTED" as GigStatus } : g)),
           }));
+          void dbUpdateGig(gigId, { status: "DISPUTED" });
           return;
         }
         set((s) => ({
@@ -216,6 +299,10 @@ export const useApp = create<AppState>()(
               : g,
           ),
         }));
+        void dbUpdateGig(gigId, {
+          status: "REVISION_REQUESTED",
+          revisionCount: gig.revisionCount + 1,
+        });
         get().notify({ userId: gig.creatorId, title: "Revision requested", body: `Revision ${gig.revisionCount + 1} of ${MAX_REVISIONS} on "${gig.title}".`, href: `/gig/${gigId}` });
       },
 
@@ -238,6 +325,7 @@ export const useApp = create<AppState>()(
             d.gigId === gigId ? { ...d, watermarked: false } : d,
           ),
         }));
+        void dbUpdateGig(gigId, { status: "COMPLETED", priceCents: gig.priceCents });
         get().notify({ userId: gig.creatorId, title: "Payment released", body: `Escrow released. Reviews are now unlocked for this gig.`, href: `/dashboard/wallet` });
       },
 
@@ -251,6 +339,7 @@ export const useApp = create<AppState>()(
             ? [...s.transactions, { id: uid("t"), gigId, type: "refund" as const, amountCents: gig.priceCents, stripeRef: `re_demo_${gigId}`, createdAt: now() }]
             : s.transactions,
         }));
+        void dbUpdateGig(gigId, { status: "CANCELLED" });
       },
 
       addScript: (doc) => set((s) => ({ scripts: [doc, ...s.scripts] })),
@@ -283,7 +372,7 @@ export const useApp = create<AppState>()(
 
       resetDemo: () => set(seedState()),
     }),
-    { name: "mcc-demo-data", version: 4, migrate: () => ({ ...seedState() }) as never },
+    { name: "mcc-demo-data", version: 5, migrate: () => ({ ...emptyLiveState() }) as never },
   ),
 );
 

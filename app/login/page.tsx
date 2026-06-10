@@ -7,15 +7,12 @@ import { motion } from "framer-motion";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { z } from "zod";
 import { logInWithEmail } from "@/lib/auth";
-import { useSession } from "@/lib/store/session";
 import { TypeOnce } from "@/components/shared/typewriter";
-import type { Role } from "@/lib/types";
 
 const schema = z.object({ email: z.string().email("real email please"), password: z.string().min(6, "at least 6 characters") });
 
 export default function LoginPage() {
   const router = useRouter();
-  const signInDemo = useSession((s) => s.signInDemo);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -36,11 +33,6 @@ export default function LoginPage() {
       setError(e instanceof Error ? e.message : "Login failed");
       setBusy(false);
     }
-  };
-
-  const demo = (role: Role) => {
-    signInDemo(role);
-    router.push("/dashboard");
   };
 
   return (
@@ -106,18 +98,6 @@ export default function LoginPage() {
                 Log in
               </motion.button>
               <span className="hidden text-xs font-bold uppercase tracking-widest text-[#faf6ef]/30 sm:block">press Enter ↵</span>
-            </div>
-
-            <div className="border-t-2 border-[#faf6ef]/10 pt-6">
-              <p className="text-xs font-bold uppercase tracking-widest text-[#faf6ef]/30">Just looking? Tour with sample data</p>
-              <div className="mt-3 flex gap-3">
-                <button onClick={() => demo("creator")} className="rounded-full border-2 border-[#a8d98a]/40 px-5 py-2 text-sm font-bold text-[#a8d98a] transition-colors hover:border-[#a8d98a] cursor-pointer">
-                  Demo as creator
-                </button>
-                <button onClick={() => demo("company")} className="rounded-full border-2 border-[#f2a3df]/40 px-5 py-2 text-sm font-bold text-[#f2a3df] transition-colors hover:border-[#f2a3df] cursor-pointer">
-                  Demo as brand
-                </button>
-              </div>
             </div>
           </div>
         </div>

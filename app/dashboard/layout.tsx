@@ -24,6 +24,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToastViewport } from "@/components/ui/toast";
 import { companyById } from "@/lib/seed";
+import { fetchCreators, fetchMyWorld } from "@/lib/sync";
 import { daysAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { CommandPalette } from "@/components/company/command-palette";
@@ -57,6 +58,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { userId, role, name, onboarded, isDemo, signOut } = useSession();
   const creators = useApp((s) => s.creators);
   const notifications = useApp((s) => s.notifications);
+  const enterLiveMode = useApp((s) => s.enterLiveMode);
+  const setCreatorsFromDb = useApp((s) => s.setCreatorsFromDb);
+  const setLiveWorld = useApp((s) => s.setLiveWorld);
   const markRead = useApp((s) => s.markNotificationsRead);
   const ensureCreator = useApp((s) => s.ensureCreator);
   const [bellOpen, setBellOpen] = useState(false);
@@ -74,6 +78,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       ensureCreator(userId, name ? { name } : undefined);
     }
   }, [hydrated, userId, role, isDemo, name, ensureCreator]);
+
+  useEffect(() => {
+    if (!hydrated || !userId || isDemo) return;
+    let cancelled = false;
+
+    enterLiveMode();
+    const loadLiveData = async () => {
+      const [creatorRows, world] = await Promise.all([fetchCreators(), fetchMyWorld()]);
+      if (cancelled) return;
+      setCreatorsFromDb(creatorRows);
+      if (world) setLiveWorld(world);
+    };
+
+    void loadLiveData();
+    const timer = window.setInterval(() => void loadLiveData(), 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [enterLiveMode, hydrated, isDemo, setCreatorsFromDb, setLiveWorld, userId]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

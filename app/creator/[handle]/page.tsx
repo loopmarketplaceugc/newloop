@@ -1,7 +1,8 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, FileText, MapPin, MessageSquare } from "lucide-react";
 import { useApp, useHydrated } from "@/lib/store/app";
 import { useSession } from "@/lib/store/session";
@@ -16,13 +17,19 @@ import { PlatformIcon } from "@/components/shared/platform-icon";
 import { StarRating } from "@/components/shared/star-rating";
 import { COMPENSATION_LABELS, PLATFORM_LABELS } from "@/lib/types";
 import { companyById } from "@/lib/seed";
+import { dbCreateGig } from "@/lib/sync";
 import { formatCompact, formatMoney } from "@/lib/format";
+import { toast } from "@/components/ui/toast";
 
 export default function CreatorPublicPage({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = use(params);
+  const router = useRouter();
   const hydrated = useHydrated();
   const role = useSession((s) => s.role);
+  const userId = useSession((s) => s.userId);
+  const isDemo = useSession((s) => s.isDemo);
   const { creators, reviews, gigs } = useApp();
+  const [starting, setStarting] = useState(false);
   const c = creators.find((x) => x.handle === decodeURIComponent(handle));
 
   if (!hydrated) return <div className="mx-auto max-w-3xl p-6"><CardSkeleton /></div>;
@@ -37,7 +44,35 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
   }
 
   const myReviews = reviews.filter((r) => r.targetId === c.id);
-  const firstGig = gigs.find((g) => g.creatorId === c.id);
+  const firstGig = gigs.find((g) => g.creatorId === c.id && (!userId || g.companyId === userId));
+
+  const startConversation = async () => {
+    if (!userId) {
+      router.push("/signup?role=company");
+      return;
+    }
+    if (firstGig) {
+      router.push(`/gig/${firstGig.id}`);
+      return;
+    }
+    if (isDemo) {
+      router.push("/dashboard/messages");
+      return;
+    }
+
+    setStarting(true);
+    const created = await dbCreateGig(c.id, c.name);
+    if (created) {
+      useApp.getState().upsertGig(created);
+      router.push(`/gig/${created.id}`);
+      return;
+    }
+    setStarting(false);
+    toast("Could not open chat", {
+      body: "Make sure your brand profile is finished, then try again.",
+      tone: "warning",
+    });
+  };
 
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-8">
@@ -66,10 +101,8 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
           </div>
         </div>
         {role === "company" && (
-          <Button asChild>
-            <Link href={firstGig ? `/gig/${firstGig.id}` : "/dashboard/messages"}>
-              <MessageSquare className="h-4 w-4" /> Start a conversation
-            </Link>
+          <Button onClick={startConversation} disabled={starting}>
+            <MessageSquare className="h-4 w-4" /> {starting ? "Opening chat..." : "Start a conversation"}
           </Button>
         )}
       </div>

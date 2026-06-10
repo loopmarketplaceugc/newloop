@@ -34,6 +34,7 @@ import { StarPicker } from "@/components/shared/star-rating";
 import { PlatformIcon } from "@/components/shared/platform-icon";
 import { ScriptEngine } from "@/components/company/script-engine";
 import { companyById } from "@/lib/seed";
+import { fetchMyWorld, fetchProfileNames, subscribeToGig } from "@/lib/sync";
 import {
   AUTO_APPROVE_DAYS,
   MAX_REVISIONS,
@@ -54,6 +55,7 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
   const hydrated = useHydrated();
   const userId = useSession((s) => s.userId);
   const role = useSession((s) => s.role);
+  const isDemo = useSession((s) => s.isDemo);
   const app = useApp();
   const [draft, setDraft] = useState("");
   const [offerOpen, setOfferOpen] = useState(false);
@@ -68,6 +70,8 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
   const [offerDeliverables, setOfferDeliverables] = useState("1 × 30s vertical video, 2 revision rounds");
   const [offerUsage, setOfferUsage] = useState(90);
   const [offerRaw, setOfferRaw] = useState(false);
+  const [profileNames, setProfileNames] = useState<Record<string, { name: string; hue: number }>>({});
+  const [liveChecked, setLiveChecked] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const gig = app.gigs.find((g) => g.id === id);
@@ -77,7 +81,46 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
     bottomRef.current?.scrollIntoView({ behavior: "instant", block: "end" });
   }, [msgs.length, hydrated]);
 
-  if (!hydrated || !userId) return <div className="p-6"><CardSkeleton /></div>;
+  useEffect(() => {
+    if (!hydrated || !userId || isDemo) return;
+    let cancelled = false;
+    setLiveChecked(false);
+
+    const refresh = async () => {
+      const world = await fetchMyWorld();
+      if (!cancelled && world) useApp.getState().setLiveWorld(world);
+      if (!cancelled) setLiveChecked(true);
+    };
+
+    const unsubscribe = subscribeToGig(
+      id,
+      (message) => useApp.getState().upsertMessage(message),
+      (updatedGig) => useApp.getState().upsertGig(updatedGig),
+    );
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 2000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      unsubscribe();
+    };
+  }, [hydrated, id, isDemo, userId]);
+
+  useEffect(() => {
+    if (isDemo || !gig) return;
+    let cancelled = false;
+    void fetchProfileNames([gig.companyId, gig.creatorId]).then((names) => {
+      if (!cancelled) setProfileNames(names);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [gig?.companyId, gig?.creatorId, isDemo]);
+
+  if (!hydrated || !userId || (!isDemo && !gig && !liveChecked)) {
+    return <div className="p-6"><CardSkeleton /></div>;
+  }
   if (!gig) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4">
@@ -89,6 +132,9 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
 
   const creator = app.creators.find((c) => c.id === gig.creatorId);
   const company = companyById(gig.companyId);
+  const companyProfile = profileNames[gig.companyId];
+  const companyName = company?.name ?? companyProfile?.name ?? "Brand";
+  const companyHue = company?.logoHue ?? companyProfile?.hue ?? 285;
   const contract = app.contracts.find((c) => c.gigId === gig.id);
   const deliverables = app.deliverables.filter((d) => d.gigId === gig.id);
   const script = app.scripts.find((s) => s.id === gig.scriptId);
@@ -210,7 +256,7 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
             <h1 className="truncate text-sm font-semibold sm:text-base">{gig.title}</h1>
             <p className="flex items-center gap-1.5 text-xs text-text-tertiary">
               <PlatformIcon platform={gig.platform} className="h-3 w-3" />
-              {company?.name} × {creator?.name}
+              {companyName} × {creator?.name ?? "Creator"}
             </p>
           </div>
           <StatusPill status={gig.status} />
@@ -225,10 +271,10 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
             <CardContent className="flex items-center gap-3 p-4">
               {isCreator ? (
                 <>
-                  <Avatar name={company?.name ?? "?"} hue={company?.logoHue ?? 0} size="md" />
+                  <Avatar name={companyName} hue={companyHue} size="md" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold">{company?.name}</p>
-                    <p className="truncate text-xs text-text-tertiary">{company?.about}</p>
+                    <p className="text-sm font-semibold">{companyName}</p>
+                    <p className="truncate text-xs text-text-tertiary">Brand workspace</p>
                   </div>
                 </>
               ) : (
@@ -422,8 +468,8 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
             )}
             {msgs.map((m) => {
               const mine = m.senderId === userId;
-              const sender = m.senderId.startsWith("co")
-                ? { name: companyById(m.senderId)?.name ?? "Brand", hue: companyById(m.senderId)?.logoHue ?? 0 }
+              const sender = m.senderId === gig.companyId
+                ? { name: companyName, hue: companyHue }
                 : (() => {
                     const c = app.creators.find((c) => c.id === m.senderId);
                     return { name: c?.name ?? "Creator", hue: c?.avatarHue ?? 0 };
@@ -538,7 +584,7 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
                     send();
                   }
                 }}
-                placeholder={`Message ${isCreator ? company?.name : creator?.name}…`}
+                placeholder={`Message ${isCreator ? companyName : creator?.name ?? "Creator"}…`}
                 className="min-h-9 max-h-32 flex-1 py-2"
                 rows={1}
               />
@@ -599,7 +645,7 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
           {contract && (
             <div className="mt-4 space-y-3 text-[13px] leading-relaxed">
               {[
-                ["Parties", `${company?.name} (“Brand”) and ${creator?.name} (“Creator”)`],
+                ["Parties", `${companyName} (“Brand”) and ${creator?.name ?? "Creator"} (“Creator”)`],
                 ["Deliverables", contract.terms.deliverables],
                 ["Compensation", `${formatMoney(contract.terms.priceCents)} held in escrow; released on approval minus the 10% platform fee.`],
                 ["Usage rights", `${contract.terms.usageRightsDays} days of paid digital usage from approval${gig.usageExpiresAt ? `, expiring ${formatDate(gig.usageExpiresAt)}` : ""}. Both parties are reminded 7 days before expiry.`],
@@ -631,7 +677,7 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
       {/* Review dialog */}
       <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
         <DialogContent>
-          <DialogTitle>Review {isCreator ? company?.name : creator?.name}</DialogTitle>
+          <DialogTitle>Review {isCreator ? companyName : creator?.name}</DialogTitle>
           <DialogDescription>Reviews unlock only after completion and are public.</DialogDescription>
           <div className="mt-4 space-y-4">
             <StarPicker value={rating} onChange={setRating} />

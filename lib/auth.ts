@@ -24,6 +24,15 @@ export async function signUpWithEmail(email: string, password: string, role: Rol
 
 const PENDING_KEY = "mcc-pending-profile";
 
+function makeHandle(input: string, fallback: string) {
+  const base = input
+    .toLowerCase()
+    .replace(/[^a-z0-9._]+/g, ".")
+    .replace(/^\.+|\.+$/g, "")
+    .slice(0, 24);
+  return `${base || fallback}.${Math.random().toString(36).slice(2, 6)}`;
+}
+
 /** Save any onboarding data parked before email confirmation. Safe to call anytime. */
 export async function flushPendingProfile() {
   try {
@@ -110,6 +119,7 @@ export async function saveCreatorProfile(p: {
   const { error } = await sb.from("profiles").upsert({
     id: uid,
     role: "creator",
+    handle: makeHandle(name, "creator"),
     name,
     first_name: p.firstName,
     last_name: p.lastName,
@@ -122,10 +132,11 @@ export async function saveCreatorProfile(p: {
   if (p.platforms.length) {
     await sb.from("creator_platforms").upsert(
       p.platforms.map((pl) => ({
-        creator_id: uid,
-        platform: pl.platform,
-        follower_count: pl.followerCount,
-      })),
+          creator_id: uid,
+          platform: pl.platform,
+          url: "",
+          follower_count: pl.followerCount,
+        })),
       { onConflict: "creator_id,platform" },
     );
   }
@@ -152,6 +163,7 @@ export async function saveCompanyProfile(p: {
   const { error } = await sb.from("profiles").upsert({
     id: uid,
     role: "company",
+    handle: makeHandle(p.companyName, "brand"),
     name: p.companyName,
     first_name: p.firstName,
     last_name: p.lastName,

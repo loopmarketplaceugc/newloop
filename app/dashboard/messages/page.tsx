@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MessageSquare } from "lucide-react";
 import { useApp, useHydrated } from "@/lib/store/app";
@@ -10,18 +11,21 @@ import { CardSkeleton } from "@/components/ui/skeleton";
 import { StatusPill } from "@/components/ui/status-pill";
 import { companyById } from "@/lib/seed";
 import { daysAgo } from "@/lib/format";
+import { fetchProfileNames } from "@/lib/sync";
 
 export default function MessagesPage() {
   const hydrated = useHydrated();
   const userId = useSession((s) => s.userId);
   const role = useSession((s) => s.role);
+  const isDemo = useSession((s) => s.isDemo);
   const { gigs, messages, creators } = useApp();
+  const [profileNames, setProfileNames] = useState<Record<string, { name: string; hue: number }>>({});
 
-  if (!hydrated || !userId) return <CardSkeleton />;
-
-  const myGigs = gigs.filter((g) =>
+  const myGigs = userId ? gigs.filter((g) =>
     role === "creator" ? g.creatorId === userId : g.companyId === userId,
-  );
+  ) : [];
+  const companyIds = Array.from(new Set(myGigs.map((g) => g.companyId)));
+  const companyIdsKey = companyIds.join(",");
   const threads = myGigs
     .map((g) => ({
       gig: g,
@@ -29,6 +33,19 @@ export default function MessagesPage() {
     }))
     .filter((t) => t.last)
     .sort((a, b) => (b.last!.createdAt ?? "").localeCompare(a.last!.createdAt ?? ""));
+
+  useEffect(() => {
+    if (isDemo || role !== "creator" || myGigs.length === 0) return;
+    let cancelled = false;
+    void fetchProfileNames(companyIds).then((names) => {
+      if (!cancelled) setProfileNames(names);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyIdsKey, isDemo, role]);
+
+  if (!hydrated || !userId) return <CardSkeleton />;
 
   return (
     <div className="space-y-4">
@@ -49,7 +66,10 @@ export default function MessagesPage() {
           {threads.map(({ gig, last }) => {
             const other =
               role === "creator"
-                ? { name: companyById(gig.companyId)?.name ?? "Brand", hue: companyById(gig.companyId)?.logoHue ?? 0 }
+                ? {
+                    name: companyById(gig.companyId)?.name ?? profileNames[gig.companyId]?.name ?? "Brand",
+                    hue: companyById(gig.companyId)?.logoHue ?? profileNames[gig.companyId]?.hue ?? 285,
+                  }
                 : (() => {
                     const c = creators.find((c) => c.id === gig.creatorId);
                     return { name: c?.name ?? "Creator", hue: c?.avatarHue ?? 0 };
