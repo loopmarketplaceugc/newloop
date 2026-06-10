@@ -20,12 +20,10 @@ import {
 } from "lucide-react";
 import { useSession } from "@/lib/store/session";
 import { useApp, useHydrated } from "@/lib/store/app";
-import { Logo } from "@/components/shared/logo";
 import { Avatar } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToastViewport } from "@/components/ui/toast";
-import { Button } from "@/components/ui/button";
-import { creatorById, companyById } from "@/lib/seed";
+import { companyById } from "@/lib/seed";
 import { daysAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { CommandPalette } from "@/components/company/command-palette";
@@ -56,9 +54,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const hydrated = useHydrated();
   const router = useRouter();
   const pathname = usePathname();
-  const { userId, role, onboarded, signOut } = useSession();
+  const { userId, role, name, onboarded, isDemo, signOut } = useSession();
+  const creators = useApp((s) => s.creators);
   const notifications = useApp((s) => s.notifications);
   const markRead = useApp((s) => s.markNotificationsRead);
+  const ensureCreator = useApp((s) => s.ensureCreator);
   const [bellOpen, setBellOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
@@ -67,6 +67,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (hydrated && userId && !onboarded)
       router.replace(role === "creator" ? "/onboarding/creator" : "/onboarding/company");
   }, [hydrated, userId, onboarded, role, router]);
+
+  // Real creator accounts get a clean local record (zeros, not fake stats)
+  useEffect(() => {
+    if (hydrated && userId && role === "creator" && !isDemo) {
+      ensureCreator(userId, name ? { name } : undefined);
+    }
+  }, [hydrated, userId, role, isDemo, name, ensureCreator]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -82,10 +89,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!hydrated || !userId || !role) {
     return (
       <div className="flex min-h-screen">
-        <div className="hidden w-56 border-r border-border p-4 md:block">
-          <Skeleton className="h-7 w-28 mb-8" />
+        <div className="hidden w-60 bg-ink p-5 md:block">
+          <Skeleton className="h-7 w-28 mb-8 bg-[#faf6ef]/10" />
           {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-9 w-full mb-2" />
+            <Skeleton key={i} className="h-10 w-full mb-2 bg-[#faf6ef]/10" />
           ))}
         </div>
         <div className="flex-1 p-6 space-y-4">
@@ -101,25 +108,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const nav = role === "creator" ? creatorNav : companyNav;
-  const me = role === "creator" ? creatorById(userId) : undefined;
-  const myCompany = role === "company" ? companyById(userId) : undefined;
-  const displayName = me?.name ?? myCompany?.name ?? "You";
-  const avatarHue = me?.avatarHue ?? myCompany?.logoHue ?? 200;
+  const me = role === "creator" ? creators.find((c) => c.id === userId) : undefined;
+  const myCompany = role === "company" && isDemo ? companyById(userId) : undefined;
+  const displayName = name || me?.name || myCompany?.name || "You";
+  const avatarHue = me?.avatarHue ?? myCompany?.logoHue ?? 285;
   const myNotifs = notifications.filter((n) => n.userId === userId);
   const unread = myNotifs.filter((n) => !n.read).length;
 
   return (
     <div className="flex min-h-screen w-full">
       {role === "company" && <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />}
-      {/* Sidebar — desktop */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 flex-col border-r border-border bg-bg md:flex">
-        <div className="px-5 py-5">
-          <Link href="/dashboard" className="flex items-center gap-2 font-serif text-lg font-semibold">
-            <span className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-text-primary font-sans text-[11px] font-bold text-bg">M</span>
-            MCC
+
+      {/* Sidebar — ink */}
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col bg-ink text-[#faf6ef] md:flex">
+        <div className="px-5 py-6">
+          <Link href="/dashboard" className="font-serif text-2xl font-extrabold text-[#f2a3df]">
+            MCC<span className="align-super text-[10px]">®</span>
           </Link>
+          {isDemo && (
+            <span className="sticker mt-2 inline-block bg-[#a8d98a] text-[11px] text-ink">demo mode</span>
+          )}
         </div>
-        <nav className="flex-1 space-y-1 px-3">
+        <nav className="flex-1 space-y-1.5 px-3">
           {nav.map((item) => {
             const active =
               item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
@@ -128,31 +138,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-2.5 rounded-[8px] px-3 py-2 text-sm font-medium transition-colors",
+                  "flex items-center gap-3 rounded-full px-4 py-2.5 font-serif text-[15px] font-bold transition-all",
                   active
-                    ? "bg-surface-2 text-text-primary"
-                    : "text-text-secondary hover:bg-surface-2/60 hover:text-text-primary",
+                    ? "bg-[#f2a3df] text-ink"
+                    : "text-[#faf6ef]/60 hover:bg-[#faf6ef]/10 hover:text-[#faf6ef]",
                 )}
               >
-                <item.icon className="h-4 w-4" />
+                <item.icon className="h-[18px] w-[18px]" />
                 {item.label}
               </Link>
             );
           })}
         </nav>
-        <div className="border-t border-border p-3">
-          <div className="flex items-center gap-2.5 rounded-[8px] px-2 py-2">
+        <div className="border-t-2 border-[#faf6ef]/10 p-4">
+          <div className="flex items-center gap-3">
             <Avatar name={displayName} hue={avatarHue} size="sm" />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-medium">{displayName}</p>
-              <p className="text-[11px] capitalize text-text-tertiary">{role}</p>
+              <p className="truncate text-[13px] font-bold">{displayName}</p>
+              <p className="text-[11px] font-medium capitalize text-[#faf6ef]/40">{role}</p>
             </div>
             <button
               onClick={() => {
                 signOut();
                 router.push("/");
               }}
-              className="rounded p-1.5 text-text-tertiary hover:bg-surface-2 hover:text-text-primary cursor-pointer"
+              className="rounded-full p-2 text-[#faf6ef]/40 transition-colors hover:bg-[#faf6ef]/10 hover:text-[#f2a3df] cursor-pointer"
               aria-label="Sign out"
             >
               <LogOut className="h-4 w-4" />
@@ -162,36 +172,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Main */}
-      <div className="flex min-h-screen flex-1 flex-col md:pl-56">
-        {/* Top bar */}
-        <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b border-border bg-bg/80 px-4 backdrop-blur-sm md:px-6">
-          <Link href="/dashboard" className="font-serif text-base font-semibold md:hidden">
-            MCC
+      <div className="flex min-h-screen flex-1 flex-col md:pl-60">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b-2 border-ink/10 bg-bg/90 px-4 backdrop-blur-md md:px-6">
+          <Link href="/dashboard" className="font-serif text-xl font-extrabold md:hidden">
+            MCC<span className="text-[#d6409f]">®</span>
           </Link>
           <div className="hidden md:block">
             {role === "company" && (
               <button
                 onClick={() => setPaletteOpen(true)}
-                className="flex w-64 items-center gap-2 rounded-[8px] border border-border bg-surface px-3 py-1.5 text-[13px] text-text-tertiary transition-colors hover:border-border-bright cursor-pointer"
+                className="flex w-72 items-center gap-2 rounded-full border-2 border-ink/15 bg-surface px-4 py-2 text-[13px] font-bold text-text-tertiary transition-all hover:border-ink hover:scale-[1.02] cursor-pointer"
               >
-                <Search className="h-3.5 w-3.5" />
+                <Search className="h-4 w-4" />
                 Search creators…
-                <kbd className="num ml-auto rounded border border-border bg-surface-2 px-1.5 text-[10px]">⌘K</kbd>
+                <kbd className="num ml-auto rounded-full bg-surface-2 px-2 py-0.5 text-[10px]">⌘K</kbd>
               </button>
             )}
           </div>
-          <div className="relative flex items-center gap-1">
+          <div className="relative flex items-center gap-2">
             <button
               onClick={() => {
                 setBellOpen((o) => !o);
                 if (!bellOpen) markRead(userId);
               }}
-              className="relative rounded-full p-2 text-text-secondary transition-colors hover:bg-surface-2 hover:text-text-primary cursor-pointer"
+              className="relative rounded-full border-2 border-ink/15 p-2.5 text-text-secondary transition-all hover:border-ink hover:scale-105 cursor-pointer"
               aria-label="Notifications"
             >
               <Bell className="h-[18px] w-[18px]" />
               {unread > 0 && (
-                <span className="num absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-ai px-1 text-[10px] font-semibold text-white">
+                <span className="num absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#d6409f] px-1 text-[10px] font-bold text-white">
                   {unread}
                 </span>
               )}
@@ -199,11 +208,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {bellOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setBellOpen(false)} />
-                <div className="absolute right-0 top-11 z-50 w-[min(92vw,360px)] rounded-[12px] border border-border bg-surface shadow-lg">
-                  <div className="border-b border-border px-4 py-3 text-sm font-medium">Notifications</div>
+                <div className="absolute right-0 top-12 z-50 w-[min(92vw,380px)] overflow-hidden rounded-[20px] border-[3px] border-ink bg-surface shadow-[6px_6px_0_0_#101805]">
+                  <div className="border-b-2 border-ink/10 px-5 py-3 font-serif text-base font-bold">
+                    Notifications
+                  </div>
                   <div className="max-h-80 overflow-y-auto">
                     {myNotifs.length === 0 ? (
-                      <p className="px-4 py-8 text-center text-[13px] text-text-tertiary">
+                      <p className="px-5 py-10 text-center text-[13px] font-medium text-text-tertiary">
                         Nothing yet. Activity on your gigs lands here.
                       </p>
                     ) : (
@@ -212,9 +223,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           key={n.id}
                           href={n.href ?? "#"}
                           onClick={() => setBellOpen(false)}
-                          className="block border-b border-border px-4 py-3 transition-colors last:border-0 hover:bg-surface-2/60"
+                          className="block border-b border-ink/10 px-5 py-3.5 transition-colors last:border-0 hover:bg-surface-2"
                         >
-                          <p className="text-[13px] font-medium">{n.title}</p>
+                          <p className="text-[13px] font-bold">{n.title}</p>
                           <p className="mt-0.5 text-xs leading-relaxed text-text-secondary">{n.body}</p>
                           <p className="num mt-1 text-[11px] text-text-tertiary">{daysAgo(n.createdAt)}</p>
                         </Link>
@@ -224,26 +235,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </div>
               </>
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="hidden text-xs lg:inline-flex"
-              onClick={() => {
-                const next = role === "creator" ? "company" : "creator";
-                useSession.getState().signInDemo(next);
-                router.push("/dashboard");
-              }}
-            >
-              View as {role === "creator" ? "brand" : "creator"}
-            </Button>
+            {isDemo && (
+              <button
+                className="hidden rounded-full border-2 border-ink/15 px-4 py-2 text-xs font-bold transition-all hover:border-ink hover:scale-105 lg:inline-flex cursor-pointer"
+                onClick={() => {
+                  const next = role === "creator" ? "company" : "creator";
+                  useSession.getState().signInDemo(next);
+                  router.push("/dashboard");
+                }}
+              >
+                View as {role === "creator" ? "brand" : "creator"}
+              </button>
+            )}
           </div>
         </header>
 
-        <main className="flex-1 px-4 py-6 pb-24 md:px-6 md:pb-8">{children}</main>
+        <main className="flex-1 px-4 py-6 pb-28 md:px-6 md:pb-10">{children}</main>
       </div>
 
       {/* Bottom nav — mobile */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-bg/95 backdrop-blur-sm md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 flex bg-ink md:hidden">
         {nav.map((item) => {
           const active =
             item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
@@ -252,8 +263,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium",
-                active ? "text-text-primary" : "text-text-tertiary",
+                "flex flex-1 flex-col items-center gap-1 py-3 text-[10px] font-bold",
+                active ? "text-[#f2a3df]" : "text-[#faf6ef]/40",
               )}
             >
               <item.icon className="h-5 w-5" />

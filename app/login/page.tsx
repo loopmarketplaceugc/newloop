@@ -1,83 +1,132 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Building2, UserRound } from "lucide-react";
+import { motion } from "framer-motion";
+import { ArrowRight, Loader2 } from "lucide-react";
 import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input, Label } from "@/components/ui/input";
-import { Logo } from "@/components/shared/logo";
+import { logInWithEmail } from "@/lib/auth";
 import { useSession } from "@/lib/store/session";
+import { TypeOnce } from "@/components/shared/typewriter";
 import type { Role } from "@/lib/types";
 
-const loginSchema = z.object({
-  role: z.enum(["creator", "company"]),
-  email: z.string().email(),
-});
+const schema = z.object({ email: z.string().email("real email please"), password: z.string().min(6, "at least 6 characters") });
 
 export default function LoginPage() {
   const router = useRouter();
   const signInDemo = useSession((s) => s.signInDemo);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const signIn = (role: Role) => {
-    const parsed = loginSchema.safeParse({
-      role,
-      email: role === "creator" ? "creator@mcc.demo" : "brand@mcc.demo",
-    });
-    if (!parsed.success) return;
-    signInDemo(parsed.data.role);
+  const submit = async () => {
+    setError(null);
+    const r = schema.safeParse({ email, password });
+    if (!r.success) {
+      setError(r.error.issues[0].message);
+      return;
+    }
+    setBusy(true);
+    try {
+      const { onboarded } = await logInWithEmail(email, password);
+      router.push(onboarded ? "/dashboard" : "/onboarding/creator");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Login failed");
+      setBusy(false);
+    }
+  };
+
+  const demo = (role: Role) => {
+    signInDemo(role);
     router.push("/dashboard");
   };
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-5 py-6">
-      <Logo />
-      <div className="grid flex-1 items-center gap-8 py-10 md:grid-cols-[1.1fr_0.9fr]">
-        <section>
-          <p className="text-[12px] font-medium uppercase text-text-tertiary">Demo sign in</p>
-          <h1 className="mt-3 font-serif text-4xl font-semibold leading-tight md:text-5xl">
-            Open a live marketplace workspace in one click.
-          </h1>
-          <p className="mt-4 max-w-xl text-sm leading-relaxed text-text-secondary">
-            The app runs with seeded Supabase-ready data, mock payments, and a typed AI
-            script generator until production keys are connected.
-          </p>
-        </section>
+    <div className="flex min-h-screen flex-col bg-ink text-[#faf6ef]">
+      <header className="flex items-center justify-between px-6 py-5">
+        <Link href="/" className="font-serif text-xl font-extrabold text-[#f2a3df]">MCC®</Link>
+        <Link href="/signup" className="rounded-full border-2 border-[#faf6ef]/30 px-4 py-1.5 text-sm font-bold transition-colors hover:border-[#a8d98a] hover:text-[#a8d98a]">
+          Sign up
+        </Link>
+      </header>
 
-        <Card>
-          <CardContent className="space-y-5">
+      <main className="relative z-10 flex flex-1 items-center justify-center px-6 pb-24">
+        <div className="w-full max-w-xl">
+          <h1 className="font-serif min-h-[1.2em] text-4xl font-extrabold sm:text-6xl">
+            <TypeOnce text="Welcome back." speed={40} />
+          </h1>
+          <p className="mt-3 font-medium text-[#faf6ef]/50">Log in and get back to the money.</p>
+
+          <div className="mt-10 space-y-7">
             <div>
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" value="demo@mcc.local" readOnly className="mt-1.5" />
+              <label htmlFor="email" className="text-xs font-bold uppercase tracking-widest text-[#faf6ef]/40">Email</label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                autoFocus
+                placeholder="you@studio.com"
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && submit()}
+                className="mt-2 w-full border-b-4 border-[#faf6ef]/20 bg-transparent pb-2 font-serif text-2xl font-bold text-[#a8d98a] placeholder:text-[#faf6ef]/15 focus:border-[#f2a3df] focus:outline-none sm:text-3xl"
+                style={{ boxShadow: "none", borderRadius: 0 }}
+              />
             </div>
-            <div className="grid gap-3">
-              <Button onClick={() => signIn("creator")} variant="money" size="lg" className="justify-between">
-                <span className="flex items-center gap-2">
-                  <UserRound className="h-4 w-4" /> Continue as creator
-                </span>
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-              <Button onClick={() => signIn("company")} size="lg" className="justify-between">
-                <span className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4" /> Continue as brand
-                </span>
-                <ArrowRight className="h-4 w-4" />
-              </Button>
+            <div>
+              <label htmlFor="password" className="text-xs font-bold uppercase tracking-widest text-[#faf6ef]/40">Password</label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                placeholder="••••••••"
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && submit()}
+                className="mt-2 w-full border-b-4 border-[#faf6ef]/20 bg-transparent pb-2 font-serif text-2xl font-bold text-[#a8d98a] placeholder:text-[#faf6ef]/15 focus:border-[#f2a3df] focus:outline-none sm:text-3xl"
+                style={{ boxShadow: "none", borderRadius: 0 }}
+              />
             </div>
-            <p className="text-xs leading-relaxed text-text-tertiary">
-              Google OAuth and email magic links are represented by this demo entry point.
-              The Supabase schema and RLS policies are included under `supabase/migrations`.
-            </p>
-            <p className="text-sm text-text-secondary">
-              New here?{" "}
-              <Link href="/signup" className="font-medium text-text-primary underline underline-offset-4">
-                Start onboarding
-              </Link>
-            </p>
-          </CardContent>
-        </Card>
+
+            {error && (
+              <motion.p initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="text-sm font-bold text-[#f2a3df]">
+                ↳ {error}
+              </motion.p>
+            )}
+
+            <div className="flex flex-wrap items-center gap-4">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={submit}
+                disabled={busy}
+                className="flex items-center gap-2 rounded-full bg-[#f2a3df] px-8 py-4 font-serif text-lg font-bold text-ink disabled:opacity-50 cursor-pointer"
+              >
+                {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
+                Log in
+              </motion.button>
+              <span className="hidden text-xs font-bold uppercase tracking-widest text-[#faf6ef]/30 sm:block">press Enter ↵</span>
+            </div>
+
+            <div className="border-t-2 border-[#faf6ef]/10 pt-6">
+              <p className="text-xs font-bold uppercase tracking-widest text-[#faf6ef]/30">Just looking? Tour with sample data</p>
+              <div className="mt-3 flex gap-3">
+                <button onClick={() => demo("creator")} className="rounded-full border-2 border-[#a8d98a]/40 px-5 py-2 text-sm font-bold text-[#a8d98a] transition-colors hover:border-[#a8d98a] cursor-pointer">
+                  Demo as creator
+                </button>
+                <button onClick={() => demo("company")} className="rounded-full border-2 border-[#f2a3df]/40 px-5 py-2 text-sm font-bold text-[#f2a3df] transition-colors hover:border-[#f2a3df] cursor-pointer">
+                  Demo as brand
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden="true">
+        <div className="absolute -left-10 top-1/3 h-32 w-32 animate-float rounded-[40%_60%_55%_45%/55%_45%_60%_40%] bg-[#f2a3df]/15" />
+        <div className="absolute -right-8 bottom-1/4 h-40 w-40 animate-float rounded-[60%_40%_45%_55%/45%_55%_40%_60%] bg-[#a8d98a]/15 [animation-delay:1s]" />
       </div>
-    </main>
+    </div>
   );
 }

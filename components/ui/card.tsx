@@ -1,7 +1,7 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-/** Hover darkens the border + lifts with a whisper of shadow — never scale. */
+/** Neo-brutalist: ink border, hard offset shadow that grows on hover. */
 const Card = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & { interactive?: boolean }
@@ -9,9 +9,9 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-[12px] border border-border bg-surface",
+      "rounded-[20px] border-2 border-ink bg-surface",
       interactive &&
-        "transition-all duration-150 hover:border-border-bright hover:shadow-sm cursor-pointer",
+        "transition-all duration-150 hover:-translate-y-1 hover:shadow-[5px_5px_0_0_#101805] cursor-pointer",
       className,
     )}
     {...props}

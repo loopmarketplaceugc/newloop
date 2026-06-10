@@ -7,6 +7,7 @@ import { ArrowLeft, ArrowRight, Check, Rocket } from "lucide-react";
 import { z } from "zod";
 import { useSession } from "@/lib/store/session";
 import { useApp } from "@/lib/store/app";
+import { saveCreatorProfile } from "@/lib/auth";
 import { DEMO_CREATOR_ID } from "@/lib/seed";
 import { TypeOnce } from "@/components/shared/typewriter";
 import { TikTokLogo, InstagramLogo, YouTubeLogo } from "@/components/shared/brand-logos";
@@ -48,8 +49,10 @@ type Step =
 
 export default function CreatorOnboarding() {
   const router = useRouter();
+  const session = useSession();
   const completeOnboarding = useSession((s) => s.completeOnboarding);
-  const updateCreator = useApp((s) => s.updateCreator);
+  const setName = useSession((s) => s.setName);
+  const ensureCreator = useApp((s) => s.ensureCreator);
 
   const [stepIdx, setStepIdx] = useState(0);
   const [typed, setTyped] = useState(false);
@@ -108,14 +111,26 @@ export default function CreatorOnboarding() {
       return;
     }
     if (step.kind === "done") {
-      updateCreator(DEMO_CREATOR_ID, {
-        name: `${values.firstName} ${values.lastName}`.trim() || undefined,
+      const fullName = `${values.firstName} ${values.lastName}`.trim();
+      const platformRows = platforms.map((p) => ({
+        platform: p,
+        url: "",
+        followerCount: parseInt(followers[p].replace(/\D/g, "")) || 0,
+      }));
+      // Local record (real users start zeroed — no fake numbers) + Supabase profile
+      ensureCreator(session.isDemo ? DEMO_CREATOR_ID : (session.userId ?? DEMO_CREATOR_ID), {
+        name: fullName || "Creator",
         status: "open",
-        platforms: platforms.map((p) => ({
-          platform: p,
-          url: "",
-          followerCount: parseInt(followers[p].replace(/\D/g, "")) || 0,
-        })),
+        tier,
+        platforms: platformRows,
+      });
+      setName(fullName);
+      void saveCreatorProfile({
+        firstName: values.firstName,
+        lastName: values.lastName,
+        phone: values.phone,
+        email: values.email || session.email,
+        platforms: platformRows,
       });
       completeOnboarding();
       router.push("/dashboard");

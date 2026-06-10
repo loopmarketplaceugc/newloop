@@ -29,10 +29,10 @@ export function CreatorDashboard() {
   if (!me) return null;
 
   const myGigs = gigs.filter((g) => g.creatorId === userId);
-  const released = transactions
-    .filter((t) => t.type === "release" && myGigs.some((g) => g.id === t.gigId))
-    .reduce((s, t) => s + t.amountCents, 0);
-  const totalEarned = 1_245_000 + 432_000 + released; // lifetime base + window + live releases
+  const myGigIds = new Set(myGigs.map((g) => g.id));
+  // Real numbers only: everything is derived from actual transactions
+  const releaseTxs = transactions.filter((t) => t.type === "release" && myGigIds.has(t.gigId));
+  const released = releaseTxs.reduce((s, t) => s + t.amountCents, 0);
   const pendingEscrow = myGigs
     .filter((g) => ESCROW_HELD_STATUSES.includes(g.status))
     .reduce((s, g) => s + creatorPayoutCents(g.priceCents), 0);
@@ -70,7 +70,7 @@ export function CreatorDashboard() {
 
       {/* Bento grid */}
       <div className="grid gap-4 md:grid-cols-3">
-        <EarningsCard totalEarnedCents={totalEarned} />
+        <EarningsCard releases={releaseTxs} />
 
         {/* Escrow card */}
         <Card>

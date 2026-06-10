@@ -1,103 +1,280 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, Check, Search, ShieldCheck } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ArrowLeft, ArrowRight, Check, Rocket } from "lucide-react";
 import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input, Label, Textarea } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { useSession } from "@/lib/store/session";
-import { NICHES, type Niche } from "@/lib/types";
+import { saveCompanyProfile } from "@/lib/auth";
+import { TypeOnce } from "@/components/shared/typewriter";
+import { NICHES } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
-const companyOnboardingSchema = z.object({
-  companyName: z.string().min(2),
-  website: z.string().url(),
-  budget: z.coerce.number().int().min(250).max(50000),
-  niche: z.enum(NICHES),
-});
+const fieldSchemas = {
+  firstName: z.string().min(2, "at least 2 letters"),
+  lastName: z.string().min(2, "last name keeps contracts clean"),
+  companyName: z.string().min(2, "what's the brand called?"),
+  website: z.string().regex(/^(https?:\/\/)?[\w-]+(\.[\w-]+)+\S*$/, "that doesn't look like a URL"),
+  budget: z.string().min(1, "pick a range — you can change it anytime"),
+};
 
-export default function CompanyOnboardingPage() {
+type TextStepId = "firstName" | "lastName" | "companyName" | "website";
+
+interface TextStep {
+  kind: "text";
+  id: TextStepId;
+  q: string;
+  sub?: string;
+  placeholder: string;
+}
+
+type Step =
+  | TextStep
+  | { kind: "niche"; q: string; sub: string }
+  | { kind: "budget"; q: string; sub: string }
+  | { kind: "done"; q: string; sub: string };
+
+const BUDGETS = ["under $1k / mo", "$1k–5k / mo", "$5k–20k / mo", "$20k+ / mo"];
+
+export default function CompanyOnboarding() {
   const router = useRouter();
+  const session = useSession();
   const completeOnboarding = useSession((s) => s.completeOnboarding);
-  const [companyName, setCompanyName] = useState("Lumen Pantry");
-  const [website, setWebsite] = useState("https://lumenpantry.example");
-  const [budget, setBudget] = useState("6500");
-  const [niche, setNiche] = useState<Niche>("food");
-  const [error, setError] = useState<string | null>(null);
+  const setName = useSession((s) => s.setName);
 
-  const submit = () => {
-    const parsed = companyOnboardingSchema.safeParse({ companyName, website, budget, niche });
-    if (!parsed.success) {
-      setError("Use a company name, valid URL, and campaign budget above $250.");
+  const [stepIdx, setStepIdx] = useState(0);
+  const [typed, setTyped] = useState(false);
+  const [dir, setDir] = useState(1);
+  const [error, setError] = useState<string | null>(null);
+  const [values, setValues] = useState({ firstName: "", lastName: "", companyName: "", website: "" });
+  const [niche, setNiche] = useState<string | null>(null);
+  const [budget, setBudget] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const steps: Step[] = useMemo(
+    () => [
+      { kind: "text", id: "firstName", q: "Who's running this campaign — first name?", placeholder: "Alex", sub: "Under a minute. Then you're browsing creators." },
+      { kind: "text", id: "lastName", q: `Got it, ${values.firstName || "you"}. Last name?`, placeholder: "Rivera", sub: "For contracts — creators sign with a real person." },
+      { kind: "text", id: "companyName", q: "What's the brand called?", placeholder: "Lumen Skincare", sub: "This is what creators see on offers and escrow." },
+      { kind: "text", id: "website", q: `Where can creators check ${values.companyName || "the brand"} out?`, placeholder: "lumenskin.co", sub: "Your site or socials — it builds trust before the first DM." },
+      { kind: "niche", q: "What space are you in?", sub: "We use this to surface creators who already make this content." },
+      { kind: "budget", q: "Monthly UGC budget?", sub: "Rough range — it tunes who we recommend, nothing else." },
+      { kind: "done", q: `${values.companyName || "You're"} is live.`, sub: "Time to find your first creator." },
+    ],
+    [values.firstName, values.companyName],
+  );
+
+  const step = steps[Math.min(stepIdx, steps.length - 1)];
+  const progress = Math.round((stepIdx / (steps.length - 1)) * 100);
+
+  useEffect(() => {
+    setTyped(false);
+    setError(null);
+    const t = setTimeout(() => inputRef.current?.focus(), 350);
+    return () => clearTimeout(t);
+  }, [stepIdx]);
+
+  const next = () => {
+    setError(null);
+    if (step.kind === "text") {
+      const r = fieldSchemas[step.id].safeParse(values[step.id].trim());
+      if (!r.success) {
+        setError(r.error.issues[0].message);
+        return;
+      }
+    }
+    if (step.kind === "niche" && !niche) {
+      setError("pick the closest one");
       return;
     }
-    completeOnboarding();
-    router.push("/dashboard/discover");
+    if (step.kind === "budget" && !budget) {
+      setError("pick a range — you can change it anytime");
+      return;
+    }
+    if (step.kind === "done") {
+      setName(values.companyName);
+      void saveCompanyProfile({
+        firstName: values.firstName,
+        lastName: values.lastName,
+        email: session.email,
+        companyName: values.companyName,
+        website: values.website,
+        niche: niche ?? "",
+        budgetRange: budget ?? "",
+      });
+      completeOnboarding();
+      router.push("/dashboard/discover");
+      return;
+    }
+    setDir(1);
+    setStepIdx((i) => i + 1);
+  };
+
+  const back = () => {
+    if (stepIdx === 0) return;
+    setDir(-1);
+    setStepIdx((i) => i - 1);
   };
 
   return (
-    <main className="mx-auto grid min-h-screen w-full max-w-6xl gap-8 px-5 py-8 md:grid-cols-[0.85fr_1.15fr]">
-      <section className="self-center">
-        <p className="text-[12px] font-medium uppercase text-text-tertiary">Brand onboarding</p>
-        <h1 className="mt-3 font-serif text-4xl font-semibold leading-tight">Start with buying intent, not browsing.</h1>
-        <p className="mt-4 text-sm leading-relaxed text-text-secondary">
-          MCC captures the campaign budget and vertical first, then moves brands into
-          creator discovery, scripts, contracts, and escrow.
-        </p>
-        <div className="mt-8 grid gap-3">
-          {[
-            { icon: Search, text: "Filter creators by tier, niche, rate, and availability." },
-            { icon: ShieldCheck, text: "Fund escrow only after the creator accepts terms." },
-            { icon: Building2, text: "Keep every brand conversation tied to a gig." },
-          ].map((item) => (
-            <div key={item.text} className="flex items-center gap-3 rounded-[12px] border border-border bg-surface p-3 text-sm">
-              <item.icon className="h-4 w-4 text-text-tertiary" />
-              {item.text}
-            </div>
-          ))}
-        </div>
-      </section>
-      <Card className="self-center">
-        <CardContent className="space-y-5">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <Label>Company name</Label>
-              <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} className="mt-1.5" />
-            </div>
-            <div>
-              <Label>Campaign budget</Label>
-              <Input value={budget} onChange={(e) => setBudget(e.target.value)} inputMode="numeric" className="mt-1.5" />
-            </div>
-          </div>
-          <div>
-            <Label>Website</Label>
-            <Input value={website} onChange={(e) => setWebsite(e.target.value)} className="mt-1.5" />
-          </div>
-          <div>
-            <Label>What are you selling?</Label>
-            <Textarea readOnly value="Founder-led UGC for a launch campaign. Need product demo, testimonial, and raw footage options." className="mt-1.5 min-h-24" />
-          </div>
-          <div>
-            <Label>Primary niche</Label>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {NICHES.map((n) => (
-                <button key={n} onClick={() => setNiche(n)} className="cursor-pointer">
-                  <Badge variant={niche === n ? "ai" : "outline"}>
-                    {niche === n ? <Check className="h-3 w-3" /> : null}
-                    {n}
-                  </Badge>
-                </button>
-              ))}
-            </div>
-          </div>
-          {error ? <p className="text-xs text-danger">{error}</p> : null}
-          <Button onClick={submit} size="lg" className="w-full">
-            Find matching creators
-          </Button>
-        </CardContent>
-      </Card>
-    </main>
+    <div className="flex min-h-screen flex-col bg-ink text-[#faf6ef]">
+      <div className="fixed inset-x-0 top-0 z-50 h-1.5 bg-[#faf6ef]/10">
+        <motion.div className="h-full bg-[#f2a3df]" animate={{ width: `${progress}%` }} transition={{ duration: 0.4, ease: "easeOut" }} />
+      </div>
+
+      <header className="flex items-center justify-between px-6 py-5">
+        <span className="font-serif text-xl font-extrabold text-[#a8d98a]">MCC®</span>
+        <span className="num text-xs font-bold uppercase tracking-widest text-[#faf6ef]/40">
+          {Math.min(stepIdx + 1, steps.length)} / {steps.length}
+        </span>
+      </header>
+
+      <main className="relative z-10 flex flex-1 items-center justify-center px-6 pb-24">
+        <AnimatePresence mode="wait" custom={dir}>
+          <motion.div
+            key={stepIdx}
+            custom={dir}
+            initial={{ opacity: 0, y: dir * 60 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: dir * -60 }}
+            transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full max-w-2xl"
+          >
+            <h1 className="font-serif min-h-[2.2em] text-3xl font-extrabold leading-tight sm:text-5xl">
+              <TypeOnce text={step.q} speed={22} onDone={() => setTyped(true)} />
+            </h1>
+            {step.sub && (
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: typed ? 1 : 0 }} className="mt-3 text-base font-medium text-[#faf6ef]/50">
+                {step.sub}
+              </motion.p>
+            )}
+
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: typed ? 1 : 0, y: typed ? 0 : 16 }}
+              transition={{ duration: 0.25 }}
+              className="mt-10"
+            >
+              {step.kind === "text" && (
+                <input
+                  ref={inputRef}
+                  value={values[step.id]}
+                  placeholder={step.placeholder}
+                  onChange={(e) => setValues((v) => ({ ...v, [step.id]: e.target.value }))}
+                  onKeyDown={(e) => e.key === "Enter" && next()}
+                  className="w-full border-b-4 border-[#faf6ef]/20 bg-transparent pb-3 font-serif text-3xl font-bold text-[#f2a3df] placeholder:text-[#faf6ef]/15 focus:border-[#a8d98a] focus:outline-none sm:text-5xl"
+                  style={{ boxShadow: "none", borderRadius: 0 }}
+                />
+              )}
+
+              {step.kind === "niche" && (
+                <div className="flex flex-wrap gap-3">
+                  {NICHES.map((n, i) => {
+                    const on = niche === n;
+                    return (
+                      <motion.button
+                        key={n}
+                        initial={{ opacity: 0, y: 16 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.03 * i }}
+                        whileHover={{ scale: 1.08, rotate: i % 2 ? 2 : -2 }}
+                        whileTap={{ scale: 0.94 }}
+                        onClick={() => setNiche(n)}
+                        className={cn(
+                          "rounded-full border-[3px] px-5 py-2.5 font-serif text-lg font-bold transition-colors cursor-pointer",
+                          on ? "border-transparent bg-[#a8d98a] text-ink" : "border-[#faf6ef]/20 text-[#faf6ef] hover:border-[#faf6ef]/50",
+                        )}
+                      >
+                        {on && <Check className="mr-1 inline h-4 w-4" />}
+                        {n}
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {step.kind === "budget" && (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {BUDGETS.map((b, i) => {
+                    const on = budget === b;
+                    return (
+                      <motion.button
+                        key={b}
+                        initial={{ opacity: 0, y: 16 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.05 * i }}
+                        whileHover={{ scale: 1.04, rotate: i % 2 ? 1 : -1 }}
+                        whileTap={{ scale: 0.96 }}
+                        onClick={() => setBudget(b)}
+                        className={cn(
+                          "rounded-[20px] border-[3px] px-6 py-5 text-left font-serif text-xl font-bold transition-colors cursor-pointer",
+                          on ? "border-transparent bg-[#f2a3df] text-ink" : "border-[#faf6ef]/20 text-[#faf6ef] hover:border-[#faf6ef]/50",
+                        )}
+                      >
+                        {on && <Check className="mr-2 inline h-5 w-5" />}
+                        <span className="num">{b}</span>
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {step.kind === "done" && (
+                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex flex-wrap items-center gap-3">
+                  <span className="sticker bg-[#f2a3df] text-ink">{niche}</span>
+                  <span className="sticker bg-[#a8d98a] text-ink">{budget}</span>
+                  <span className="rounded-full bg-[#faf6ef]/10 px-4 py-2 text-sm font-bold">{values.website}</span>
+                </motion.div>
+              )}
+
+              {error && (
+                <motion.p initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="mt-4 text-sm font-bold text-[#f2a3df]">
+                  ↳ {error}
+                </motion.p>
+              )}
+
+              <div className="mt-10 flex items-center gap-3">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={next}
+                  className={cn(
+                    "flex items-center gap-2 rounded-full px-8 py-4 font-serif text-lg font-bold cursor-pointer",
+                    step.kind === "done" ? "bg-[#f2a3df] text-ink" : "bg-[#a8d98a] text-ink",
+                  )}
+                >
+                  {step.kind === "done" ? (
+                    <>
+                      <Rocket className="h-5 w-5" /> Find creators
+                    </>
+                  ) : (
+                    <>
+                      OK <ArrowRight className="h-5 w-5" />
+                    </>
+                  )}
+                </motion.button>
+                {step.kind !== "done" && (
+                  <span className="hidden text-xs font-bold uppercase tracking-widest text-[#faf6ef]/30 sm:block">press Enter ↵</span>
+                )}
+                {stepIdx > 0 && step.kind !== "done" && (
+                  <button
+                    onClick={back}
+                    className="ml-auto flex items-center gap-1 rounded-full px-4 py-2 text-sm font-bold text-[#faf6ef]/40 transition-colors hover:text-[#faf6ef] cursor-pointer"
+                  >
+                    <ArrowLeft className="h-4 w-4" /> back
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        </AnimatePresence>
+      </main>
+
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden="true">
+        <div className="absolute -left-10 top-1/4 h-32 w-32 animate-float rounded-[40%_60%_55%_45%/55%_45%_60%_40%] bg-[#a8d98a]/15" />
+        <div className="absolute -right-8 bottom-1/4 h-40 w-40 animate-float rounded-[60%_40%_45%_55%/45%_55%_40%_60%] bg-[#f2a3df]/15 [animation-delay:1s]" />
+      </div>
+    </div>
   );
 }

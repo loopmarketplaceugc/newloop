@@ -40,6 +40,8 @@ interface AppState {
   notifications: Notification[];
 
   updateCreator: (id: string, partial: Partial<Creator>) => void;
+  /** Real (authed) users get a clean, zeroed creator record — no fake numbers. */
+  ensureCreator: (id: string, partial?: Partial<Creator>) => void;
   sendMessage: (m: { gigId: string; senderId: string; kind: MessageKind; text?: string; attachmentName?: string; scriptId?: string; offer?: OfferBody }) => void;
   respondToOffer: (messageId: string, accept: boolean) => void;
   transition: (gigId: string, to: GigStatus, patch?: Partial<Gig>) => boolean;
@@ -77,6 +79,40 @@ export const useApp = create<AppState>()(
         set((s) => ({
           creators: s.creators.map((c) => (c.id === id ? { ...c, ...partial } : c)),
         })),
+
+      ensureCreator: (id, partial) =>
+        set((s) => {
+          if (s.creators.some((c) => c.id === id)) {
+            return partial
+              ? { creators: s.creators.map((c) => (c.id === id ? { ...c, ...partial } : c)) }
+              : {};
+          }
+          const blank: Creator = {
+            id,
+            handle: "",
+            name: "Creator",
+            avatarHue: Math.floor(Math.random() * 360),
+            bio: "",
+            location: "",
+            status: "open",
+            tier: "nano",
+            platforms: [],
+            niches: [],
+            baseRateCents: 0,
+            usageUpchargePct: 30,
+            rawUpchargePct: 40,
+            capacityPerWeek: 3,
+            slotsBooked: 0,
+            compensationPref: "product_plus",
+            rating: 0,
+            reviewCount: 0,
+            completedGigs: 0,
+            portfolio: [],
+            joinedAt: now(),
+            ...partial,
+          };
+          return { creators: [...s.creators, blank] };
+        }),
 
       sendMessage: (m) =>
         set((s) => ({
