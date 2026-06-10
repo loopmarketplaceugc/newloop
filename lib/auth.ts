@@ -101,10 +101,15 @@ export async function logInWithEmail(email: string, password: string) {
 
 /** Send Supabase's password recovery email. */
 export async function requestPasswordReset(email: string) {
-  const { error } = await supabase().auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/update-password`,
+  const res = await fetch("/api/auth/reset-password", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email }),
   });
-  if (error) throw new Error(error.message);
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? "Could not send reset email");
+  }
 }
 
 /** Update the password while a recovery session is active. */

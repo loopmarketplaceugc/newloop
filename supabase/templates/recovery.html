@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+  <body style="margin:0;background:#101805;color:#faf6ef;font-family:Arial,Helvetica,sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#101805;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;border:3px solid #faf6ef;border-radius:28px;background:#f2a3df;color:#101805;overflow:hidden;">
+            <tr>
+              <td style="padding:28px 28px 8px;font-family:Georgia,'Times New Roman',serif;font-size:28px;font-weight:900;line-height:1;">
+                MCC<span style="font-size:12px;vertical-align:super;">&reg;</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:8px 28px 0;font-family:Georgia,'Times New Roman',serif;font-size:52px;font-weight:900;line-height:.92;letter-spacing:-1.5px;">
+                Reset your password.
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 28px 0;font-size:16px;line-height:1.5;font-weight:700;">
+                We got a password reset request for your MCC account.
+                Tap the button below and choose a new one.
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px;">
+                <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#101805;color:#a8d98a;text-decoration:none;border-radius:999px;padding:16px 24px;font-size:18px;font-weight:900;font-family:Georgia,'Times New Roman',serif;">
+                  Choose a new password
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 28px 28px;font-size:13px;line-height:1.5;font-weight:700;color:rgba(16,24,5,.65);">
+                This link expires soon. If you didn’t ask for this, ignore the email and your password stays the same.
+              </td>
+            </tr>
+          </table>
+          <p style="max-width:520px;margin:18px auto 0;color:rgba(250,246,239,.55);font-size:12px;line-height:1.5;">
+            Button not working? Paste this into your browser:<br />
+            <span style="word-break:break-all;color:#a8d98a;">{{ .ConfirmationURL }}</span>
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
