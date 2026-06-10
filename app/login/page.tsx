@@ -67,7 +67,12 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label htmlFor="password" className="text-xs font-bold uppercase tracking-widest text-[#faf6ef]/40">Password</label>
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="password" className="text-xs font-bold uppercase tracking-widest text-[#faf6ef]/40">Password</label>
+                <Link href="/reset-password" className="text-xs font-bold text-[#f2a3df] underline underline-offset-4">
+                  Forgot password?
+                </Link>
+              </div>
               <input
                 id="password"
                 type="password"

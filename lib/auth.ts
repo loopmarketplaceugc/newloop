@@ -99,6 +99,20 @@ export async function logInWithEmail(email: string, password: string) {
   return { onboarded: Boolean(profile) };
 }
 
+/** Send Supabase's password recovery email. */
+export async function requestPasswordReset(email: string) {
+  const { error } = await supabase().auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/update-password`,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** Update the password while a recovery session is active. */
+export async function updatePassword(password: string) {
+  const { error } = await supabase().auth.updateUser({ password });
+  if (error) throw new Error(error.message);
+}
+
 /** Persist a creator profile after onboarding (no-op without a live auth session — RLS). */
 export async function saveCreatorProfile(p: {
   firstName: string;
