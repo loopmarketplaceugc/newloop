@@ -10,7 +10,10 @@ export async function signUpWithEmail(email: string, password: string, role: Rol
   const { data, error } = await sb.auth.signUp({
     email,
     password,
-    options: { data: { role } },
+    options: {
+      data: { role },
+      emailRedirectTo: `${window.location.origin}/auth/callback`,
+    },
   });
   if (error) throw new Error(error.message);
   const userId = data.user?.id;
@@ -21,6 +24,45 @@ export async function signUpWithEmail(email: string, password: string, role: Rol
 
 const PENDING_KEY = "mcc-pending-profile";
 
+/** Save any onboarding data parked before email confirmation. Safe to call anytime. */
+export async function flushPendingProfile() {
+  try {
+    const pending = localStorage.getItem(PENDING_KEY);
+    if (!pending) return;
+    const parsed = JSON.parse(pending) as { kind: "creator" | "company"; payload: never };
+    const ok =
+      parsed.kind === "creator"
+        ? await saveCreatorProfile(parsed.payload)
+        : await saveCompanyProfile(parsed.payload);
+    if (ok) localStorage.removeItem(PENDING_KEY);
+  } catch {
+    // non-fatal — profile can be completed from the dashboard
+  }
+}
+
+/** Hydrate the session store from a live Supabase session (used by /auth/callback). */
+export async function completeAuthFromSession() {
+  const sb = supabase();
+  const { data } = await sb.auth.getUser();
+  const user = data.user;
+  if (!user) return null;
+  await flushPendingProfile();
+  const metaRole = (user.user_metadata?.role as Role | undefined) ?? "creator";
+  const { data: profile } = await sb
+    .from("profiles")
+    .select("role, name")
+    .eq("id", user.id)
+    .maybeSingle();
+  useSession.getState().setAuthed({
+    userId: user.id,
+    role: (profile?.role as Role | undefined) ?? metaRole,
+    name: profile?.name ?? "",
+    email: user.email ?? "",
+    onboarded: Boolean(profile),
+  });
+  return { onboarded: Boolean(profile), role: (profile?.role as Role | undefined) ?? metaRole };
+}
+
 /** Log in, load the profile, and hydrate the session store. */
 export async function logInWithEmail(email: string, password: string) {
   const sb = supabase();
@@ -30,17 +72,7 @@ export async function logInWithEmail(email: string, password: string) {
   const metaRole = (data.user.user_metadata?.role as Role | undefined) ?? "creator";
 
   // Flush onboarding data captured before the email was confirmed
-  try {
-    const pending = localStorage.getItem(PENDING_KEY);
-    if (pending) {
-      const parsed = JSON.parse(pending) as { kind: "creator" | "company"; payload: never };
-      if (parsed.kind === "creator") await saveCreatorProfile(parsed.payload);
-      else await saveCompanyProfile(parsed.payload);
-      localStorage.removeItem(PENDING_KEY);
-    }
-  } catch {
-    // non-fatal — profile can be completed from the dashboard
-  }
+  await flushPendingProfile();
 
   const { data: profile } = await sb
     .from("profiles")

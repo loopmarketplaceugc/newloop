@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ToastViewport } from "@/components/ui/toast";
+import { AuthHashCatcher } from "@/components/shared/auth-hash-catcher";
 
 export const metadata: Metadata = {
   title: { default: "MCC — The Marketplace for Content Creation", template: "%s · MCC" },
@@ -25,6 +26,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col bg-bg text-text-primary">
         {children}
+        <AuthHashCatcher />
         <ToastViewport />
       </body>
     </html>
