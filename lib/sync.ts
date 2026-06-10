@@ -22,6 +22,7 @@ interface ProfileRow {
   role: "creator" | "company";
   handle?: string | null;
   name?: string | null;
+  avatar_url?: string | null;
   bio: string | null;
   location: string | null;
   status: "open" | "busy" | "away";
@@ -45,6 +46,8 @@ interface PlatformRow {
   platform: Platform;
   url: string;
   follower_count: number;
+  post_count?: number | null;
+  average_views?: number | null;
 }
 
 interface GigRow {
@@ -87,6 +90,7 @@ export function mapCreator(p: ProfileRow, d?: DetailsRow | null, platforms: Plat
     handle: p.handle ?? `creator-${p.id.slice(0, 8)}`,
     name: p.name || "Creator",
     avatarHue: p.avatar_hue ?? 285,
+    avatarUrl: p.avatar_url ?? undefined,
     bio: p.bio ?? "",
     location: p.location ?? "",
     status: p.status,
@@ -95,6 +99,8 @@ export function mapCreator(p: ProfileRow, d?: DetailsRow | null, platforms: Plat
       platform: x.platform,
       url: x.url,
       followerCount: x.follower_count,
+      postCount: x.post_count ?? undefined,
+      averageViews: x.average_views ?? undefined,
     })),
     niches: (d?.niches ?? []) as Creator["niches"],
     baseRateCents: d?.base_rate_cents ?? 0,

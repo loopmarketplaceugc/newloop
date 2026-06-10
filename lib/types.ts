@@ -56,6 +56,8 @@ export interface PlatformPresence {
   platform: Platform;
   url: string;
   followerCount: number;
+  postCount?: number;
+  averageViews?: number;
 }
 
 export interface PortfolioItem {
@@ -71,6 +73,7 @@ export interface Creator {
   handle: string;
   name: string;
   avatarHue: number;
+  avatarUrl?: string;
   bio: string;
   location: string;
   status: CreatorStatus;

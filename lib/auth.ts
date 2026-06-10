@@ -15,9 +15,17 @@ export async function signUpWithEmail(email: string, password: string, role: Rol
       emailRedirectTo: `${window.location.origin}/auth/callback`,
     },
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (/already|registered|exists/i.test(error.message)) {
+      throw new Error("There is already an account with this email. Log in instead, or reset your password.");
+    }
+    throw new Error(error.message);
+  }
   const userId = data.user?.id;
   if (!userId) throw new Error("Signup failed — try again.");
+  if (Array.isArray(data.user?.identities) && data.user.identities.length === 0) {
+    throw new Error("There is already an account with this email. Log in instead, or reset your password.");
+  }
   useSession.getState().setAuthed({ userId, role, email, onboarded: false });
   return { hasSession: Boolean(data.session), userId };
 }
@@ -124,7 +132,13 @@ export async function saveCreatorProfile(p: {
   lastName: string;
   phone: string;
   email: string;
-  platforms: { platform: string; followerCount: number }[];
+  platforms: {
+    platform: string;
+    url: string;
+    followerCount: number;
+    postCount?: number;
+    averageViews?: number;
+  }[];
 }) {
   const sb = supabase();
   const { data } = await sb.auth.getUser();
@@ -149,15 +163,29 @@ export async function saveCreatorProfile(p: {
   if (error) return false;
   await sb.from("creator_details").upsert({ profile_id: uid });
   if (p.platforms.length) {
-    await sb.from("creator_platforms").upsert(
-      p.platforms.map((pl) => ({
+    const rows = p.platforms.map((pl) => ({
           creator_id: uid,
           platform: pl.platform,
-          url: "",
+          url: pl.url,
           follower_count: pl.followerCount,
-        })),
+          post_count: pl.postCount,
+          average_views: pl.averageViews,
+        }));
+    const { error: platformError } = await sb.from("creator_platforms").upsert(
+      rows,
       { onConflict: "creator_id,platform" },
     );
+    if (platformError && /post_count|average_views|schema cache/i.test(platformError.message)) {
+      await sb.from("creator_platforms").upsert(
+        rows.map((row) => ({
+          creator_id: row.creator_id,
+          platform: row.platform,
+          url: row.url,
+          follower_count: row.follower_count,
+        })),
+        { onConflict: "creator_id,platform" },
+      );
+    }
   }
   return true;
 }

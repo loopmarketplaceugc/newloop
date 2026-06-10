@@ -84,7 +84,7 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
       </Link>
 
       <div className="flex flex-wrap items-start gap-5">
-        <Avatar name={c.name} hue={c.avatarHue} size="xl" />
+        <Avatar name={c.name} hue={c.avatarHue} src={c.avatarUrl} size="xl" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="font-serif text-3xl font-semibold">{c.name}</h1>
@@ -128,12 +128,25 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
         {c.platforms.map((p) => (
           <Card key={p.platform}>
-            <CardContent className="flex items-center justify-between p-4">
-              <span className="flex items-center gap-2 text-sm font-medium">
-                <PlatformIcon platform={p.platform} />
-                {PLATFORM_LABELS[p.platform]}
-              </span>
-              <span className="num text-sm font-semibold">{formatCompact(p.followerCount)} followers</span>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-3">
+                <span className="flex items-center gap-2 text-sm font-medium">
+                  <PlatformIcon platform={p.platform} />
+                  {PLATFORM_LABELS[p.platform]}
+                </span>
+                <span className="num text-sm font-semibold">{formatCompact(p.followerCount)} followers</span>
+              </div>
+              {(p.postCount || p.averageViews || p.url) && (
+                <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-bold text-text-tertiary">
+                  {p.postCount ? <span className="num">{formatCompact(p.postCount)} posts</span> : null}
+                  {p.averageViews ? <span className="num">{formatCompact(p.averageViews)} avg views</span> : null}
+                  {p.url ? (
+                    <a href={p.url} target="_blank" rel="noreferrer" className="text-[#d6409f] underline underline-offset-2">
+                      open profile
+                    </a>
+                  ) : null}
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}

@@ -25,6 +25,7 @@ function SignupInner() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const accountExists = /already an account/i.test(error ?? "");
 
   useEffect(() => {
     const r = params.get("role");
@@ -65,7 +66,7 @@ function SignupInner() {
         <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {(
             [
-              { value: "creator" as Role, icon: Clapperboard, title: "Creator", body: "Make content. Get paid 90%.", tint: "#a8d98a" },
+              { value: "creator" as Role, icon: Clapperboard, title: "Creator", body: "Make content. Get paid.", tint: "#a8d98a" },
               { value: "company" as Role, icon: Building2, title: "Brand", body: "Find creators. Ship campaigns.", tint: "#f2a3df" },
             ]
           ).map((opt, i) => {
@@ -124,9 +125,19 @@ function SignupInner() {
           </div>
 
           {error && (
-            <motion.p initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="text-sm font-bold text-[#f2a3df]">
-              ↳ {error}
-            </motion.p>
+            <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}>
+              <p className="text-sm font-bold text-[#f2a3df]">↳ {error}</p>
+              {accountExists && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link href="/login" className="rounded-full bg-[#f2a3df] px-4 py-2 text-sm font-bold text-ink">
+                    Log in
+                  </Link>
+                  <Link href="/reset-password" className="rounded-full border-2 border-[#a8d98a]/50 px-4 py-2 text-sm font-bold text-[#a8d98a]">
+                    Reset password
+                  </Link>
+                </div>
+              )}
+            </motion.div>
           )}
 
           <div className="flex flex-wrap items-center gap-4">

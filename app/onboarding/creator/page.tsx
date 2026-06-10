@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, Rocket } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, Rocket, Sparkles } from "lucide-react";
 import { z } from "zod";
 import { useSession } from "@/lib/store/session";
 import { useApp } from "@/lib/store/app";
@@ -44,8 +44,23 @@ interface TextStep {
 type Step =
   | TextStep
   | { kind: "platforms"; q: string; sub: string }
-  | { kind: "followers"; q: string; sub: string; platform: Platform }
+  | { kind: "profile"; q: string; sub: string; platform: Platform }
   | { kind: "done"; q: string; sub: string };
+
+interface PlatformMetrics {
+  followerCount: number | null;
+  postCount: number | null;
+  averageViews: number | null;
+  confidence: "high" | "medium" | "low";
+  message: string;
+}
+
+const emptyLinks: Record<Platform, string> = { tiktok: "", reels: "", shorts: "" };
+const emptyFollowers: Record<Platform, string> = { tiktok: "", reels: "", shorts: "" };
+
+function numericInput(value: string) {
+  return parseInt(value.replace(/\D/g, "")) || 0;
+}
 
 export default function CreatorOnboarding() {
   const router = useRouter();
@@ -60,7 +75,10 @@ export default function CreatorOnboarding() {
   const [error, setError] = useState<string | null>(null);
   const [values, setValues] = useState({ firstName: "", lastName: "", phone: "", email: "" });
   const [platforms, setPlatforms] = useState<Platform[]>([]);
-  const [followers, setFollowers] = useState<Record<Platform, string>>({ tiktok: "", reels: "", shorts: "" });
+  const [profileLinks, setProfileLinks] = useState<Record<Platform, string>>(emptyLinks);
+  const [followers, setFollowers] = useState<Record<Platform, string>>(emptyFollowers);
+  const [metrics, setMetrics] = useState<Partial<Record<Platform, PlatformMetrics>>>({});
+  const [analyzing, setAnalyzing] = useState<Platform | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const steps: Step[] = useMemo(
@@ -75,10 +93,13 @@ export default function CreatorOnboarding() {
         sub: "Tap everything that applies. Followers are context, not a gate — UGC is about quality.",
       },
       ...platforms.map((p) => ({
-        kind: "followers" as const,
+        kind: "profile" as const,
         platform: p,
-        q: `How many followers on ${PLATFORMS.find((x) => x.id === p)!.label}?`,
-        sub: "Rough number is fine — it just sets your tier badge.",
+        q: `Drop your ${PLATFORMS.find((x) => x.id === p)!.label} link.`,
+        sub:
+          p === "shorts"
+            ? "Paste your channel/profile link, then add followers manually."
+            : "We’ll try to pull followers, posts, and average views from the public profile. No fake stats.",
       })),
       { kind: "done", q: `You're in, ${values.firstName || "creator"}.`, sub: "Profile live. Status: Open to Work." },
     ],
@@ -87,7 +108,9 @@ export default function CreatorOnboarding() {
 
   const step = steps[Math.min(stepIdx, steps.length - 1)];
   const progress = Math.round((stepIdx / (steps.length - 1)) * 100);
-  const totalFollowers = platforms.reduce((s, p) => s + (parseInt(followers[p].replace(/\D/g, "")) || 0), 0);
+  const followerCountFor = (platform: Platform) =>
+    metrics[platform]?.followerCount ?? numericInput(followers[platform]);
+  const totalFollowers = platforms.reduce((s, p) => s + followerCountFor(p), 0);
   const tier = tierForFollowers(totalFollowers);
 
   useEffect(() => {
@@ -110,12 +133,34 @@ export default function CreatorOnboarding() {
       setError("pick at least one — brands filter by platform");
       return;
     }
+    if (step.kind === "profile") {
+      const link = profileLinks[step.platform].trim();
+      const requiresLink = step.platform === "tiktok" || step.platform === "reels";
+      if (requiresLink && !link) {
+        setError("paste your profile link so brands can verify you");
+        return;
+      }
+      if (link) {
+        try {
+          new URL(link);
+        } catch {
+          setError("that link is not a valid URL");
+          return;
+        }
+      }
+      if (followerCountFor(step.platform) <= 0) {
+        setError("add your followers or run the analyzer first");
+        return;
+      }
+    }
     if (step.kind === "done") {
       const fullName = `${values.firstName} ${values.lastName}`.trim();
       const platformRows = platforms.map((p) => ({
         platform: p,
-        url: "",
-        followerCount: parseInt(followers[p].replace(/\D/g, "")) || 0,
+        url: profileLinks[p].trim(),
+        followerCount: followerCountFor(p),
+        postCount: metrics[p]?.postCount ?? undefined,
+        averageViews: metrics[p]?.averageViews ?? undefined,
       }));
       // Local record (real users start zeroed — no fake numbers) + Supabase profile
       ensureCreator(session.isDemo ? DEMO_CREATOR_ID : (session.userId ?? DEMO_CREATOR_ID), {
@@ -144,6 +189,48 @@ export default function CreatorOnboarding() {
     if (stepIdx === 0) return;
     setDir(-1);
     setStepIdx((i) => i - 1);
+  };
+
+  const analyzeProfile = async (platform: Platform) => {
+    if (platform === "shorts") return;
+    setError(null);
+    const url = profileLinks[platform].trim();
+    if (!url) {
+      setError("paste the profile link first");
+      return;
+    }
+    setAnalyzing(platform);
+    try {
+      const res = await fetch("/api/analyze-profile", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ platform, url }),
+      });
+      const body = (await res.json()) as Partial<PlatformMetrics> & { error?: string };
+      if (!res.ok) {
+        setError(body.error ?? "could not analyze that profile");
+        return;
+      }
+      const nextMetrics: PlatformMetrics = {
+        followerCount: body.followerCount ?? null,
+        postCount: body.postCount ?? null,
+        averageViews: body.averageViews ?? null,
+        confidence: body.confidence ?? "low",
+        message: body.message ?? "Profile checked.",
+      };
+      setMetrics((m) => ({ ...m, [platform]: nextMetrics }));
+      if (nextMetrics.followerCount) {
+        setFollowers((f) => ({
+          ...f,
+          [platform]: nextMetrics.followerCount!.toLocaleString("en-US"),
+        }));
+      }
+      if (nextMetrics.confidence === "low") setError(nextMetrics.message);
+    } catch {
+      setError("could not reach that profile — enter the metrics manually");
+    } finally {
+      setAnalyzing(null);
+    }
   };
 
   return (
@@ -246,9 +333,9 @@ export default function CreatorOnboarding() {
                 </div>
               )}
 
-              {/* FOLLOWERS */}
-              {step.kind === "followers" && (
-                <div>
+              {/* PROFILE LINK + METRICS */}
+              {step.kind === "profile" && (
+                <div className="space-y-7">
                   <div className="flex items-end gap-4">
                     {(() => {
                       const P = PLATFORMS.find((x) => x.id === step.platform)!;
@@ -256,6 +343,66 @@ export default function CreatorOnboarding() {
                     })()}
                     <input
                       ref={inputRef}
+                      type="url"
+                      value={profileLinks[step.platform]}
+                      placeholder={
+                        step.platform === "tiktok"
+                          ? "https://www.tiktok.com/@yourhandle"
+                          : step.platform === "reels"
+                            ? "https://www.instagram.com/yourhandle"
+                            : "https://www.youtube.com/@yourhandle"
+                      }
+                      onChange={(e) =>
+                        setProfileLinks((links) => ({
+                          ...links,
+                          [step.platform]: e.target.value,
+                        }))
+                      }
+                      onKeyDown={(e) => e.key === "Enter" && next()}
+                      className="w-full border-b-4 border-[#faf6ef]/20 bg-transparent pb-3 font-serif text-2xl font-bold text-[#a8d98a] placeholder:text-[#faf6ef]/15 focus:border-[#f2a3df] focus:outline-none sm:text-4xl"
+                      style={{ boxShadow: "none", borderRadius: 0 }}
+                    />
+                  </div>
+
+                  {step.platform !== "shorts" && (
+                    <motion.button
+                      whileHover={{ scale: 1.04 }}
+                      whileTap={{ scale: 0.96 }}
+                      onClick={() => analyzeProfile(step.platform)}
+                      disabled={analyzing === step.platform}
+                      className="inline-flex items-center gap-2 rounded-full bg-[#f2a3df] px-5 py-3 font-serif text-sm font-bold text-ink disabled:opacity-60 cursor-pointer"
+                    >
+                      {analyzing === step.platform ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-4 w-4" />
+                      )}
+                      Analyze public profile
+                    </motion.button>
+                  )}
+
+                  {metrics[step.platform] && (
+                    <div className="rounded-[22px] border-2 border-[#faf6ef]/15 bg-[#faf6ef]/5 p-4">
+                      <p className="text-sm font-bold text-[#faf6ef]/70">{metrics[step.platform]?.message}</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {[
+                          ["followers", metrics[step.platform]?.followerCount],
+                          ["posts", metrics[step.platform]?.postCount],
+                          ["avg views", metrics[step.platform]?.averageViews],
+                        ].map(([label, value]) => (
+                          <span key={label} className="rounded-full bg-[#101805] px-3 py-1.5 text-xs font-bold text-[#a8d98a]">
+                            {label}: <span className="num">{typeof value === "number" ? formatCompact(value) : "manual"}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-widest text-[#faf6ef]/40">
+                      Followers {metrics[step.platform]?.followerCount ? "(auto-filled)" : "(manual fallback)"}
+                    </label>
+                    <input
                       inputMode="numeric"
                       value={followers[step.platform]}
                       placeholder="12,500"
@@ -270,6 +417,7 @@ export default function CreatorOnboarding() {
                       style={{ boxShadow: "none", borderRadius: 0 }}
                     />
                   </div>
+
                   {totalFollowers > 0 && (
                     <motion.p
                       key={tier}
@@ -296,7 +444,7 @@ export default function CreatorOnboarding() {
                     return (
                       <span key={p} className="flex items-center gap-2 rounded-full bg-[#faf6ef]/10 px-4 py-2 text-sm font-bold">
                         <P.Logo className="h-4 w-4" />
-                        <span className="num">{formatCompact(parseInt(followers[p].replace(/\D/g, "")) || 0)}</span>
+                        <span className="num">{formatCompact(followerCountFor(p))}</span>
                       </span>
                     );
                   })}
