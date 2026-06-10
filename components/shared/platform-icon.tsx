@@ -1,11 +1,11 @@
-import { Music2, Clapperboard, PlaySquare, type LucideIcon } from "lucide-react";
 import { PLATFORM_LABELS, type Platform } from "@/lib/types";
+import { TikTokLogo, InstagramLogo, YouTubeLogo } from "./brand-logos";
 import { cn } from "@/lib/utils";
 
-const icons: Record<Platform, LucideIcon> = {
-  tiktok: Music2,
-  reels: Clapperboard,
-  shorts: PlaySquare,
+const icons: Record<Platform, typeof TikTokLogo> = {
+  tiktok: TikTokLogo,
+  reels: InstagramLogo,
+  shorts: YouTubeLogo,
 };
 
 export function PlatformIcon({
