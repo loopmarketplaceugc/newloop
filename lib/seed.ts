@@ -1,0 +1,747 @@
+import type {
+  Company,
+  Contract,
+  Creator,
+  Deliverable,
+  EarningsPoint,
+  Gig,
+  Message,
+  Notification,
+  Review,
+  ScriptDoc,
+  Transaction,
+} from "./types";
+import { platformFeeCents } from "./gig-machine";
+
+/** ISO timestamp n days from now (negative = past). */
+function d(daysOffset: number, hour = 10): string {
+  const t = new Date();
+  t.setDate(t.getDate() + daysOffset);
+  t.setHours(hour, Math.abs((daysOffset * 17) % 60), 0, 0);
+  return t.toISOString();
+}
+
+export const DEMO_CREATOR_ID = "c1";
+export const DEMO_COMPANY_ID = "co1";
+
+export const creators: Creator[] = [
+  {
+    id: "c1",
+    handle: "mia.creates",
+    name: "Mia Tanaka",
+    avatarHue: 160,
+    bio: "UGC for beauty & skincare brands. 200+ videos shipped. I write my own hooks and turn drafts around in 72 hours.",
+    location: "Los Angeles, CA",
+    status: "open",
+    tier: "micro",
+    platforms: [
+      { platform: "tiktok", url: "https://tiktok.com/@mia.creates", followerCount: 42_300 },
+      { platform: "reels", url: "https://instagram.com/mia.creates", followerCount: 18_900 },
+    ],
+    niches: ["beauty", "fashion"],
+    baseRateCents: 35_000,
+    usageUpchargePct: 30,
+    rawUpchargePct: 40,
+    capacityPerWeek: 5,
+    slotsBooked: 3,
+    compensationPref: "product_plus",
+    rating: 4.9,
+    reviewCount: 38,
+    completedGigs: 47,
+    portfolio: [
+      { id: "p1", type: "video", title: "Glow serum — 3 hooks tested", thumbnailHue: 330, durationSec: 31 },
+      { id: "p2", type: "video", title: "Morning shelf GRWM", thumbnailHue: 20, durationSec: 28 },
+      { id: "p3", type: "video", title: "SPF myth-busting explainer", thumbnailHue: 200, durationSec: 34 },
+      { id: "p4", type: "photo", title: "Flat-lay product set", thumbnailHue: 280 },
+      { id: "p5", type: "video", title: "Before/after testimonial", thumbnailHue: 120, durationSec: 27 },
+      { id: "p6", type: "video", title: "Unboxing — ASMR cut", thumbnailHue: 60, durationSec: 22 },
+    ],
+    mediaKitUrl: "media-kits/mia-tanaka-2026.pdf",
+    joinedAt: d(-410),
+  },
+  {
+    id: "c2",
+    handle: "dev.darius",
+    name: "Darius Cole",
+    avatarHue: 210,
+    bio: "Tech & SaaS explainer videos that don't feel like ads. Ex-PM, so I actually understand your product.",
+    location: "Austin, TX",
+    status: "open",
+    tier: "mid",
+    platforms: [
+      { platform: "tiktok", url: "https://tiktok.com/@dev.darius", followerCount: 128_000 },
+      { platform: "shorts", url: "https://youtube.com/@devdarius", followerCount: 86_000 },
+    ],
+    niches: ["tech", "SaaS", "finance"],
+    baseRateCents: 65_000,
+    usageUpchargePct: 35,
+    rawUpchargePct: 40,
+    capacityPerWeek: 3,
+    slotsBooked: 2,
+    compensationPref: "paid_only",
+    rating: 4.8,
+    reviewCount: 25,
+    completedGigs: 31,
+    portfolio: [
+      { id: "p1", type: "video", title: "CRM walkthrough in 30s", thumbnailHue: 220, durationSec: 30 },
+      { id: "p2", type: "video", title: "Budget app — POV demo", thumbnailHue: 150, durationSec: 33 },
+      { id: "p3", type: "video", title: "Keyboard unboxing", thumbnailHue: 30, durationSec: 26 },
+    ],
+    joinedAt: d(-350),
+  },
+  {
+    id: "c3",
+    handle: "soph.eats",
+    name: "Sophia Reyes",
+    avatarHue: 25,
+    bio: "Food content with cinematic close-ups. Restaurants, CPG snacks, meal kits — if it's edible, I'll make it look irresistible.",
+    location: "Chicago, IL",
+    status: "busy",
+    tier: "micro",
+    platforms: [
+      { platform: "reels", url: "https://instagram.com/soph.eats", followerCount: 33_500 },
+      { platform: "tiktok", url: "https://tiktok.com/@soph.eats", followerCount: 21_000 },
+    ],
+    niches: ["food", "local"],
+    baseRateCents: 28_000,
+    usageUpchargePct: 30,
+    rawUpchargePct: 35,
+    capacityPerWeek: 4,
+    slotsBooked: 4,
+    compensationPref: "product_plus",
+    rating: 4.7,
+    reviewCount: 19,
+    completedGigs: 23,
+    portfolio: [
+      { id: "p1", type: "video", title: "Ramen kit — steam shots", thumbnailHue: 10, durationSec: 24 },
+      { id: "p2", type: "video", title: "Brunch spot tour", thumbnailHue: 45, durationSec: 38 },
+      { id: "p3", type: "photo", title: "Menu hero shots", thumbnailHue: 90 },
+    ],
+    joinedAt: d(-280),
+  },
+  {
+    id: "c4",
+    handle: "liftwithlena",
+    name: "Lena Okafor",
+    avatarHue: 300,
+    bio: "Fitness UGC — supplements, apparel, home gym gear. Real workouts, real sweat, honest reviews your audience trusts.",
+    location: "Miami, FL",
+    status: "open",
+    tier: "elite",
+    platforms: [
+      { platform: "tiktok", url: "https://tiktok.com/@liftwithlena", followerCount: 410_000 },
+      { platform: "reels", url: "https://instagram.com/liftwithlena", followerCount: 265_000 },
+    ],
+    niches: ["fitness", "fashion"],
+    baseRateCents: 120_000,
+    usageUpchargePct: 40,
+    rawUpchargePct: 50,
+    capacityPerWeek: 2,
+    slotsBooked: 1,
+    compensationPref: "paid_only",
+    rating: 5.0,
+    reviewCount: 41,
+    completedGigs: 52,
+    portfolio: [
+      { id: "p1", type: "video", title: "Pre-workout taste test", thumbnailHue: 350, durationSec: 29 },
+      { id: "p2", type: "video", title: "Leggings squat-proof test", thumbnailHue: 270, durationSec: 31 },
+      { id: "p3", type: "video", title: "Home gym setup tour", thumbnailHue: 190, durationSec: 42 },
+    ],
+    mediaKitUrl: "media-kits/lena-okafor-2026.pdf",
+    joinedAt: d(-500),
+  },
+  {
+    id: "c5",
+    handle: "jakeunboxes",
+    name: "Jake Moreau",
+    avatarHue: 45,
+    bio: "Gadget unboxings and honest first impressions. Clean desk setups, crisp audio, zero fluff.",
+    location: "Seattle, WA",
+    status: "open",
+    tier: "nano",
+    platforms: [
+      { platform: "shorts", url: "https://youtube.com/@jakeunboxes", followerCount: 8_200 },
+      { platform: "tiktok", url: "https://tiktok.com/@jakeunboxes", followerCount: 5_600 },
+    ],
+    niches: ["tech", "home"],
+    baseRateCents: 15_000,
+    usageUpchargePct: 25,
+    rawUpchargePct: 30,
+    capacityPerWeek: 6,
+    slotsBooked: 2,
+    compensationPref: "product_ok",
+    rating: 4.6,
+    reviewCount: 11,
+    completedGigs: 14,
+    portfolio: [
+      { id: "p1", type: "video", title: "Smart lamp unboxing", thumbnailHue: 55, durationSec: 27 },
+      { id: "p2", type: "video", title: "Desk tour 2026", thumbnailHue: 230, durationSec: 35 },
+    ],
+    joinedAt: d(-150),
+  },
+  {
+    id: "c6",
+    handle: "theglowarchive",
+    name: "Amara Diallo",
+    avatarHue: 280,
+    bio: "Luxury-feel beauty content on an indie budget. Soft lighting, slow pans, voiceovers that convert.",
+    location: "New York, NY",
+    status: "open",
+    tier: "mid",
+    platforms: [
+      { platform: "reels", url: "https://instagram.com/theglowarchive", followerCount: 96_000 },
+    ],
+    niches: ["beauty", "fashion"],
+    baseRateCents: 55_000,
+    usageUpchargePct: 30,
+    rawUpchargePct: 40,
+    capacityPerWeek: 4,
+    slotsBooked: 2,
+    compensationPref: "product_plus",
+    rating: 4.9,
+    reviewCount: 28,
+    completedGigs: 33,
+    portfolio: [
+      { id: "p1", type: "video", title: "Lip oil — macro shots", thumbnailHue: 340, durationSec: 25 },
+      { id: "p2", type: "video", title: "Night routine voiceover", thumbnailHue: 260, durationSec: 36 },
+      { id: "p3", type: "photo", title: "Vanity editorial set", thumbnailHue: 310 },
+    ],
+    joinedAt: d(-320),
+  },
+  {
+    id: "c7",
+    handle: "casa.carlos",
+    name: "Carlos Vega",
+    avatarHue: 95,
+    bio: "Home & DIY content. Renovation b-roll, tool reviews, organization hacks. Dad energy, real results.",
+    location: "Phoenix, AZ",
+    status: "away",
+    tier: "micro",
+    platforms: [
+      { platform: "tiktok", url: "https://tiktok.com/@casa.carlos", followerCount: 27_400 },
+      { platform: "shorts", url: "https://youtube.com/@casacarlos", followerCount: 12_100 },
+    ],
+    niches: ["home", "local"],
+    baseRateCents: 22_000,
+    usageUpchargePct: 25,
+    rawUpchargePct: 35,
+    capacityPerWeek: 3,
+    slotsBooked: 0,
+    compensationPref: "product_ok",
+    rating: 4.5,
+    reviewCount: 9,
+    completedGigs: 12,
+    portfolio: [
+      { id: "p1", type: "video", title: "Garage makeover timelapse", thumbnailHue: 100, durationSec: 40 },
+      { id: "p2", type: "video", title: "Cordless drill review", thumbnailHue: 35, durationSec: 32 },
+    ],
+    joinedAt: d(-200),
+  },
+  {
+    id: "c8",
+    handle: "petsofpriya",
+    name: "Priya Sharma",
+    avatarHue: 15,
+    bio: "Pet content featuring two golden retrievers and a very judgmental cat. Treats, toys, tech for pets.",
+    location: "Denver, CO",
+    status: "open",
+    tier: "micro",
+    platforms: [
+      { platform: "tiktok", url: "https://tiktok.com/@petsofpriya", followerCount: 48_700 },
+      { platform: "reels", url: "https://instagram.com/petsofpriya", followerCount: 31_200 },
+    ],
+    niches: ["pets", "home"],
+    baseRateCents: 30_000,
+    usageUpchargePct: 30,
+    rawUpchargePct: 40,
+    capacityPerWeek: 5,
+    slotsBooked: 1,
+    compensationPref: "product_plus",
+    rating: 4.8,
+    reviewCount: 22,
+    completedGigs: 26,
+    portfolio: [
+      { id: "p1", type: "video", title: "Treat taste test (dog POV)", thumbnailHue: 40, durationSec: 23 },
+      { id: "p2", type: "video", title: "Auto-feeder week one", thumbnailHue: 180, durationSec: 30 },
+    ],
+    joinedAt: d(-260),
+  },
+  {
+    id: "c9",
+    handle: "wanderwithwes",
+    name: "Wes Kim",
+    avatarHue: 195,
+    bio: "Travel & lifestyle UGC. Hotels, luggage, booking apps. Shot on cinema glass, delivered in vertical.",
+    location: "San Diego, CA",
+    status: "open",
+    tier: "mid",
+    platforms: [
+      { platform: "reels", url: "https://instagram.com/wanderwithwes", followerCount: 152_000 },
+      { platform: "tiktok", url: "https://tiktok.com/@wanderwithwes", followerCount: 74_000 },
+    ],
+    niches: ["travel", "tech"],
+    baseRateCents: 75_000,
+    usageUpchargePct: 35,
+    rawUpchargePct: 45,
+    capacityPerWeek: 2,
+    slotsBooked: 1,
+    compensationPref: "paid_only",
+    rating: 4.7,
+    reviewCount: 17,
+    completedGigs: 21,
+    portfolio: [
+      { id: "p1", type: "video", title: "Carry-on packing hack", thumbnailHue: 205, durationSec: 28 },
+      { id: "p2", type: "video", title: "Boutique hotel walkthrough", thumbnailHue: 160, durationSec: 45 },
+    ],
+    joinedAt: d(-380),
+  },
+  {
+    id: "c10",
+    handle: "frugal.fern",
+    name: "Fern Whitaker",
+    avatarHue: 130,
+    bio: "Personal finance made unscary. Budgeting apps, cashback tools, banks. Plain-English scripts, high retention.",
+    location: "Columbus, OH",
+    status: "open",
+    tier: "nano",
+    platforms: [
+      { platform: "tiktok", url: "https://tiktok.com/@frugal.fern", followerCount: 9_300 },
+    ],
+    niches: ["finance", "SaaS"],
+    baseRateCents: 18_000,
+    usageUpchargePct: 30,
+    rawUpchargePct: 40,
+    capacityPerWeek: 7,
+    slotsBooked: 3,
+    compensationPref: "paid_only",
+    rating: 4.9,
+    reviewCount: 13,
+    completedGigs: 16,
+    portfolio: [
+      { id: "p1", type: "video", title: "Cashback app — 30 day results", thumbnailHue: 140, durationSec: 33 },
+      { id: "p2", type: "video", title: "Budget template walkthrough", thumbnailHue: 120, durationSec: 29 },
+    ],
+    joinedAt: d(-120),
+  },
+  {
+    id: "c11",
+    handle: "mamabearmeg",
+    name: "Meg Lawson",
+    avatarHue: 340,
+    bio: "Parenting & family products tested by three kids under six. If it survives my house, it'll survive anything.",
+    location: "Nashville, TN",
+    status: "busy",
+    tier: "micro",
+    platforms: [
+      { platform: "reels", url: "https://instagram.com/mamabearmeg", followerCount: 39_800 },
+      { platform: "tiktok", url: "https://tiktok.com/@mamabearmeg", followerCount: 26_500 },
+    ],
+    niches: ["parenting", "home", "food"],
+    baseRateCents: 32_000,
+    usageUpchargePct: 30,
+    rawUpchargePct: 40,
+    capacityPerWeek: 3,
+    slotsBooked: 3,
+    compensationPref: "product_plus",
+    rating: 4.8,
+    reviewCount: 31,
+    completedGigs: 35,
+    portfolio: [
+      { id: "p1", type: "video", title: "Snack box — kid reactions", thumbnailHue: 25, durationSec: 26 },
+      { id: "p2", type: "video", title: "Stroller fold test, one hand", thumbnailHue: 320, durationSec: 31 },
+    ],
+    joinedAt: d(-300),
+  },
+  {
+    id: "c12",
+    handle: "atlas.runs",
+    name: "Atlas Nguyen",
+    avatarHue: 250,
+    bio: "Running & endurance gear. Shoe reviews at mile 40, not mile zero. Marathon PR 2:51.",
+    location: "Portland, OR",
+    status: "open",
+    tier: "elite",
+    platforms: [
+      { platform: "shorts", url: "https://youtube.com/@atlasruns", followerCount: 295_000 },
+      { platform: "tiktok", url: "https://tiktok.com/@atlas.runs", followerCount: 188_000 },
+    ],
+    niches: ["fitness", "travel"],
+    baseRateCents: 110_000,
+    usageUpchargePct: 40,
+    rawUpchargePct: 50,
+    capacityPerWeek: 2,
+    slotsBooked: 0,
+    compensationPref: "paid_only",
+    rating: 4.9,
+    reviewCount: 36,
+    completedGigs: 44,
+    portfolio: [
+      { id: "p1", type: "video", title: "Race-day shoe review", thumbnailHue: 240, durationSec: 38 },
+      { id: "p2", type: "video", title: "Hydration vest 50k test", thumbnailHue: 200, durationSec: 34 },
+    ],
+    mediaKitUrl: "media-kits/atlas-nguyen-2026.pdf",
+    joinedAt: d(-440),
+  },
+];
+
+export const companies: Company[] = [
+  {
+    id: "co1",
+    name: "Lumen Skincare",
+    website: "https://lumenskin.co",
+    niche: "beauty",
+    budgetRange: "$2k–10k / mo",
+    logoHue: 330,
+    about: "Clinical skincare without the clinical price. DTC, 40k customers.",
+  },
+  {
+    id: "co2",
+    name: "Forklift HQ",
+    website: "https://forklifthq.com",
+    niche: "SaaS",
+    budgetRange: "$5k–20k / mo",
+    logoHue: 215,
+    about: "Inventory management for small warehouses. B2B SaaS, Series A.",
+  },
+  {
+    id: "co3",
+    name: "Crisp & Co.",
+    website: "https://crispand.co",
+    niche: "food",
+    budgetRange: "$1k–5k / mo",
+    logoHue: 45,
+    about: "Air-dried fruit snacks in compostable packaging.",
+  },
+];
+
+const g = (
+  id: string,
+  partial: Omit<Gig, "id" | "feeCents" | "revisionCount"> & { revisionCount?: number },
+): Gig => ({
+  id,
+  feeCents: platformFeeCents(partial.priceCents),
+  revisionCount: partial.revisionCount ?? 0,
+  ...partial,
+});
+
+export const gigs: Gig[] = [
+  g("g1", {
+    companyId: "co1",
+    creatorId: "c1",
+    status: "IN_PRODUCTION",
+    title: "Glow Serum launch — 3 TikTok videos",
+    brief:
+      "Three 30s TikToks for the Glow Serum launch. Angle 1: morning routine integration. Angle 2: 7-day results testimonial. Angle 3: ingredient explainer (niacinamide + peptides). Must show texture close-up and the pump mechanism.",
+    platform: "tiktok",
+    priceCents: 105_000,
+    usageDays: 90,
+    usageExpiresAt: d(96),
+    rawFootage: false,
+    physicalProduct: true,
+    trackingNumber: "1Z999AA10123456784",
+    deadline: d(6),
+    createdAt: d(-12),
+    scriptId: "s1",
+  }),
+  g("g2", {
+    companyId: "co2",
+    creatorId: "c2",
+    status: "DELIVERED",
+    title: "Forklift HQ — 'spreadsheet graduation' demo",
+    brief:
+      "One 45s YouTube Short. Hook on the pain of inventory spreadsheets, screen-record the import flow, end on the live dashboard. Educational tone, no music bed under VO.",
+    platform: "shorts",
+    priceCents: 65_000,
+    usageDays: 180,
+    usageExpiresAt: d(178),
+    rawFootage: true,
+    physicalProduct: false,
+    deadline: d(-1),
+    deliveredAt: d(-2),
+    createdAt: d(-18),
+    scriptId: "s2",
+  }),
+  g("g3", {
+    companyId: "co3",
+    creatorId: "c3",
+    status: "FUNDED_IN_ESCROW",
+    title: "Crisp & Co. snack drop — taste test reel",
+    brief:
+      "30s Reel. On-camera taste test of all four flavors, ranked. Show the compostable bag dissolving teaser at the end. Chaotic-fun energy.",
+    platform: "reels",
+    priceCents: 28_000,
+    usageDays: 60,
+    usageExpiresAt: d(64),
+    rawFootage: false,
+    physicalProduct: true,
+    deadline: d(10),
+    createdAt: d(-4),
+  }),
+  g("g4", {
+    companyId: "co1",
+    creatorId: "c6",
+    status: "COMPLETED",
+    title: "Night Cream — luxury voiceover Reel",
+    brief:
+      "One 35s Reel with soft-light macro shots and a calm voiceover. Aesthetic tone. Mention the 2% retinol gently — no medical claims.",
+    platform: "reels",
+    priceCents: 55_000,
+    usageDays: 90,
+    usageExpiresAt: d(52),
+    rawFootage: false,
+    physicalProduct: true,
+    deadline: d(-40),
+    deliveredAt: d(-41),
+    createdAt: d(-60),
+  }),
+  g("g5", {
+    companyId: "co2",
+    creatorId: "c10",
+    status: "OFFER_SENT",
+    title: "Forklift HQ — founder-style testimonial",
+    brief:
+      "30s TikTok, talking-head testimonial as a small-business operator. Focus on the 'count everything in one afternoon' onboarding story.",
+    platform: "tiktok",
+    priceCents: 18_000,
+    usageDays: 90,
+    rawFootage: false,
+    physicalProduct: false,
+    deadline: d(14),
+    createdAt: d(-1),
+  }),
+  g("g6", {
+    companyId: "co3",
+    creatorId: "c11",
+    status: "REVISION_REQUESTED",
+    title: "Lunchbox snack swap — parent POV",
+    brief:
+      "25–30s TikTok. Lunchbox packing POV swapping chips for Crisp mango. Kid reaction shot required. Keep it under 30s.",
+    platform: "tiktok",
+    priceCents: 32_000,
+    usageDays: 60,
+    usageExpiresAt: d(57),
+    rawFootage: false,
+    physicalProduct: true,
+    deadline: d(3),
+    deliveredAt: d(-3),
+    revisionCount: 1,
+    createdAt: d(-15),
+  }),
+  g("g7", {
+    companyId: "co1",
+    creatorId: "c4",
+    status: "PAID_OUT",
+    title: "SPF mist — gym bag essential",
+    brief:
+      "30s TikTok positioning the SPF mist as a post-workout reapply. Show real gym setting, sweat-proof claim demo on forearm.",
+    platform: "tiktok",
+    priceCents: 120_000,
+    usageDays: 120,
+    usageExpiresAt: d(110),
+    rawFootage: true,
+    physicalProduct: true,
+    deadline: d(-8),
+    deliveredAt: d(-9),
+    createdAt: d(-30),
+  }),
+  g("g8", {
+    companyId: "co2",
+    creatorId: "c5",
+    status: "PRODUCT_SHIPPED",
+    title: "Warehouse scanner unboxing",
+    brief:
+      "35s YouTube Short. Unbox the Zebra scanner bundle we ship to new customers, pair it with the app, scan three items. Clean desk aesthetic.",
+    platform: "shorts",
+    priceCents: 15_000,
+    usageDays: 90,
+    rawFootage: false,
+    physicalProduct: true,
+    trackingNumber: "9405511899560001234567",
+    deadline: d(12),
+    createdAt: d(-3),
+  }),
+];
+
+export const contracts: Contract[] = gigs
+  .filter((gg) => !["DRAFT", "OFFER_SENT"].includes(gg.status))
+  .map((gg) => ({
+    gigId: gg.id,
+    terms: {
+      deliverables: gg.brief.split(".")[0],
+      priceCents: gg.priceCents,
+      usageRightsDays: gg.usageDays,
+      rawFootageIncluded: gg.rawFootage,
+      exclusivity: gg.id === "g7",
+    },
+    companySignedAt: gg.createdAt,
+    creatorSignedAt: gg.createdAt,
+  }));
+
+export const messages: Message[] = [
+  // g1 — Lumen × Mia
+  { id: "m1", gigId: "g1", senderId: "co1", kind: "text", text: "Hi Mia! Loved your serum hooks for Dewpoint. We're launching Glow Serum next month — three TikToks, brief attached.", createdAt: d(-12, 9) },
+  { id: "m2", gigId: "g1", senderId: "c1", kind: "text", text: "Hey! Just read the brief — the niacinamide explainer angle is right in my lane. Can do all three in one batch.", createdAt: d(-12, 11) },
+  { id: "m3", gigId: "g1", senderId: "co1", kind: "offer", offer: { priceCents: 105_000, deliverables: "3 × 30s TikTok videos, 2 revision rounds", usageRightsDays: 90, rawFootageIncluded: false, state: "accepted" }, createdAt: d(-12, 14) },
+  { id: "m4", gigId: "g1", senderId: "c1", kind: "text", text: "Accepted! Ship the serum to the address on file — I'll start scripting while it's in transit.", createdAt: d(-12, 15) },
+  { id: "m5", gigId: "g1", senderId: "co1", kind: "script", scriptId: "s1", createdAt: d(-10, 10) },
+  { id: "m6", gigId: "g1", senderId: "c1", kind: "text", text: "Serum arrived. Texture close-ups are going to look great — filming Thursday.", createdAt: d(-5, 16) },
+  // g2 — Forklift × Darius
+  { id: "m7", gigId: "g2", senderId: "co2", kind: "text", text: "Darius — your CRM walkthrough video is exactly the energy we want for Forklift. Sent a brief for a 45s Short.", createdAt: d(-18, 9) },
+  { id: "m8", gigId: "g2", senderId: "co2", kind: "offer", offer: { priceCents: 65_000, deliverables: "1 × 45s YouTube Short + raw footage", usageRightsDays: 180, rawFootageIncluded: true, state: "accepted" }, createdAt: d(-17, 10) },
+  { id: "m9", gigId: "g2", senderId: "c2", kind: "text", text: "Deal. I'll need a sandbox account with demo inventory to record the import flow.", createdAt: d(-17, 12) },
+  { id: "m10", gigId: "g2", senderId: "co2", kind: "text", text: "Sandbox creds sent to your email. Demo warehouse has 1,200 SKUs loaded.", createdAt: d(-16, 9) },
+  { id: "m11", gigId: "g2", senderId: "c2", kind: "attachment", attachmentName: "forklift-demo-v1.mp4", text: "Final cut uploaded to the gig workspace. The spreadsheet-rip hook tested best with my audience panel.", createdAt: d(-2, 17) },
+  // g6 — Crisp × Meg
+  { id: "m12", gigId: "g6", senderId: "co3", kind: "text", text: "Meg, the lunchbox cut is so close. One ask: can we see the kid's reaction before the flavor reveal? Retention dips at 0:18.", createdAt: d(-3, 11) },
+  { id: "m13", gigId: "g6", senderId: "c11", kind: "text", text: "Good catch — I have an alt take where she grabs the bag first. Re-editing tonight, new cut tomorrow.", createdAt: d(-3, 13) },
+  // g5 — Forklift × Fern (offer pending)
+  { id: "m14", gigId: "g5", senderId: "co2", kind: "text", text: "Fern — your budgeting scripts are the clearest we've seen. We want that plain-English style for a founder testimonial.", createdAt: d(-1, 10) },
+  { id: "m15", gigId: "g5", senderId: "co2", kind: "offer", offer: { priceCents: 18_000, deliverables: "1 × 30s TikTok testimonial", usageRightsDays: 90, rawFootageIncluded: false, state: "pending" }, createdAt: d(-1, 11) },
+];
+
+export const deliverables: Deliverable[] = [
+  { id: "d1", gigId: "g2", fileName: "forklift-demo-v1.mp4", version: 1, watermarked: true, submittedAt: d(-2, 17), sizeMb: 84 },
+  { id: "d2", gigId: "g6", fileName: "lunchbox-swap-v1.mp4", version: 1, watermarked: true, submittedAt: d(-3, 15), sizeMb: 62 },
+  { id: "d3", gigId: "g4", fileName: "night-cream-final.mp4", version: 2, watermarked: false, submittedAt: d(-41, 12), sizeMb: 71 },
+  { id: "d4", gigId: "g7", fileName: "spf-mist-gym-final.mp4", version: 1, watermarked: false, submittedAt: d(-9, 14), sizeMb: 93 },
+];
+
+export const transactions: Transaction[] = [
+  { id: "t1", gigId: "g1", type: "fund", amountCents: 105_000, stripeRef: "pi_3PqGlowSerum01", createdAt: d(-11) },
+  { id: "t2", gigId: "g2", type: "fund", amountCents: 65_000, stripeRef: "pi_3PqForklift02", createdAt: d(-16) },
+  { id: "t3", gigId: "g3", type: "fund", amountCents: 28_000, stripeRef: "pi_3PqCrisp03", createdAt: d(-4) },
+  { id: "t4", gigId: "g4", type: "fund", amountCents: 55_000, stripeRef: "pi_3PqNightCream04", createdAt: d(-58) },
+  { id: "t5", gigId: "g4", type: "fee", amountCents: 5_500, stripeRef: "fee_NightCream04", createdAt: d(-39) },
+  { id: "t6", gigId: "g4", type: "release", amountCents: 49_500, stripeRef: "tr_NightCream04", createdAt: d(-39) },
+  { id: "t7", gigId: "g6", type: "fund", amountCents: 32_000, stripeRef: "pi_3PqLunchbox06", createdAt: d(-14) },
+  { id: "t8", gigId: "g7", type: "fund", amountCents: 120_000, stripeRef: "pi_3PqSpfMist07", createdAt: d(-28) },
+  { id: "t9", gigId: "g7", type: "fee", amountCents: 12_000, stripeRef: "fee_SpfMist07", createdAt: d(-7) },
+  { id: "t10", gigId: "g7", type: "release", amountCents: 108_000, stripeRef: "tr_SpfMist07", createdAt: d(-7) },
+  { id: "t11", gigId: "g8", type: "fund", amountCents: 15_000, stripeRef: "pi_3PqScanner08", createdAt: d(-2) },
+];
+
+export const reviews: Review[] = [
+  { id: "r1", gigId: "g4", authorId: "co1", targetId: "c6", rating: 5, tags: ["on-time", "great communication", "exceeded brief"], body: "Amara's voiceover made a $55 cream feel like a $300 one. Zero revisions needed.", createdAt: d(-38) },
+  { id: "r2", gigId: "g4", authorId: "c6", targetId: "co1", rating: 5, tags: ["clear brief", "fast approval"], body: "Dream client. Brief was specific, approval came in a day, payment instant.", createdAt: d(-38) },
+  { id: "r3", gigId: "g7", authorId: "co1", targetId: "c4", rating: 5, tags: ["high production", "on-time"], body: "Lena's sweat-proof demo is our best performing ad this quarter. 2.1% CTR.", createdAt: d(-6) },
+];
+
+export const scripts: ScriptDoc[] = [
+  {
+    id: "s1",
+    companyId: "co1",
+    gigId: "g1",
+    inputs: {
+      productName: "Glow Serum",
+      productDescription: "Niacinamide + peptide serum that brightens in 7 days. $42, fragrance-free.",
+      audience: "Women 22–35 with combination skin who already use skincare",
+      tone: "aesthetic",
+      platform: "tiktok",
+      kind: "script",
+    },
+    output: {
+      kind: "script",
+      title: "Glow Serum — 7-Day Results",
+      blocks: [
+        { start: "0:00", end: "0:03", label: "HOOK", text: "POV: it's day 7 and you finally see what everyone meant by 'glass skin'. (Macro shot of serum dropper catching light.)" },
+        { start: "0:03", end: "0:25", label: "BODY", text: "Soft VO: 'I gave Glow Serum one week. Two pumps every morning, under SPF.' Show texture pull on back of hand. Day 1 vs day 7 split screen — same lighting, no filter. 'It's the niacinamide-peptide combo. No fragrance, no sting, just… this.' Slow pan across the bottle on the shelf." },
+        { start: "0:25", end: "0:30", label: "CTA", text: "'It's $42 and it's replacing three things on my shelf. Link's where you think it is.' End on the pump press, one bead of serum." },
+      ],
+    },
+    createdAt: d(-10),
+  },
+  {
+    id: "s2",
+    companyId: "co2",
+    gigId: "g2",
+    inputs: {
+      productName: "Forklift HQ",
+      productDescription: "Inventory management SaaS for small warehouses. Import a spreadsheet, get live stock counts, low-stock alerts.",
+      audience: "Warehouse managers and ops leads at companies with 5–50 employees",
+      tone: "educational",
+      platform: "shorts",
+      kind: "script",
+    },
+    output: {
+      kind: "script",
+      title: "Forklift HQ — Spreadsheet Graduation",
+      blocks: [
+        { start: "0:00", end: "0:03", label: "HOOK", text: "'This spreadsheet runs a $2M warehouse. That's the problem.' (Hold up printed 400-row spreadsheet, let it unroll to the floor.)" },
+        { start: "0:03", end: "0:35", label: "BODY", text: "Screen recording: drag the same spreadsheet into Forklift HQ. 'Watch — 1,200 SKUs imported in 40 seconds.' Cut to live dashboard. 'Every count updates when your team scans. Low stock pings you before it's a problem, not after.' Show phone notification: 'Pallet wrap — 3 days left at current burn.'" },
+        { start: "0:35", end: "0:45", label: "CTA", text: "'If your inventory lives in a spreadsheet, you're one typo from a bad week. Free for your first 100 SKUs — link in description.'" },
+      ],
+    },
+    createdAt: d(-17),
+  },
+  {
+    id: "s3",
+    companyId: "co1",
+    inputs: {
+      productName: "SPF Reapply Mist",
+      productDescription: "SPF 40 setting mist for reapplying sunscreen over makeup. Sweat-resistant.",
+      audience: "Gym-goers and commuters 20–40 who wear makeup or hate greasy sunscreen",
+      tone: "chaotic",
+      platform: "tiktok",
+      kind: "brief",
+    },
+    output: {
+      kind: "brief",
+      title: "SPF Mist — Gym Bag Brief",
+      bullets: [
+        "Open mid-workout, slightly out of breath — authenticity beats polish here",
+        "Must-mention: reapplies OVER makeup without smearing (demo on camera)",
+        "Show the sweat test: misted forearm vs bare forearm after 20 min cardio",
+        "One-handed spray while holding a dumbbell — the 'no excuses' visual",
+        "Mention SPF 40 exactly once; don't lecture about sun damage",
+        "CTA: 'It lives in my gym bag now' — keep it possessive, not salesy",
+      ],
+    },
+    createdAt: d(-22),
+  },
+];
+
+export const notifications: Notification[] = [
+  { id: "n1", userId: "c1", title: "Escrow funded", body: "Lumen Skincare funded $1,050.00 for 'Glow Serum launch'. You're cleared to film.", href: "/gig/g1", read: false, createdAt: d(-11) },
+  { id: "n2", userId: "c1", title: "Usage rights expiring", body: "Lumen's rights to 'Night Cream Reel' (via @theglowarchive) expire in 52 days.", href: "/dashboard/wallet", read: true, createdAt: d(-2) },
+  { id: "n3", userId: "c1", title: "New message", body: "Lumen Skincare sent a script card in 'Glow Serum launch'.", href: "/gig/g1", read: true, createdAt: d(-10) },
+  { id: "n4", userId: "co1", title: "Deliverable approaching deadline", body: "'Glow Serum launch' is due in 6 days. Mia is in production.", href: "/gig/g1", read: false, createdAt: d(-1) },
+  { id: "n5", userId: "co1", title: "Auto-approve reminder", body: "Forklift HQ's demo gig auto-approves in 12 days if no action is taken.", href: "/gig/g2", read: false, createdAt: d(0, 8) },
+  { id: "n6", userId: "co2", title: "Delivery received", body: "Darius Cole delivered 'forklift-demo-v1.mp4'. Review within 14 days or it auto-approves.", href: "/gig/g2", read: false, createdAt: d(-2, 17) },
+];
+
+/** Cumulative earnings series for the demo creator (c1), in cents. */
+export function earningsSeries(days: number): EarningsPoint[] {
+  const releases = [
+    { day: -160, amount: 31_500 },
+    { day: -141, amount: 27_000 },
+    { day: -120, amount: 31_500 },
+    { day: -104, amount: 58_500 },
+    { day: -88, amount: 31_500 },
+    { day: -69, amount: 45_000 },
+    { day: -55, amount: 31_500 },
+    { day: -41, amount: 63_000 },
+    { day: -27, amount: 31_500 },
+    { day: -16, amount: 49_500 },
+    { day: -7, amount: 31_500 },
+  ];
+  const points: EarningsPoint[] = [];
+  const base = 1_245_000; // lifetime earnings before the window
+  for (let i = days; i >= 0; i--) {
+    const dayOffset = -i;
+    const cumulative =
+      base +
+      releases.filter((r) => r.day >= -days && r.day <= dayOffset).reduce((s, r) => s + r.amount, 0);
+    points.push({ date: d(dayOffset), cumulativeCents: cumulative });
+  }
+  return points;
+}
+
+export function creatorById(id: string) {
+  return creators.find((c) => c.id === id);
+}
+export function creatorByHandle(handle: string) {
+  return creators.find((c) => c.handle === handle);
+}
+export function companyById(id: string) {
+  return companies.find((c) => c.id === id);
+}
