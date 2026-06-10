@@ -19,6 +19,8 @@ export async function signUpWithEmail(email: string, password: string, role: Rol
   return { hasSession: Boolean(data.session), userId };
 }
 
+const PENDING_KEY = "mcc-pending-profile";
+
 /** Log in, load the profile, and hydrate the session store. */
 export async function logInWithEmail(email: string, password: string) {
   const sb = supabase();
@@ -26,6 +28,19 @@ export async function logInWithEmail(email: string, password: string) {
   if (error) throw new Error(error.message);
   const userId = data.user.id;
   const metaRole = (data.user.user_metadata?.role as Role | undefined) ?? "creator";
+
+  // Flush onboarding data captured before the email was confirmed
+  try {
+    const pending = localStorage.getItem(PENDING_KEY);
+    if (pending) {
+      const parsed = JSON.parse(pending) as { kind: "creator" | "company"; payload: never };
+      if (parsed.kind === "creator") await saveCreatorProfile(parsed.payload);
+      else await saveCompanyProfile(parsed.payload);
+      localStorage.removeItem(PENDING_KEY);
+    }
+  } catch {
+    // non-fatal — profile can be completed from the dashboard
+  }
 
   const { data: profile } = await sb
     .from("profiles")
@@ -54,7 +69,11 @@ export async function saveCreatorProfile(p: {
   const sb = supabase();
   const { data } = await sb.auth.getUser();
   const uid = data.user?.id;
-  if (!uid) return false;
+  if (!uid) {
+    // No confirmed session yet — park it; flushed automatically on first login
+    localStorage.setItem(PENDING_KEY, JSON.stringify({ kind: "creator", payload: p }));
+    return false;
+  }
   const name = `${p.firstName} ${p.lastName}`.trim();
   const { error } = await sb.from("profiles").upsert({
     id: uid,
@@ -94,7 +113,10 @@ export async function saveCompanyProfile(p: {
   const sb = supabase();
   const { data } = await sb.auth.getUser();
   const uid = data.user?.id;
-  if (!uid) return false;
+  if (!uid) {
+    localStorage.setItem(PENDING_KEY, JSON.stringify({ kind: "company", payload: p }));
+    return false;
+  }
   const { error } = await sb.from("profiles").upsert({
     id: uid,
     role: "company",
