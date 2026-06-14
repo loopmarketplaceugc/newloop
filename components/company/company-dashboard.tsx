@@ -43,7 +43,7 @@ export function CompanyDashboard() {
           </h1>
           <p className="mt-2 font-bold text-text-secondary">
             <span className="num">{active.length}</span> active gig{active.length === 1 ? "" : "s"} ·{" "}
-            <span className="num">{formatMoney(inEscrow)}</span> in escrow
+            <span className="num">{formatMoney(inEscrow)}</span> secured
           </p>
         </div>
         <div className="flex gap-2.5">
@@ -66,9 +66,9 @@ export function CompanyDashboard() {
       <div className="grid gap-5 sm:grid-cols-3">
         <Card className="bg-[#f2a3df]">
           <CardContent className="text-ink">
-            <span className="sticker bg-ink text-[11px] text-[#f2a3df]">in escrow</span>
+            <span className="sticker bg-ink text-[11px] text-[#f2a3df]">secured</span>
             <p className="num mt-2 font-serif text-4xl font-extrabold">{formatMoney(inEscrow)}</p>
-            <p className="mt-1 text-xs font-bold opacity-60">released only when you approve</p>
+            <p className="mt-1 text-xs font-bold opacity-60">creator payments in motion</p>
           </CardContent>
         </Card>
         <Card className="border-ink bg-ink">
@@ -126,7 +126,7 @@ export function CompanyDashboard() {
             <EmptyState
               icon={Briefcase}
               title="No active gigs"
-              body="Find a creator, send an offer, and your gigs line up here with live escrow status."
+              body="Find a creator, send an offer, and every payment, file, and deadline stays attached."
               action={
                 <Link href="/dashboard/discover" className="rounded-full bg-ink px-5 py-2.5 font-serif text-sm font-bold text-[#a8d98a] transition-transform hover:scale-105">
                   Browse creators →
@@ -143,7 +143,7 @@ export function CompanyDashboard() {
                     href={`/gig/${g.id}`}
                     className="flex items-center gap-3 rounded-[14px] border-2 border-ink p-3.5 transition-all hover:-translate-y-0.5 hover:shadow-[3px_3px_0_0_#101805]"
                   >
-                    <Avatar name={creator?.name ?? "?"} hue={creator?.avatarHue ?? 0} size="sm" />
+                    <Avatar name={creator?.name ?? "?"} hue={creator?.avatarHue ?? 0} src={creator?.avatarUrl} size="sm" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold">{g.title}</p>
                       <p className="flex items-center gap-1.5 text-xs font-medium text-text-tertiary">

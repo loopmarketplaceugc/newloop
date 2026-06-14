@@ -1,14 +1,17 @@
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-/** Demo avatars: warm pastel gradient + initials, hue seeded per profile. */
+/** Demo avatars: photo when available, warm pastel gradient + initials otherwise. */
 export function Avatar({
   name,
   hue,
+  src,
   size = "md",
   className,
 }: {
   name: string;
   hue: number;
+  src?: string;
   size?: "xs" | "sm" | "md" | "lg" | "xl";
   className?: string;
 }) {
@@ -22,7 +25,7 @@ export function Avatar({
     <div
       aria-hidden="true"
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-full font-semibold text-white/95 select-none",
+        "relative flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold text-white/95 select-none",
         size === "xs" && "h-6 w-6 text-[9px]",
         size === "sm" && "h-8 w-8 text-[11px]",
         size === "md" && "h-10 w-10 text-[13px]",
@@ -34,7 +37,11 @@ export function Avatar({
         background: `linear-gradient(135deg, hsl(${hue} 45% 62%), hsl(${(hue + 45) % 360} 40% 48%))`,
       }}
     >
-      {initials}
+      {src ? (
+        <Image src={src} alt="" fill sizes="80px" className="object-cover" />
+      ) : (
+        initials
+      )}
     </div>
   );
 }

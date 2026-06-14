@@ -6,7 +6,7 @@ import { AuthHashCatcher } from "@/components/shared/auth-hash-catcher";
 export const metadata: Metadata = {
   title: { default: "MCC — The Marketplace for Content Creation", template: "%s · MCC" },
   description:
-    "UGC creators and brands, matched. AI scripting, auto-contracts, escrow payments, and delivery tracking in one workspace.",
+    "UGC creators and brands, matched. AI scripting, auto-contracts, Stripe payments, and delivery tracking in one workspace.",
 };
 
 export default function RootLayout({

@@ -4,30 +4,31 @@ import { supabase } from "@/lib/supabase";
 import { useSession } from "@/lib/store/session";
 import type { Role } from "@/lib/types";
 
-/** Sign up with email+password; role stored in auth metadata. Returns whether a live session exists. */
+/**
+ * Sign up with email+password; role stored in auth metadata.
+ * Uses the `signup_instant` RPC (pre-confirmed user, no confirmation email — the
+ * built-in mailer is rate-limited) and immediately signs in for a live session.
+ */
 export async function signUpWithEmail(email: string, password: string, role: Role) {
   const sb = supabase();
-  const { data, error } = await sb.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { role },
-      emailRedirectTo: `${window.location.origin}/auth/callback`,
-    },
+  const { data: rpcData, error: rpcError } = await sb.rpc("signup_instant", {
+    p_email: email,
+    p_password: password,
+    p_role: role,
   });
+  if (rpcError) throw new Error(rpcError.message.replace(/^.*?:\s*/, "") || "Signup failed — try again.");
+  const existed = (rpcData as { status?: string } | null)?.status === "exists";
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
   if (error) {
-    if (/already|registered|exists/i.test(error.message)) {
+    if (existed) {
       throw new Error("There is already an account with this email. Log in instead, or reset your password.");
     }
     throw new Error(error.message);
   }
-  const userId = data.user?.id;
-  if (!userId) throw new Error("Signup failed — try again.");
-  if (Array.isArray(data.user?.identities) && data.user.identities.length === 0) {
-    throw new Error("There is already an account with this email. Log in instead, or reset your password.");
-  }
+  const userId = data.user.id;
   useSession.getState().setAuthed({ userId, role, email, onboarded: false });
-  return { hasSession: Boolean(data.session), userId };
+  return { hasSession: true, userId };
 }
 
 const PENDING_KEY = "mcc-pending-profile";
@@ -126,6 +127,53 @@ export async function updatePassword(password: string) {
   if (error) throw new Error(error.message);
 }
 
+/** Local MCC-tag generator — used for demo accounts and as an offline fallback. */
+export function generateMccTag() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous 0/O/1/I
+  const block = () =>
+    Array.from({ length: 4 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
+  return `MCC-${block()}-${block()}`;
+}
+
+/**
+ * Mint (or fetch) the caller's unique MCC tag at certification.
+ * Uses the `mint_mcc_tag` RPC for live accounts; falls back to a local tag when
+ * there's no session (demo mode), so the certificate screen always has a code.
+ */
+export async function certifyCreator(): Promise<string> {
+  try {
+    const sb = supabase();
+    const { data: auth } = await sb.auth.getUser();
+    if (!auth.user) return generateMccTag();
+    const { data, error } = await sb.rpc("mint_mcc_tag");
+    if (error || typeof data !== "string") return generateMccTag();
+    return data;
+  } catch {
+    return generateMccTag();
+  }
+}
+
+/** Simplified creator save — just nickname + platform follower counts (no URL required). */
+export async function saveCreatorNickname(p: {
+  nickname: string;
+  platforms: { platform: string; followerCount: number }[];
+}): Promise<boolean> {
+  const sb = supabase();
+  const { data } = await sb.auth.getUser();
+  const uid = data.user?.id;
+  if (!uid) return false;
+  const handle = makeHandle(p.nickname, "creator");
+  await sb.from("profiles").upsert({ id: uid, role: "creator", name: p.nickname, handle, status: "open" });
+  await sb.from("creator_details").upsert({ profile_id: uid });
+  if (p.platforms.length) {
+    await sb.from("creator_platforms").upsert(
+      p.platforms.map((pl) => ({ creator_id: uid, platform: pl.platform, url: "", follower_count: pl.followerCount })),
+      { onConflict: "creator_id,platform" },
+    );
+  }
+  return true;
+}
+
 /** Persist a creator profile after onboarding (no-op without a live auth session — RLS). */
 export async function saveCreatorProfile(p: {
   firstName: string;
@@ -192,13 +240,14 @@ export async function saveCreatorProfile(p: {
 
 /** Persist a company profile after onboarding. */
 export async function saveCompanyProfile(p: {
-  firstName: string;
-  lastName: string;
-  email: string;
   companyName: string;
   website: string;
   niche: string;
   budgetRange: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  balance?: string;
 }) {
   const sb = supabase();
   const { data } = await sb.auth.getUser();
@@ -212,9 +261,9 @@ export async function saveCompanyProfile(p: {
     role: "company",
     handle: makeHandle(p.companyName, "brand"),
     name: p.companyName,
-    first_name: p.firstName,
-    last_name: p.lastName,
-    email: p.email,
+    ...(p.firstName ? { first_name: p.firstName } : {}),
+    ...(p.lastName ? { last_name: p.lastName } : {}),
+    ...(p.email ? { email: p.email } : {}),
   });
   if (error) return false;
   await sb.from("companies").upsert({

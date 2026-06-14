@@ -6,7 +6,7 @@ import { formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /**
- * The signature moment: when escrow releases, the earnings figure counts up
+ * The signature moment: when a payout lands, the earnings figure counts up
  * with a brief green glow pulse. Everything else stays quiet.
  */
 export function CountUpMoney({

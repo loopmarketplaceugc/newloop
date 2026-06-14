@@ -28,7 +28,7 @@ export function CreatorCard({ creator }: { creator: Creator }) {
         />
         <CardContent className="space-y-4">
           <div className="-mt-12 flex items-end justify-between">
-            <Avatar name={creator.name} hue={creator.avatarHue} size="lg" />
+            <Avatar name={creator.name} hue={creator.avatarHue} src={creator.avatarUrl} size="lg" />
             <ArrowUpRight className="mb-1 h-4 w-4 text-text-tertiary" />
           </div>
           <div>

@@ -19,6 +19,7 @@ export function GigCard({
   const company = companyById(gig.companyId);
   const partnerName = perspective === "creator" ? company?.name ?? "Brand" : creator?.name ?? "Creator";
   const partnerHue = perspective === "creator" ? company?.logoHue ?? 20 : creator?.avatarHue ?? 180;
+  const partnerAvatarUrl = perspective === "company" ? creator?.avatarUrl : undefined;
   const deadline = gig.deadline ? daysUntil(gig.deadline) : null;
 
   return (
@@ -27,7 +28,7 @@ export function GigCard({
         <CardContent className="space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <Avatar name={partnerName} hue={partnerHue} size="sm" />
+              <Avatar name={partnerName} hue={partnerHue} src={partnerAvatarUrl} size="sm" />
               <div className="min-w-0">
                 <h3 className="truncate text-sm font-semibold">{gig.title}</h3>
                 <p className="truncate text-xs text-text-tertiary">{partnerName}</p>
@@ -40,7 +41,7 @@ export function GigCard({
 
           <div className="grid grid-cols-3 gap-2 rounded-[10px] border border-border bg-bg p-3">
             <div>
-              <p className="text-[11px] text-text-tertiary">Escrow</p>
+              <p className="text-[11px] text-text-tertiary">Payment</p>
               <p className="num mt-0.5 text-sm font-semibold text-money">{formatMoney(gig.priceCents)}</p>
             </div>
             <div>

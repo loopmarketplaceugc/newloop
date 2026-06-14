@@ -87,7 +87,7 @@ interface AppState {
   sendMessage: (m: { gigId: string; senderId: string; kind: MessageKind; text?: string; attachmentName?: string; scriptId?: string; offer?: OfferBody }) => void;
   respondToOffer: (messageId: string, accept: boolean) => void;
   transition: (gigId: string, to: GigStatus, patch?: Partial<Gig>) => boolean;
-  fundEscrow: (gigId: string) => void;
+  fundEscrow: (gigId: string, stripeRef?: string) => void;
   submitDeliverable: (gigId: string, fileName: string, sizeMb: number) => void;
   requestRevision: (gigId: string) => void;
   approveAndRelease: (gigId: string) => void;
@@ -115,11 +115,14 @@ const seedState = () => ({
 export const useApp = create<AppState>()(
   persist(
     (set, get) => ({
-      ...emptyLiveState(),
+      ...seedState(),
 
       enterLiveMode: () => set(emptyLiveState()),
 
-      setCreatorsFromDb: (creators) => set({ creators }),
+      setCreatorsFromDb: (creators) =>
+        set((s) => ({
+          creators: mergeById(s.creators, creators),
+        })),
 
       setLiveWorld: (world) =>
         set((s) => ({
@@ -230,7 +233,7 @@ export const useApp = create<AppState>()(
               priceCents: msg.offer.priceCents,
             });
             void dbInsertContract(gig.id, contract.terms);
-            get().notify({ userId: gig.companyId, title: "Offer accepted", body: "Contract generated — fund escrow to start production.", href: `/gig/${gig.id}` });
+            get().notify({ userId: gig.companyId, title: "Offer accepted", body: "Contract generated — pay to start production.", href: `/gig/${gig.id}` });
           }
         }
       },
@@ -245,7 +248,7 @@ export const useApp = create<AppState>()(
         return true;
       },
 
-      fundEscrow: (gigId) => {
+      fundEscrow: (gigId, stripeRef) => {
         const gig = get().gigs.find((g) => g.id === gigId);
         if (!gig || !canTransition(gig.status, "FUNDED_IN_ESCROW")) return;
         const usageExpiresAt = new Date(Date.now() + gig.usageDays * 86_400_000).toISOString();
@@ -255,11 +258,11 @@ export const useApp = create<AppState>()(
           ),
           transactions: [
             ...s.transactions,
-            { id: uid("t"), gigId, type: "fund", amountCents: gig.priceCents, stripeRef: `pi_demo_${gigId}`, createdAt: now() },
+            { id: uid("t"), gigId, type: "fund", amountCents: gig.priceCents, stripeRef: stripeRef ?? `pi_demo_${gigId}`, createdAt: now() },
           ],
         }));
         void dbUpdateGig(gigId, { status: "FUNDED_IN_ESCROW", usageExpiresAt });
-        get().notify({ userId: gig.creatorId, title: "Escrow funded", body: `${"Funds are held"} — you're cleared to start.`, href: `/gig/${gigId}` });
+        get().notify({ userId: gig.creatorId, title: "Payment secured", body: "The brand paid — you're cleared to start.", href: `/gig/${gigId}` });
       },
 
       submitDeliverable: (gigId, fileName, sizeMb) => {
@@ -306,7 +309,7 @@ export const useApp = create<AppState>()(
         get().notify({ userId: gig.creatorId, title: "Revision requested", body: `Revision ${gig.revisionCount + 1} of ${MAX_REVISIONS} on "${gig.title}".`, href: `/gig/${gigId}` });
       },
 
-      /** APPROVED → fee + release transactions → PAID_OUT → COMPLETED, watermark unlocked. */
+      /** APPROVED → fee + payout transactions → PAID_OUT → COMPLETED, watermark unlocked. */
       approveAndRelease: (gigId) => {
         const gig = get().gigs.find((g) => g.id === gigId);
         if (!gig || !canTransition(gig.status, "APPROVED")) return;
@@ -326,7 +329,7 @@ export const useApp = create<AppState>()(
           ),
         }));
         void dbUpdateGig(gigId, { status: "COMPLETED", priceCents: gig.priceCents });
-        get().notify({ userId: gig.creatorId, title: "Payment released", body: `Escrow released. Reviews are now unlocked for this gig.`, href: `/dashboard/wallet` });
+        get().notify({ userId: gig.creatorId, title: "Work approved", body: "Payout is logged and reviews are now unlocked for this gig.", href: `/dashboard/wallet` });
       },
 
       cancelGig: (gigId) => {
@@ -372,7 +375,7 @@ export const useApp = create<AppState>()(
 
       resetDemo: () => set(seedState()),
     }),
-    { name: "mcc-demo-data", version: 5, migrate: () => ({ ...emptyLiveState() }) as never },
+    { name: "mcc-demo-data", version: 6, migrate: () => ({ ...seedState() }) as never },
   ),
 );
 

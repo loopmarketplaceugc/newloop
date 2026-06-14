@@ -54,7 +54,7 @@ export default function ProfilePage() {
 
       <Card>
         <CardContent className="flex flex-wrap items-center gap-4">
-          <Avatar name={me.name} hue={me.avatarHue} size="xl" />
+          <Avatar name={me.name} hue={me.avatarHue} src={me.avatarUrl} size="xl" />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-serif text-xl font-semibold">{me.name}</h2>

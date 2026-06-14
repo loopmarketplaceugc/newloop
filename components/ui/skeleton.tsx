@@ -1,10 +1,15 @@
 import { cn } from "@/lib/utils";
 
-/** Every async surface gets a skeleton — no spinners. */
+/** Every async surface gets a skeleton — gradient shimmer, no dull pulse. */
 export function Skeleton({ className }: { className?: string }) {
   return (
     <div
-      className={cn("animate-pulse rounded-[8px] bg-surface-2", className)}
+      className={cn(
+        "relative overflow-hidden rounded-[8px] bg-surface-2",
+        "after:absolute after:inset-0 after:-translate-x-full after:animate-shimmer",
+        "after:bg-gradient-to-r after:from-transparent after:via-white/60 after:to-transparent",
+        className,
+      )}
       aria-hidden="true"
     />
   );
@@ -12,7 +17,7 @@ export function Skeleton({ className }: { className?: string }) {
 
 export function CardSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn("rounded-[10px] border border-border bg-surface p-5 space-y-3", className)}>
+    <div className={cn("rounded-[16px] border-2 border-border bg-surface p-5 space-y-3", className)}>
       <Skeleton className="h-3 w-24" />
       <Skeleton className="h-8 w-40" />
       <Skeleton className="h-3 w-full" />

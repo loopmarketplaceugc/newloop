@@ -1,7 +1,17 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Briefcase, FileWarning, Star } from "lucide-react";
+import {
+  ArrowRight,
+  Briefcase,
+  CalendarClock,
+  CircleDollarSign,
+  Compass,
+  FileWarning,
+  Star,
+  Wallet,
+} from "lucide-react";
 import { useApp } from "@/lib/store/app";
 import { useSession } from "@/lib/store/session";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,29 +19,61 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Avatar } from "@/components/ui/avatar";
 import { StarRating } from "@/components/shared/star-rating";
 import { PlatformIcon } from "@/components/shared/platform-icon";
+import { QrCode } from "@/components/shared/qr-code";
 import { EarningsCard } from "./earnings-card";
+import { IdeaChat } from "./idea-chat";
+import { CreatorTour } from "./creator-tour";
 import { companyById } from "@/lib/seed";
 import {
   ACTIVE_STATUSES,
   ESCROW_HELD_STATUSES,
   KANBAN_LANES,
+  PLATFORM_FEE_PCT,
   creatorPayoutCents,
 } from "@/lib/gig-machine";
 import { daysUntil, formatMoney } from "@/lib/format";
+import { haptics } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
+import type { Creator } from "@/lib/types";
+
+function firstRunCreator(id: string, name: string): Creator {
+  return {
+    id,
+    handle: "creator",
+    name: name || "Creator",
+    avatarHue: 285,
+    bio: "",
+    location: "",
+    status: "open",
+    tier: "nano",
+    platforms: [],
+    niches: [],
+    baseRateCents: 0,
+    usageUpchargePct: 30,
+    rawUpchargePct: 40,
+    capacityPerWeek: 3,
+    slotsBooked: 0,
+    compensationPref: "product_plus",
+    rating: 0,
+    reviewCount: 0,
+    completedGigs: 0,
+    portfolio: [],
+    joinedAt: new Date().toISOString(),
+  };
+}
 
 export function CreatorDashboard() {
   const userId = useSession((s) => s.userId)!;
+  const sessionName = useSession((s) => s.name);
   const { gigs, transactions, reviews, creators } = useApp();
-  const me = creators.find((c) => c.id === userId);
-  if (!me) return null;
+  const me = creators.find((c) => c.id === userId) ?? firstRunCreator(userId, sessionName);
 
   const myGigs = gigs.filter((g) => g.creatorId === userId);
   const myGigIds = new Set(myGigs.map((g) => g.id));
   // Real numbers only: everything is derived from actual transactions
   const releaseTxs = transactions.filter((t) => t.type === "release" && myGigIds.has(t.gigId));
   const released = releaseTxs.reduce((s, t) => s + t.amountCents, 0);
-  const pendingEscrow = myGigs
+  const pendingPayout = myGigs
     .filter((g) => ESCROW_HELD_STATUSES.includes(g.status))
     .reduce((s, g) => s + creatorPayoutCents(g.priceCents), 0);
   const myReviews = reviews.filter((r) => r.targetId === userId);
@@ -47,19 +89,31 @@ export function CreatorDashboard() {
   ];
   const doneCount = completeness.filter((c) => c.done).length;
   const pct = Math.round((doneCount / completeness.length) * 100);
+  const firstName = me.name.trim().split(/\s+/)[0] || "creator";
 
   const slotsPct = me.capacityPerWeek > 0 ? Math.min(100, (me.slotsBooked / me.capacityPerWeek) * 100) : 0;
   const expiring = myGigs
     .filter((g) => g.usageExpiresAt && daysUntil(g.usageExpiresAt) > 0)
     .sort((a, b) => daysUntil(a.usageExpiresAt!) - daysUntil(b.usageExpiresAt!))[0];
 
+  // "Due soon": active gigs with an upcoming deadline, soonest first.
+  const dueSoon = myGigs
+    .filter((g) => g.deadline && ACTIVE_STATUSES.includes(g.status))
+    .sort((a, b) => daysUntil(a.deadline!) - daysUntil(b.deadline!))
+    .slice(0, 4);
+
+  const [origin, setOrigin] = useState("");
+  useEffect(() => setOrigin(window.location.origin), []);
+
   return (
     <div className="space-y-5">
+      <CreatorTour />
+
       {/* Hero greeting */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-serif text-4xl font-extrabold leading-[0.95] sm:text-6xl">
-            Hey, {me.name.split(" ")[0] || "you"}
+            Hey, <span className="text-gradient-ink">{firstName}</span>
             <span className="text-[#d6409f]">.</span>
           </h1>
           <p className="mt-2 font-bold text-text-secondary">
@@ -69,28 +123,43 @@ export function CreatorDashboard() {
               <span className="sticker ml-3 bg-[#a8d98a] text-xs text-ink">open to work</span>
             )}
           </p>
+          {me.mccTag && (
+            <p className="num mt-2 inline-flex items-center gap-2 rounded-full border-2 border-ink/15 bg-surface px-3 py-1 text-xs font-bold text-text-secondary">
+              <span className="text-[#d6409f]">●</span> MCC tag: <span className="font-extrabold text-text-primary">{me.mccTag}</span>
+            </p>
+          )}
         </div>
+        <Link
+          href="/dashboard/opportunities"
+          onClick={() => haptics.select()}
+          className="flex items-center gap-2 rounded-full bg-ink px-6 py-3.5 font-serif text-base font-bold text-[#faf6ef] transition-transform hover:scale-105"
+        >
+          <Compass className="h-5 w-5 text-[#a8d98a]" /> Find opportunities
+          <ArrowRight className="h-4 w-4" />
+        </Link>
       </div>
 
       {/* Bento grid */}
       <div className="grid gap-5 md:grid-cols-3">
         <EarningsCard releases={releaseTxs} />
 
-        {/* Escrow card — pink */}
+        {/* Payment card — pink */}
         <Card className="bg-[#f2a3df]">
           <CardContent className="flex h-full flex-col justify-between gap-4 text-ink">
             <div>
-              <p className="font-serif text-lg font-extrabold">Escrow</p>
+              <p className="flex items-center gap-2 font-serif text-lg font-extrabold">
+                <CircleDollarSign className="h-5 w-5" /> Payments
+              </p>
               <div className="mt-4 space-y-5">
                 <div>
-                  <span className="sticker bg-ink text-[11px] text-[#f2a3df]">pending</span>
-                  <p className="num mt-1.5 font-serif text-3xl font-extrabold">{formatMoney(pendingEscrow)}</p>
-                  <p className="text-xs font-bold opacity-60">held until brands approve</p>
+                  <span className="sticker bg-ink text-[11px] text-[#f2a3df]">secured</span>
+                  <p className="num mt-1.5 font-serif text-3xl font-extrabold">{formatMoney(pendingPayout)}</p>
+                  <p className="text-xs font-bold opacity-60">brand-paid work in progress</p>
                 </div>
                 <div>
                   <span className="sticker bg-money text-[11px] text-white">released</span>
                   <p className="num mt-1.5 font-serif text-3xl font-extrabold">{formatMoney(released)}</p>
-                  <p className="text-xs font-bold opacity-60">you keep 90% of every gig</p>
+                  <p className="text-xs font-bold opacity-60">approved work paid to you</p>
                 </div>
               </div>
             </div>
@@ -104,11 +173,97 @@ export function CreatorDashboard() {
           </CardContent>
         </Card>
 
+        {/* Idea Studio — AI scripts & ideas chatbot */}
+        <IdeaChat niches={me.niches as string[]} platforms={me.platforms.map((p) => p.platform)} />
+
+        {/* Due soon */}
+        <Card className="md:col-span-3">
+          <CardContent>
+            <div className="mb-4 flex items-center justify-between">
+              <p className="flex items-center gap-2 font-serif text-lg font-extrabold">
+                <CalendarClock className="h-5 w-5 text-[#d6409f]" /> Due soon
+              </p>
+              <Link href="/dashboard/gigs" className="rounded-full border-2 border-ink px-3.5 py-1 text-xs font-bold transition-all hover:scale-105 hover:bg-ink hover:text-[#a8d98a]">
+                all gigs →
+              </Link>
+            </div>
+            {dueSoon.length === 0 ? (
+              <EmptyState
+                icon={CalendarClock}
+                title="Nothing due"
+                body="Deadlines from your active gigs show up here so you never miss a delivery date."
+              />
+            ) : (
+              <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+                {dueSoon.map((g) => {
+                  const days = daysUntil(g.deadline!);
+                  const urgent = days <= 2;
+                  return (
+                    <Link
+                      key={g.id}
+                      href={`/gig/${g.id}`}
+                      className="rounded-[14px] border-2 border-ink p-3 transition-all hover:-translate-y-0.5 hover:shadow-[3px_3px_0_0_#101805]"
+                    >
+                      <p className="line-clamp-2 text-xs font-bold leading-snug">{g.title}</p>
+                      <p className={cn("num mt-2 text-sm font-extrabold", urgent ? "text-[#d6409f]" : "text-text-secondary")}>
+                        {days <= 0 ? "due today" : `${days}d left`}
+                      </p>
+                      <p className="num mt-0.5 text-xs font-bold text-money">{formatMoney(creatorPayoutCents(g.priceCents))}</p>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* MCC tag certificate */}
+        {me.mccTag && (
+          <Card className="bg-[#f2a3df] md:col-span-1">
+            <CardContent className="flex h-full flex-col items-center justify-center gap-3 p-5 text-center text-ink">
+              <span className="sticker bg-ink text-[11px] text-[#f2a3df]">certified</span>
+              <QrCode value={`${origin}/creator/${me.mccTag}`} size={120} label={`MCC tag ${me.mccTag}`} />
+              <p className="num font-serif text-lg font-extrabold">{me.mccTag}</p>
+              <p className="text-xs font-bold opacity-70">Brands scan this to open your verified profile.</p>
+            </CardContent>
+          </Card>
+        )}
+
+        <Card className={cn("border-ink bg-[#a8d98a]", me.mccTag ? "md:col-span-2" : "md:col-span-3")}>
+          <CardContent className="flex h-full flex-col justify-between gap-5 text-ink sm:flex-row sm:items-center">
+            <div>
+              <div className="flex items-center gap-2">
+                <Wallet className="h-5 w-5" />
+                <span className="sticker bg-ink text-[11px] text-[#a8d98a]">
+                  {me.stripePayoutsEnabled ? "payouts live" : "payout setup"}
+                </span>
+              </div>
+              <h2 className="mt-3 font-serif text-3xl font-extrabold leading-none">
+                {me.stripePayoutsEnabled ? "Stripe is connected." : "Connect Stripe to get paid."}
+              </h2>
+              <p className="mt-2 max-w-xl text-sm font-bold leading-relaxed text-ink/70">
+                Brands pay through MCC. You keep{" "}
+                <span className="num font-extrabold">{100 - PLATFORM_FEE_PCT}%</span>; MCC keeps a{" "}
+                <span className="num font-extrabold">{PLATFORM_FEE_PCT}%</span> commission. Change the commission with{" "}
+                <span className="num">NEXT_PUBLIC_PLATFORM_FEE_PCT</span>.
+              </p>
+            </div>
+            <Link
+              href="/dashboard/wallet"
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-ink px-5 py-3 font-serif text-sm font-bold text-[#a8d98a] transition-transform hover:scale-105"
+            >
+              {me.stripePayoutsEnabled ? "View wallet" : "Connect payouts"} <ArrowRight className="h-4 w-4" />
+            </Link>
+          </CardContent>
+        </Card>
+
         {/* Active gigs kanban */}
         <Card className="md:col-span-2">
           <CardContent>
             <div className="mb-4 flex items-center justify-between">
-              <p className="font-serif text-lg font-extrabold">Active gigs</p>
+              <div>
+                <p className="font-serif text-lg font-extrabold">Active gigs</p>
+              </div>
               <Link href="/dashboard/gigs" className="rounded-full border-2 border-ink px-3.5 py-1 text-xs font-bold transition-all hover:scale-105 hover:bg-ink hover:text-[#a8d98a]">
                 view all →
               </Link>

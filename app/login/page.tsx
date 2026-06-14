@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { z } from "zod";
 import { logInWithEmail } from "@/lib/auth";
+import { haptics } from "@/lib/haptics";
 import { TypeOnce } from "@/components/shared/typewriter";
 
 const schema = z.object({ email: z.string().email("real email please"), password: z.string().min(6, "at least 6 characters") });
@@ -22,14 +23,18 @@ export default function LoginPage() {
     setError(null);
     const r = schema.safeParse({ email, password });
     if (!r.success) {
+      haptics.error();
       setError(r.error.issues[0].message);
       return;
     }
     setBusy(true);
+    haptics.step();
     try {
       const { onboarded } = await logInWithEmail(email, password);
+      haptics.success();
       router.push(onboarded ? "/dashboard" : "/onboarding/creator");
     } catch (e) {
+      haptics.error();
       setError(e instanceof Error ? e.message : "Login failed");
       setBusy(false);
     }
@@ -47,7 +52,7 @@ export default function LoginPage() {
       <main className="relative z-10 flex flex-1 items-center justify-center px-6 pb-24">
         <div className="w-full max-w-xl">
           <h1 className="font-serif min-h-[1.2em] text-4xl font-extrabold sm:text-6xl">
-            <TypeOnce text="Welcome back." speed={40} />
+            <TypeOnce text="Welcome back." speed={40} className="text-gradient" caret={false} />
           </h1>
           <p className="mt-3 font-medium text-[#faf6ef]/50">Log in and get back to the money.</p>
 
@@ -60,7 +65,10 @@ export default function LoginPage() {
                 value={email}
                 autoFocus
                 placeholder="you@studio.com"
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  haptics.tap();
+                  setEmail(e.target.value);
+                }}
                 onKeyDown={(e) => e.key === "Enter" && submit()}
                 className="mt-2 w-full border-b-4 border-[#faf6ef]/20 bg-transparent pb-2 font-serif text-2xl font-bold text-[#a8d98a] placeholder:text-[#faf6ef]/15 focus:border-[#f2a3df] focus:outline-none sm:text-3xl"
                 style={{ boxShadow: "none", borderRadius: 0 }}
@@ -78,7 +86,10 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 placeholder="••••••••"
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  haptics.tap();
+                  setPassword(e.target.value);
+                }}
                 onKeyDown={(e) => e.key === "Enter" && submit()}
                 className="mt-2 w-full border-b-4 border-[#faf6ef]/20 bg-transparent pb-2 font-serif text-2xl font-bold text-[#a8d98a] placeholder:text-[#faf6ef]/15 focus:border-[#f2a3df] focus:outline-none sm:text-3xl"
                 style={{ boxShadow: "none", borderRadius: 0 }}

@@ -48,10 +48,10 @@ export default function GigsPage() {
           {mine.map((g) => {
             const other =
               role === "creator"
-                ? { name: companyById(g.companyId)?.name ?? "Brand", hue: companyById(g.companyId)?.logoHue ?? 0 }
+                ? { name: companyById(g.companyId)?.name ?? "Brand", hue: companyById(g.companyId)?.logoHue ?? 0, src: undefined }
                 : (() => {
                     const c = creators.find((c) => c.id === g.creatorId);
-                    return { name: c?.name ?? "Creator", hue: c?.avatarHue ?? 0 };
+                    return { name: c?.name ?? "Creator", hue: c?.avatarHue ?? 0, src: c?.avatarUrl };
                   })();
             const amount = role === "creator" ? creatorPayoutCents(g.priceCents) : g.priceCents;
             return (
@@ -60,7 +60,7 @@ export default function GigsPage() {
                 href={`/gig/${g.id}`}
                 className="flex items-center gap-3 border-b border-border px-4 py-3.5 transition-colors last:border-0 hover:bg-surface-2/40"
               >
-                <Avatar name={other.name} hue={other.hue} size="sm" />
+                <Avatar name={other.name} hue={other.hue} src={other.src} size="sm" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{g.title}</p>
                   <p className="flex items-center gap-1.5 text-xs text-text-tertiary">

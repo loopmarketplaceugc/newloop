@@ -22,6 +22,7 @@ import { useSession } from "@/lib/store/session";
 import { useApp, useHydrated } from "@/lib/store/app";
 import { Avatar } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Loader } from "@/components/shared/loader";
 import { ToastViewport } from "@/components/ui/toast";
 import { companyById } from "@/lib/seed";
 import { fetchCreators, fetchMyWorld } from "@/lib/sync";
@@ -37,6 +38,7 @@ interface NavItem {
 
 const creatorNav: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
+  { href: "/dashboard/opportunities", label: "Opportunities", icon: Compass },
   { href: "/dashboard/gigs", label: "Gigs", icon: Briefcase },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
   { href: "/dashboard/profile", label: "Profile", icon: User },
@@ -46,8 +48,8 @@ const creatorNav: NavItem[] = [
 const companyNav: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/discover", label: "Discover", icon: Compass },
+  { href: "/dashboard/requests", label: "Requests", icon: FileText },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
-  { href: "/dashboard/scripts", label: "Scripts", icon: FileText },
   { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
 ];
 
@@ -72,7 +74,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       router.replace(role === "creator" ? "/onboarding/creator" : "/onboarding/company");
   }, [hydrated, userId, onboarded, role, router]);
 
-  // Real creator accounts get a clean local record (zeros, not fake stats)
   useEffect(() => {
     if (hydrated && userId && role === "creator" && !isDemo) {
       ensureCreator(userId, name ? { name } : undefined);
@@ -84,6 +85,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     let cancelled = false;
 
     enterLiveMode();
+    if (role === "creator") ensureCreator(userId, name ? { name } : undefined);
     const loadLiveData = async () => {
       const [creatorRows, world] = await Promise.all([fetchCreators(), fetchMyWorld()]);
       if (cancelled) return;
@@ -98,7 +100,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [enterLiveMode, hydrated, isDemo, setCreatorsFromDb, setLiveWorld, userId]);
+  }, [enterLiveMode, ensureCreator, hydrated, isDemo, name, role, setCreatorsFromDb, setLiveWorld, userId]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -114,19 +116,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!hydrated || !userId || !role) {
     return (
       <div className="flex min-h-screen">
-        <div className="hidden w-60 bg-ink p-5 md:block">
-          <Skeleton className="h-7 w-28 mb-8 bg-[#faf6ef]/10" />
+        <div className="hidden w-60 flex-col bg-ink p-5 md:flex">
+          <span className="mb-10 font-serif text-2xl font-extrabold text-[#f2a3df]">
+            loop
+          </span>
           {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-10 w-full mb-2 bg-[#faf6ef]/10" />
+            <Skeleton key={i} className="mb-2 h-10 w-full bg-[#faf6ef]/10" />
           ))}
         </div>
-        <div className="flex-1 p-6 space-y-4">
-          <Skeleton className="h-10 w-64" />
-          <div className="grid gap-4 md:grid-cols-3">
-            {[...Array(6)].map((_, i) => (
-              <Skeleton key={i} className="h-40" />
-            ))}
-          </div>
+        <div className="flex flex-1 items-center justify-center p-6">
+          <Loader label="Loading your studio" />
         </div>
       </div>
     );
@@ -137,6 +136,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const myCompany = role === "company" && isDemo ? companyById(userId) : undefined;
   const displayName = name || me?.name || myCompany?.name || "You";
   const avatarHue = me?.avatarHue ?? myCompany?.logoHue ?? 285;
+  const avatarUrl = me?.avatarUrl;
   const myNotifs = notifications.filter((n) => n.userId === userId);
   const unread = myNotifs.filter((n) => !n.read).length;
 
@@ -148,7 +148,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col bg-ink text-[#faf6ef] md:flex">
         <div className="px-5 py-6">
           <Link href="/dashboard" className="font-serif text-2xl font-extrabold text-[#f2a3df]">
-            MCC<span className="align-super text-[10px]">®</span>
+            loop
           </Link>
           {isDemo && (
             <span className="sticker mt-2 inline-block bg-[#a8d98a] text-[11px] text-ink">demo mode</span>
@@ -177,7 +177,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
         <div className="border-t-2 border-[#faf6ef]/10 p-4">
           <div className="flex items-center gap-3">
-            <Avatar name={displayName} hue={avatarHue} size="sm" />
+            <Avatar name={displayName} hue={avatarHue} src={avatarUrl} size="sm" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-bold">{displayName}</p>
               <p className="text-[11px] font-medium capitalize text-[#faf6ef]/40">{role}</p>
@@ -198,84 +198,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Main */}
       <div className="flex min-h-screen flex-1 flex-col md:pl-60">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b-2 border-ink/10 bg-bg/90 px-4 backdrop-blur-md md:px-6">
-          <Link href="/dashboard" className="font-serif text-xl font-extrabold md:hidden">
-            MCC<span className="text-[#d6409f]">®</span>
-          </Link>
-          <div className="hidden md:block">
-            {role === "company" && (
-              <button
-                onClick={() => setPaletteOpen(true)}
-                className="flex w-72 items-center gap-2 rounded-full border-2 border-ink/15 bg-surface px-4 py-2 text-[13px] font-bold text-text-tertiary transition-all hover:border-ink hover:scale-[1.02] cursor-pointer"
-              >
-                <Search className="h-4 w-4" />
-                Search creators…
-                <kbd className="num ml-auto rounded-full bg-surface-2 px-2 py-0.5 text-[10px]">⌘K</kbd>
-              </button>
-            )}
-          </div>
-          <div className="relative flex items-center gap-2">
-            <button
-              onClick={() => {
-                setBellOpen((o) => !o);
-                if (!bellOpen) markRead(userId);
-              }}
-              className="relative rounded-full border-2 border-ink/15 p-2.5 text-text-secondary transition-all hover:border-ink hover:scale-105 cursor-pointer"
-              aria-label="Notifications"
-            >
-              <Bell className="h-[18px] w-[18px]" />
-              {unread > 0 && (
-                <span className="num absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#d6409f] px-1 text-[10px] font-bold text-white">
-                  {unread}
-                </span>
-              )}
-            </button>
-            {bellOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setBellOpen(false)} />
-                <div className="absolute right-0 top-12 z-50 w-[min(92vw,380px)] overflow-hidden rounded-[20px] border-[3px] border-ink bg-surface shadow-[6px_6px_0_0_#101805]">
-                  <div className="border-b-2 border-ink/10 px-5 py-3 font-serif text-base font-bold">
-                    Notifications
-                  </div>
-                  <div className="max-h-80 overflow-y-auto">
-                    {myNotifs.length === 0 ? (
-                      <p className="px-5 py-10 text-center text-[13px] font-medium text-text-tertiary">
-                        Nothing yet. Activity on your gigs lands here.
-                      </p>
-                    ) : (
-                      myNotifs.slice(0, 8).map((n) => (
-                        <Link
-                          key={n.id}
-                          href={n.href ?? "#"}
-                          onClick={() => setBellOpen(false)}
-                          className="block border-b border-ink/10 px-5 py-3.5 transition-colors last:border-0 hover:bg-surface-2"
-                        >
-                          <p className="text-[13px] font-bold">{n.title}</p>
-                          <p className="mt-0.5 text-xs leading-relaxed text-text-secondary">{n.body}</p>
-                          <p className="num mt-1 text-[11px] text-text-tertiary">{daysAgo(n.createdAt)}</p>
-                        </Link>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
-            {isDemo && (
-              <button
-                className="hidden rounded-full border-2 border-ink/15 px-4 py-2 text-xs font-bold transition-all hover:border-ink hover:scale-105 lg:inline-flex cursor-pointer"
-                onClick={() => {
-                  const next = role === "creator" ? "company" : "creator";
-                  useSession.getState().signInDemo(next);
-                  router.push("/dashboard");
-                }}
-              >
-                View as {role === "creator" ? "brand" : "creator"}
-              </button>
-            )}
-          </div>
-        </header>
-
-        <main className="flex-1 px-4 py-6 pb-28 md:px-6 md:pb-10">{children}</main>
+        <main className="flex-1 px-4 py-4 pb-28 md:px-6 md:pb-10">{children}</main>
       </div>
 
       {/* Bottom nav — mobile */}

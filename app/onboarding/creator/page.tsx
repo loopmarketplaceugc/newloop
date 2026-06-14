@@ -3,19 +3,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, Loader2, Rocket, Sparkles } from "lucide-react";
-import { z } from "zod";
+import { ArrowLeft, ArrowRight, Check, Rocket } from "lucide-react";
 import { useSession } from "@/lib/store/session";
 import { useApp } from "@/lib/store/app";
-import { saveCreatorProfile } from "@/lib/auth";
+import { saveCreatorNickname, certifyCreator } from "@/lib/auth";
+import { haptics } from "@/lib/haptics";
 import { DEMO_CREATOR_ID } from "@/lib/seed";
+import { QrCode } from "@/components/shared/qr-code";
 import { TypeOnce } from "@/components/shared/typewriter";
 import { TikTokLogo, InstagramLogo, YouTubeLogo } from "@/components/shared/brand-logos";
 import { tierForFollowers, TIER_LABELS, type Platform } from "@/lib/types";
 import { formatCompact } from "@/lib/format";
 import { cn } from "@/lib/utils";
-
-/* One question per screen. Enter to continue. Zero friction. */
 
 const PLATFORMS: { id: Platform; label: string; Logo: typeof TikTokLogo; tint: string }[] = [
   { id: "tiktok", label: "TikTok", Logo: TikTokLogo, tint: "#f2a3df" },
@@ -23,40 +22,11 @@ const PLATFORMS: { id: Platform; label: string; Logo: typeof TikTokLogo; tint: s
   { id: "shorts", label: "YouTube", Logo: YouTubeLogo, tint: "#faf6ef" },
 ];
 
-const fieldSchemas = {
-  firstName: z.string().min(2, "at least 2 letters, promise it's worth it"),
-  lastName: z.string().min(2, "your last name too — contracts need it"),
-  phone: z.string().regex(/^[+\d][\d\s().-]{6,}$/, "that doesn't look like a phone number"),
-  email: z.string().email("that email won't get you paid"),
-};
-
-type TextStepId = keyof typeof fieldSchemas;
-
-interface TextStep {
-  kind: "text";
-  id: TextStepId;
-  q: string;
-  sub?: string;
-  placeholder: string;
-  type?: string;
-}
-
 type Step =
-  | TextStep
+  | { kind: "nickname"; q: string; sub: string }
   | { kind: "platforms"; q: string; sub: string }
-  | { kind: "profile"; q: string; sub: string; platform: Platform }
+  | { kind: "followers"; platform: Platform; q: string; sub: string }
   | { kind: "done"; q: string; sub: string };
-
-interface PlatformMetrics {
-  followerCount: number | null;
-  postCount: number | null;
-  averageViews: number | null;
-  confidence: "high" | "medium" | "low";
-  message: string;
-}
-
-const emptyLinks: Record<Platform, string> = { tiktok: "", reels: "", shorts: "" };
-const emptyFollowers: Record<Platform, string> = { tiktok: "", reels: "", shorts: "" };
 
 function numericInput(value: string) {
   return parseInt(value.replace(/\D/g, "")) || 0;
@@ -73,43 +43,48 @@ export default function CreatorOnboarding() {
   const [typed, setTyped] = useState(false);
   const [dir, setDir] = useState(1);
   const [error, setError] = useState<string | null>(null);
-  const [values, setValues] = useState({ firstName: "", lastName: "", phone: "", email: "" });
+  const [nickname, setNickname] = useState("");
   const [platforms, setPlatforms] = useState<Platform[]>([]);
-  const [profileLinks, setProfileLinks] = useState<Record<Platform, string>>(emptyLinks);
-  const [followers, setFollowers] = useState<Record<Platform, string>>(emptyFollowers);
-  const [metrics, setMetrics] = useState<Partial<Record<Platform, PlatformMetrics>>>({});
-  const [analyzing, setAnalyzing] = useState<Platform | null>(null);
+  const [followers, setFollowers] = useState<Record<Platform, string>>({ tiktok: "", reels: "", shorts: "" });
+  const [mccTag, setMccTag] = useState<string | null>(null);
+  const [origin, setOrigin] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
 
   const steps: Step[] = useMemo(
     () => [
-      { kind: "text", id: "firstName", q: "First things first — what's your first name?", placeholder: "Mia", sub: "60 seconds. That's all this takes." },
-      { kind: "text", id: "lastName", q: `Nice to meet you, ${values.firstName || "you"}. Last name?`, placeholder: "Tanaka", sub: "It goes on your contracts, not your profile." },
-      { kind: "text", id: "phone", q: "Best number to reach you?", placeholder: "+1 (555) 010-2030", type: "tel", sub: "Only for gig alerts. Never sold, never spammed." },
-      { kind: "text", id: "email", q: "And the email brands should connect with?", placeholder: "mia@studio.com", type: "email", sub: "Payout receipts land here too." },
+      {
+        kind: "nickname",
+        q: "What's your creator name?",
+        sub: "This is how brands and your audience will know you — pick whatever you go by.",
+      },
       {
         kind: "platforms",
-        q: "Where do you post?",
-        sub: "Tap everything that applies. Followers are context, not a gate — UGC is about quality.",
+        q: `Nice, ${nickname || "creator"}. Where do you post?`,
+        sub: "Tap everything that applies.",
       },
       ...platforms.map((p) => ({
-        kind: "profile" as const,
+        kind: "followers" as const,
         platform: p,
-        q: `Drop your ${PLATFORMS.find((x) => x.id === p)!.label} link.`,
-        sub:
-          p === "shorts"
-            ? "Paste your channel/profile link, then add followers manually."
-            : "We’ll try to pull followers, posts, and average views from the public profile. No fake stats.",
+        q: `How many followers on ${PLATFORMS.find((x) => x.id === p)!.label}?`,
+        sub: "Rough number is totally fine — brands care about your content, not just the count.",
       })),
-      { kind: "done", q: `You're in, ${values.firstName || "creator"}.`, sub: "Profile live. Status: Open to Work." },
+      {
+        kind: "done",
+        q: `You're in, ${nickname || "creator"}.`,
+        sub: "Profile live. Brands can find you and scan your QR to see your page.",
+      },
     ],
-    [platforms, values.firstName],
+    [platforms, nickname],
   );
 
   const step = steps[Math.min(stepIdx, steps.length - 1)];
   const progress = Math.round((stepIdx / (steps.length - 1)) * 100);
-  const followerCountFor = (platform: Platform) =>
-    metrics[platform]?.followerCount ?? numericInput(followers[platform]);
+
+  const followerCountFor = (p: Platform) => numericInput(followers[p]);
   const totalFollowers = platforms.reduce((s, p) => s + followerCountFor(p), 0);
   const tier = tierForFollowers(totalFollowers);
 
@@ -120,67 +95,66 @@ export default function CreatorOnboarding() {
     return () => clearTimeout(t);
   }, [stepIdx]);
 
+  useEffect(() => {
+    if (step.kind !== "done" || mccTag) return;
+    let cancelled = false;
+    void certifyCreator().then((tag) => {
+      if (cancelled) return;
+      setMccTag(tag);
+      haptics.celebrate();
+      const id = session.isDemo ? DEMO_CREATOR_ID : session.userId ?? DEMO_CREATOR_ID;
+      useApp.getState().updateCreator(id, { mccTag: tag, name: nickname });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [step.kind, mccTag, session.isDemo, session.userId, nickname]);
+
   const next = () => {
     setError(null);
-    if (step.kind === "text") {
-      const r = fieldSchemas[step.id].safeParse(values[step.id].trim());
-      if (!r.success) {
-        setError(r.error.issues[0].message);
+
+    if (step.kind === "nickname") {
+      const clean = nickname.trim();
+      if (clean.length < 2) {
+        haptics.error();
+        setError("need at least 2 characters — how do you want to be known?");
         return;
       }
     }
+
     if (step.kind === "platforms" && platforms.length === 0) {
-      setError("pick at least one — brands filter by platform");
+      haptics.error();
+      setError("pick at least one — this is how brands filter creators");
       return;
     }
-    if (step.kind === "profile") {
-      const link = profileLinks[step.platform].trim();
-      const requiresLink = step.platform === "tiktok" || step.platform === "reels";
-      if (requiresLink && !link) {
-        setError("paste your profile link so brands can verify you");
-        return;
-      }
-      if (link) {
-        try {
-          new URL(link);
-        } catch {
-          setError("that link is not a valid URL");
-          return;
-        }
-      }
+
+    if (step.kind === "followers") {
       if (followerCountFor(step.platform) <= 0) {
-        setError("add your followers or run the analyzer first");
+        setError("enter your follower count — even an estimate works");
         return;
       }
     }
+
     if (step.kind === "done") {
-      const fullName = `${values.firstName} ${values.lastName}`.trim();
       const platformRows = platforms.map((p) => ({
         platform: p,
-        url: profileLinks[p].trim(),
         followerCount: followerCountFor(p),
-        postCount: metrics[p]?.postCount ?? undefined,
-        averageViews: metrics[p]?.averageViews ?? undefined,
       }));
-      // Local record (real users start zeroed — no fake numbers) + Supabase profile
-      ensureCreator(session.isDemo ? DEMO_CREATOR_ID : (session.userId ?? DEMO_CREATOR_ID), {
-        name: fullName || "Creator",
+      const id = session.isDemo ? DEMO_CREATOR_ID : (session.userId ?? DEMO_CREATOR_ID);
+      ensureCreator(id, {
+        name: nickname,
         status: "open",
         tier,
-        platforms: platformRows,
+        platforms: platformRows.map((r) => ({ platform: r.platform, url: "", followerCount: r.followerCount })),
       });
-      setName(fullName);
-      void saveCreatorProfile({
-        firstName: values.firstName,
-        lastName: values.lastName,
-        phone: values.phone,
-        email: values.email || session.email,
-        platforms: platformRows,
-      });
+      setName(nickname);
+      void saveCreatorNickname({ nickname, platforms: platformRows });
       completeOnboarding();
       router.push("/dashboard");
       return;
     }
+
+    haptics.step();
     setDir(1);
     setStepIdx((i) => i + 1);
   };
@@ -191,51 +165,9 @@ export default function CreatorOnboarding() {
     setStepIdx((i) => i - 1);
   };
 
-  const analyzeProfile = async (platform: Platform) => {
-    if (platform === "shorts") return;
-    setError(null);
-    const url = profileLinks[platform].trim();
-    if (!url) {
-      setError("paste the profile link first");
-      return;
-    }
-    setAnalyzing(platform);
-    try {
-      const res = await fetch("/api/analyze-profile", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ platform, url }),
-      });
-      const body = (await res.json()) as Partial<PlatformMetrics> & { error?: string };
-      if (!res.ok) {
-        setError(body.error ?? "could not analyze that profile");
-        return;
-      }
-      const nextMetrics: PlatformMetrics = {
-        followerCount: body.followerCount ?? null,
-        postCount: body.postCount ?? null,
-        averageViews: body.averageViews ?? null,
-        confidence: body.confidence ?? "low",
-        message: body.message ?? "Profile checked.",
-      };
-      setMetrics((m) => ({ ...m, [platform]: nextMetrics }));
-      if (nextMetrics.followerCount) {
-        setFollowers((f) => ({
-          ...f,
-          [platform]: nextMetrics.followerCount!.toLocaleString("en-US"),
-        }));
-      }
-      if (nextMetrics.confidence === "low") setError(nextMetrics.message);
-    } catch {
-      setError("could not reach that profile — enter the metrics manually");
-    } finally {
-      setAnalyzing(null);
-    }
-  };
-
   return (
     <div className="flex min-h-screen flex-col bg-ink text-[#faf6ef]">
-      {/* progress */}
+      {/* progress bar */}
       <div className="fixed inset-x-0 top-0 z-50 h-1.5 bg-[#faf6ef]/10">
         <motion.div
           className="h-full bg-[#a8d98a]"
@@ -262,7 +194,6 @@ export default function CreatorOnboarding() {
             transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
             className="w-full max-w-2xl"
           >
-            {/* QUESTION — typed out */}
             <h1 className="font-serif min-h-[2.2em] text-3xl font-extrabold leading-tight sm:text-5xl">
               <TypeOnce text={step.q} speed={22} onDone={() => setTyped(true)} />
             </h1>
@@ -282,14 +213,17 @@ export default function CreatorOnboarding() {
               transition={{ duration: 0.25 }}
               className="mt-10"
             >
-              {/* TEXT INPUT */}
-              {step.kind === "text" && (
+              {/* NICKNAME */}
+              {step.kind === "nickname" && (
                 <input
                   ref={inputRef}
-                  type={step.type ?? "text"}
-                  value={values[step.id]}
-                  placeholder={step.placeholder}
-                  onChange={(e) => setValues((v) => ({ ...v, [step.id]: e.target.value }))}
+                  type="text"
+                  value={nickname}
+                  placeholder="e.g. MiaCreates"
+                  onChange={(e) => {
+                    haptics.tap();
+                    setNickname(e.target.value);
+                  }}
                   onKeyDown={(e) => e.key === "Enter" && next()}
                   className="w-full border-b-4 border-[#faf6ef]/20 bg-transparent pb-3 font-serif text-3xl font-bold text-[#a8d98a] placeholder:text-[#faf6ef]/15 focus:border-[#f2a3df] focus:outline-none sm:text-5xl"
                   style={{ boxShadow: "none", borderRadius: 0 }}
@@ -309,9 +243,10 @@ export default function CreatorOnboarding() {
                         transition={{ delay: 0.05 * i }}
                         whileHover={{ scale: 1.06, rotate: i % 2 ? 2 : -2 }}
                         whileTap={{ scale: 0.94 }}
-                        onClick={() =>
-                          setPlatforms((ps) => (on ? ps.filter((x) => x !== id) : [...ps, id]))
-                        }
+                        onClick={() => {
+                          haptics.select();
+                          setPlatforms((ps) => (on ? ps.filter((x) => x !== id) : [...ps, id]));
+                        }}
                         className={cn(
                           "relative flex flex-col items-center gap-3 rounded-[24px] border-[3px] p-7 transition-colors cursor-pointer",
                           on
@@ -333,97 +268,33 @@ export default function CreatorOnboarding() {
                 </div>
               )}
 
-              {/* PROFILE LINK + METRICS */}
-              {step.kind === "profile" && (
-                <div className="space-y-7">
-                  <div className="flex items-end gap-4">
+              {/* FOLLOWER COUNT */}
+              {step.kind === "followers" && (
+                <div className="space-y-6">
+                  <div className="flex items-center gap-4">
                     {(() => {
                       const P = PLATFORMS.find((x) => x.id === step.platform)!;
-                      return <P.Logo className="mb-3 h-10 w-10 shrink-0 text-[#f2a3df]" />;
+                      return <P.Logo className="h-10 w-10 shrink-0 text-[#f2a3df]" />;
                     })()}
                     <input
                       ref={inputRef}
-                      type="url"
-                      value={profileLinks[step.platform]}
-                      placeholder={
-                        step.platform === "tiktok"
-                          ? "https://www.tiktok.com/@yourhandle"
-                          : step.platform === "reels"
-                            ? "https://www.instagram.com/yourhandle"
-                            : "https://www.youtube.com/@yourhandle"
-                      }
-                      onChange={(e) =>
-                        setProfileLinks((links) => ({
-                          ...links,
-                          [step.platform]: e.target.value,
-                        }))
-                      }
-                      onKeyDown={(e) => e.key === "Enter" && next()}
-                      className="w-full border-b-4 border-[#faf6ef]/20 bg-transparent pb-3 font-serif text-2xl font-bold text-[#a8d98a] placeholder:text-[#faf6ef]/15 focus:border-[#f2a3df] focus:outline-none sm:text-4xl"
-                      style={{ boxShadow: "none", borderRadius: 0 }}
-                    />
-                  </div>
-
-                  {step.platform !== "shorts" && (
-                    <motion.button
-                      whileHover={{ scale: 1.04 }}
-                      whileTap={{ scale: 0.96 }}
-                      onClick={() => analyzeProfile(step.platform)}
-                      disabled={analyzing === step.platform}
-                      className="inline-flex items-center gap-2 rounded-full bg-[#f2a3df] px-5 py-3 font-serif text-sm font-bold text-ink disabled:opacity-60 cursor-pointer"
-                    >
-                      {analyzing === step.platform ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Sparkles className="h-4 w-4" />
-                      )}
-                      Analyze public profile
-                    </motion.button>
-                  )}
-
-                  {metrics[step.platform] && (
-                    <div className="rounded-[22px] border-2 border-[#faf6ef]/15 bg-[#faf6ef]/5 p-4">
-                      <p className="text-sm font-bold text-[#faf6ef]/70">{metrics[step.platform]?.message}</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {[
-                          ["followers", metrics[step.platform]?.followerCount],
-                          ["posts", metrics[step.platform]?.postCount],
-                          ["avg views", metrics[step.platform]?.averageViews],
-                        ].map(([label, value]) => (
-                          <span key={label} className="rounded-full bg-[#101805] px-3 py-1.5 text-xs font-bold text-[#a8d98a]">
-                            {label}: <span className="num">{typeof value === "number" ? formatCompact(value) : "manual"}</span>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="text-xs font-bold uppercase tracking-widest text-[#faf6ef]/40">
-                      Followers {metrics[step.platform]?.followerCount ? "(auto-filled)" : "(manual fallback)"}
-                    </label>
-                    <input
                       inputMode="numeric"
                       value={followers[step.platform]}
-                      placeholder="12,500"
+                      placeholder="10,000"
                       onChange={(e) =>
-                        setFollowers((f) => ({
-                          ...f,
-                          [step.platform]: e.target.value.replace(/[^\d,]/g, ""),
-                        }))
+                        setFollowers((f) => ({ ...f, [step.platform]: e.target.value.replace(/[^\d,]/g, "") }))
                       }
                       onKeyDown={(e) => e.key === "Enter" && next()}
                       className="num w-full border-b-4 border-[#faf6ef]/20 bg-transparent pb-3 font-serif text-4xl font-bold text-[#a8d98a] placeholder:text-[#faf6ef]/15 focus:border-[#f2a3df] focus:outline-none sm:text-6xl"
                       style={{ boxShadow: "none", borderRadius: 0 }}
                     />
                   </div>
-
                   {totalFollowers > 0 && (
                     <motion.p
                       key={tier}
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      className="mt-5 text-sm font-bold text-[#faf6ef]/60"
+                      className="text-sm font-bold text-[#faf6ef]/60"
                     >
                       <span className="num">{formatCompact(totalFollowers)}</span> combined →{" "}
                       <span className="sticker bg-[#f2a3df] text-ink">{TIER_LABELS[tier]} tier</span>
@@ -437,21 +308,45 @@ export default function CreatorOnboarding() {
                 <motion.div
                   initial={{ scale: 0.9, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  className="flex flex-wrap items-center gap-3"
+                  className="space-y-6"
                 >
-                  {platforms.map((p) => {
-                    const P = PLATFORMS.find((x) => x.id === p)!;
-                    return (
-                      <span key={p} className="flex items-center gap-2 rounded-full bg-[#faf6ef]/10 px-4 py-2 text-sm font-bold">
-                        <P.Logo className="h-4 w-4" />
-                        <span className="num">{formatCompact(followerCountFor(p))}</span>
-                      </span>
-                    );
-                  })}
-                  <span className="sticker bg-[#a8d98a] text-ink">{TIER_LABELS[tier]} tier</span>
-                  <span className="flex items-center gap-1.5 text-sm font-bold text-[#a8d98a]">
-                    <span className="h-2.5 w-2.5 animate-pulse-dot rounded-full bg-[#a8d98a]" /> Open to Work
-                  </span>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {platforms.map((p) => {
+                      const P = PLATFORMS.find((x) => x.id === p)!;
+                      return (
+                        <span key={p} className="flex items-center gap-2 rounded-full bg-[#faf6ef]/10 px-4 py-2 text-sm font-bold">
+                          <P.Logo className="h-4 w-4" />
+                          <span className="num">{formatCompact(followerCountFor(p))}</span>
+                        </span>
+                      );
+                    })}
+                    <span className="sticker bg-[#a8d98a] text-ink">{TIER_LABELS[tier]} tier</span>
+                    <span className="flex items-center gap-1.5 text-sm font-bold text-[#a8d98a]">
+                      <span className="h-2.5 w-2.5 animate-pulse-dot rounded-full bg-[#a8d98a]" /> Open to Work
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-5 rounded-[24px] border-[3px] border-[#faf6ef]/15 bg-[#faf6ef]/[0.04] p-6 sm:flex-row sm:items-center">
+                    <div className="flex-1">
+                      <span className="sticker bg-[#f2a3df] text-[11px] text-ink">certified creator</span>
+                      <p className="mt-3 text-xs font-bold uppercase tracking-widest text-[#faf6ef]/40">
+                        Your MCC tag
+                      </p>
+                      <p className="num mt-1 font-serif text-3xl font-extrabold text-[#a8d98a] sm:text-4xl">
+                        {mccTag ?? "minting…"}
+                      </p>
+                      <p className="mt-3 max-w-xs text-sm font-medium leading-relaxed text-[#faf6ef]/55">
+                        Brands scan this to instantly see your verified profile — your name, tier, and portfolio in one tap.
+                      </p>
+                    </div>
+                    {mccTag && (
+                      <QrCode
+                        value={`${origin}/creator/${mccTag}`}
+                        size={150}
+                        label={`MCC tag ${mccTag}`}
+                      />
+                    )}
+                  </div>
                 </motion.div>
               )}
 
@@ -465,7 +360,6 @@ export default function CreatorOnboarding() {
                 </motion.p>
               )}
 
-              {/* NAV */}
               <div className="mt-10 flex items-center gap-3">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
@@ -505,7 +399,6 @@ export default function CreatorOnboarding() {
         </AnimatePresence>
       </main>
 
-      {/* floating blobs */}
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden="true">
         <div className="absolute -left-10 top-1/4 h-32 w-32 animate-float rounded-[40%_60%_55%_45%/55%_45%_60%_40%] bg-[#f2a3df]/15" />
         <div className="absolute -right-8 bottom-1/4 h-40 w-40 animate-float rounded-[60%_40%_45%_55%/45%_55%_40%_60%] bg-[#a8d98a]/15 [animation-delay:1s]" />

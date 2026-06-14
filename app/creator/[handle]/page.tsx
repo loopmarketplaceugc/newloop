@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, FileText, MapPin, MessageSquare } from "lucide-react";
@@ -15,11 +15,13 @@ import { TierBadge } from "@/components/shared/tier-badge";
 import { StatusDot } from "@/components/shared/status-dot";
 import { PlatformIcon } from "@/components/shared/platform-icon";
 import { StarRating } from "@/components/shared/star-rating";
+import { QrCode } from "@/components/shared/qr-code";
 import { COMPENSATION_LABELS, PLATFORM_LABELS } from "@/lib/types";
 import { companyById } from "@/lib/seed";
-import { dbCreateGig } from "@/lib/sync";
+import { dbCreateGig, fetchCreatorByHandle } from "@/lib/sync";
 import { formatCompact, formatMoney } from "@/lib/format";
 import { toast } from "@/components/ui/toast";
+import type { Creator } from "@/lib/types";
 
 export default function CreatorPublicPage({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = use(params);
@@ -30,9 +32,31 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
   const isDemo = useSession((s) => s.isDemo);
   const { creators, reviews, gigs } = useApp();
   const [starting, setStarting] = useState(false);
-  const c = creators.find((x) => x.handle === decodeURIComponent(handle));
+  const [fetched, setFetched] = useState<Creator | null | "loading">("loading");
+  const [origin, setOrigin] = useState("");
 
-  if (!hydrated) return <div className="mx-auto max-w-3xl p-6"><CardSkeleton /></div>;
+  const key = decodeURIComponent(handle);
+  const fromStore = creators.find((x) => x.handle === key || x.mccTag === key);
+
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
+
+  // Fetch from Supabase when not in the local store — makes QR scan work for any visitor
+  useEffect(() => {
+    if (fromStore) { setFetched(null); return; }
+    let cancelled = false;
+    void fetchCreatorByHandle(key).then((c) => {
+      if (!cancelled) setFetched(c ?? null);
+    });
+    return () => { cancelled = true; };
+  }, [key, fromStore]);
+
+  const c = fromStore ?? (fetched !== "loading" ? fetched : null);
+
+  if (!hydrated || fetched === "loading") {
+    return <div className="mx-auto max-w-3xl p-6"><CardSkeleton /></div>;
+  }
 
   if (!c) {
     return (
@@ -42,6 +66,10 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
       </div>
     );
   }
+
+  // Use the mccTag QR link if available, otherwise handle
+  const profileUrl = `${origin}/creator/${c.mccTag ?? c.handle}`;
+  const isOwnProfile = userId === c.id;
 
   const myReviews = reviews.filter((r) => r.targetId === c.id);
   const firstGig = gigs.find((g) => g.creatorId === c.id && (!userId || g.companyId === userId));
@@ -91,104 +119,136 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
             <TierBadge tier={c.tier} />
           </div>
           <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-secondary">
-            @{c.handle}
-            <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{c.location}</span>
+            {c.handle && <span>@{c.handle}</span>}
+            {c.location && (
+              <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{c.location}</span>
+            )}
             <StatusDot status={c.status} />
           </p>
-          <p className="mt-3 max-w-xl text-sm leading-relaxed text-text-secondary">{c.bio}</p>
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {c.niches.map((n) => <Badge key={n}>{n}</Badge>)}
-          </div>
+          {c.bio && (
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-text-secondary">{c.bio}</p>
+          )}
+          {c.niches.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {c.niches.map((n) => <Badge key={n}>{n}</Badge>)}
+            </div>
+          )}
         </div>
-        {role === "company" && (
+        {role === "company" && !isOwnProfile && (
           <Button onClick={startConversation} disabled={starting}>
             <MessageSquare className="h-4 w-4" /> {starting ? "Opening chat..." : "Start a conversation"}
           </Button>
         )}
       </div>
 
-      {/* Stats strip */}
-      <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
-          { label: "Base rate", value: formatMoney(c.baseRateCents) },
-          { label: "Capacity", value: `${c.capacityPerWeek}/wk` },
-          { label: "Completed gigs", value: String(c.completedGigs) },
-          { label: "Usage upcharge", value: `+${c.usageUpchargePct}%` },
-        ].map((s) => (
-          <Card key={s.label}>
-            <CardContent className="p-4">
-              <p className="text-[10px] uppercase tracking-wider text-text-tertiary">{s.label}</p>
-              <p className="num mt-0.5 text-xl font-semibold">{s.value}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {/* MCC tag + QR — shown to everyone, especially useful for brands scanning creator's code */}
+      {c.mccTag && (
+        <div className="mt-6 flex flex-col gap-4 rounded-[20px] border-2 border-ink bg-surface p-5 sm:flex-row sm:items-center">
+          <div className="flex-1">
+            <p className="text-[10px] font-extrabold uppercase tracking-widest text-text-tertiary">MCC creator tag</p>
+            <p className="num mt-1 font-serif text-2xl font-extrabold">{c.mccTag}</p>
+            <p className="mt-1.5 text-xs font-medium text-text-secondary">
+              Scan to open this profile instantly — verified tier, platforms, and portfolio in one tap.
+            </p>
+          </div>
+          <QrCode value={profileUrl} size={110} label={`QR for ${c.name}`} />
+        </div>
+      )}
+
+      {/* Stats strip — only show when there's meaningful data */}
+      {(c.baseRateCents > 0 || c.completedGigs > 0) && (
+        <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            c.baseRateCents > 0 && { label: "Base rate", value: formatMoney(c.baseRateCents) },
+            { label: "Capacity", value: `${c.capacityPerWeek}/wk` },
+            { label: "Completed gigs", value: String(c.completedGigs) },
+            c.usageUpchargePct > 0 && { label: "Usage upcharge", value: `+${c.usageUpchargePct}%` },
+          ]
+            .filter(Boolean)
+            .map((s) => (
+              <Card key={(s as { label: string }).label}>
+                <CardContent className="p-4">
+                  <p className="text-[10px] uppercase tracking-wider text-text-tertiary">{(s as { label: string }).label}</p>
+                  <p className="num mt-0.5 text-xl font-semibold">{(s as { value: string }).value}</p>
+                </CardContent>
+              </Card>
+            ))}
+        </div>
+      )}
 
       {/* Platforms */}
-      <div className="mt-6 grid gap-3 sm:grid-cols-2">
-        {c.platforms.map((p) => (
-          <Card key={p.platform}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between gap-3">
-                <span className="flex items-center gap-2 text-sm font-medium">
-                  <PlatformIcon platform={p.platform} />
-                  {PLATFORM_LABELS[p.platform]}
-                </span>
-                <span className="num text-sm font-semibold">{formatCompact(p.followerCount)} followers</span>
-              </div>
-              {(p.postCount || p.averageViews || p.url) && (
-                <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-bold text-text-tertiary">
-                  {p.postCount ? <span className="num">{formatCompact(p.postCount)} posts</span> : null}
-                  {p.averageViews ? <span className="num">{formatCompact(p.averageViews)} avg views</span> : null}
-                  {p.url ? (
-                    <a href={p.url} target="_blank" rel="noreferrer" className="text-[#d6409f] underline underline-offset-2">
-                      open profile
-                    </a>
-                  ) : null}
+      {c.platforms.length > 0 && (
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          {c.platforms.map((p) => (
+            <Card key={p.platform}>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-2 text-sm font-medium">
+                    <PlatformIcon platform={p.platform} />
+                    {PLATFORM_LABELS[p.platform]}
+                  </span>
+                  <span className="num text-sm font-semibold">{formatCompact(p.followerCount)} followers</span>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-        <Card>
-          <CardContent className="flex items-center justify-between p-4">
-            <span className="text-sm text-text-secondary">Compensation</span>
-            <Badge variant="money">{COMPENSATION_LABELS[c.compensationPref]}</Badge>
-          </CardContent>
-        </Card>
-        {c.mediaKitUrl && (
-          <Card>
-            <CardContent className="flex items-center justify-between p-4">
-              <span className="flex items-center gap-2 text-sm text-text-secondary">
-                <FileText className="h-4 w-4" /> Media kit
-              </span>
-              <Button variant="outline" size="sm">Download PDF</Button>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+                {(p.postCount || p.averageViews || p.url) && (
+                  <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-bold text-text-tertiary">
+                    {p.postCount ? <span className="num">{formatCompact(p.postCount)} posts</span> : null}
+                    {p.averageViews ? <span className="num">{formatCompact(p.averageViews)} avg views</span> : null}
+                    {p.url ? (
+                      <a href={p.url} target="_blank" rel="noreferrer" className="text-[#d6409f] underline underline-offset-2">
+                        open profile
+                      </a>
+                    ) : null}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+          {c.compensationPref && (
+            <Card>
+              <CardContent className="flex items-center justify-between p-4">
+                <span className="text-sm text-text-secondary">Compensation</span>
+                <Badge variant="money">{COMPENSATION_LABELS[c.compensationPref]}</Badge>
+              </CardContent>
+            </Card>
+          )}
+          {c.mediaKitUrl && (
+            <Card>
+              <CardContent className="flex items-center justify-between p-4">
+                <span className="flex items-center gap-2 text-sm text-text-secondary">
+                  <FileText className="h-4 w-4" /> Media kit
+                </span>
+                <Button variant="outline" size="sm">Download PDF</Button>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Portfolio */}
-      <h2 className="mt-10 font-serif text-xl font-semibold">Portfolio</h2>
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {c.portfolio.map((p) => (
-          <div key={p.id}>
-            <div
-              className="flex aspect-[9/12] items-end rounded-[10px] border border-border p-2"
-              style={{
-                background: `linear-gradient(160deg, hsl(${p.thumbnailHue} 35% 88%), hsl(${(p.thumbnailHue + 50) % 360} 30% 74%))`,
-              }}
-            >
-              {p.durationSec && (
-                <span className="num rounded bg-text-primary/75 px-1.5 py-0.5 text-[10px] text-bg">
-                  0:{String(p.durationSec).padStart(2, "0")}
-                </span>
-              )}
-            </div>
-            <p className="mt-1.5 line-clamp-1 text-xs text-text-secondary">{p.title}</p>
+      {c.portfolio.length > 0 && (
+        <>
+          <h2 className="mt-10 font-serif text-xl font-semibold">Portfolio</h2>
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {c.portfolio.map((p) => (
+              <div key={p.id}>
+                <div
+                  className="flex aspect-[9/12] items-end rounded-[10px] border border-border p-2"
+                  style={{
+                    background: `linear-gradient(160deg, hsl(${p.thumbnailHue} 35% 88%), hsl(${(p.thumbnailHue + 50) % 360} 30% 74%))`,
+                  }}
+                >
+                  {p.durationSec && (
+                    <span className="num rounded bg-text-primary/75 px-1.5 py-0.5 text-[10px] text-bg">
+                      0:{String(p.durationSec).padStart(2, "0")}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1.5 line-clamp-1 text-xs text-text-secondary">{p.title}</p>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
 
       {/* Reviews */}
       <div className="mt-10 flex items-center gap-3">

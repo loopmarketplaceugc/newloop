@@ -35,9 +35,12 @@ import { PlatformIcon } from "@/components/shared/platform-icon";
 import { ScriptEngine } from "@/components/company/script-engine";
 import { companyById } from "@/lib/seed";
 import { fetchMyWorld, fetchProfileNames, subscribeToGig } from "@/lib/sync";
+import { haptics } from "@/lib/haptics";
+import { confirmGigPayment, payForGig } from "@/lib/payments";
 import {
   AUTO_APPROVE_DAYS,
   MAX_REVISIONS,
+  PLATFORM_FEE_PCT,
   STATUS_LABELS,
   creatorPayoutCents,
   mainPath,
@@ -81,6 +84,37 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
     bottomRef.current?.scrollIntoView({ behavior: "instant", block: "end" });
   }, [msgs.length, hydrated]);
 
+  // Returning from Stripe Checkout: verify with Stripe, then mark the gig paid.
+  useEffect(() => {
+    if (!hydrated || !gig) return;
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("paid") === "1") {
+      const sessionId = sp.get("session_id");
+      window.history.replaceState({}, "", `/gig/${gig.id}`);
+      void (async () => {
+        try {
+          if (!sessionId) throw new Error("Missing Stripe confirmation.");
+          const { paymentIntentId } = await confirmGigPayment({ gigId: gig.id, sessionId });
+          if (gig.status === "OFFER_ACCEPTED") useApp.getState().fundEscrow(gig.id, paymentIntentId);
+          haptics.success();
+          toast("Payment complete", {
+            body: "The creator is paid and cleared to start.",
+            tone: "success",
+          });
+        } catch (e) {
+          haptics.error();
+          toast("Payment needs review", {
+            body: e instanceof Error ? e.message : "Stripe did not confirm the payment.",
+            tone: "warning",
+          });
+        }
+      })();
+    } else if (sp.get("paid") === "0") {
+      window.history.replaceState({}, "", `/gig/${gig.id}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, gig?.id, gig?.status]);
+
   useEffect(() => {
     if (!hydrated || !userId || isDemo) return;
     let cancelled = false;
@@ -94,7 +128,12 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
 
     const unsubscribe = subscribeToGig(
       id,
-      (message) => useApp.getState().upsertMessage(message),
+      (message) => {
+        const known = useApp.getState().messages.some((m) => m.id === message.id);
+        // Buzz on a genuinely new message from the other party — immersive chat.
+        if (!known && message.senderId !== userId) haptics.message();
+        useApp.getState().upsertMessage(message);
+      },
       (updatedGig) => useApp.getState().upsertGig(updatedGig),
     );
     void refresh();
@@ -146,6 +185,7 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
 
   const send = () => {
     if (!draft.trim()) return;
+    haptics.select();
     app.sendMessage({ gigId: gig.id, senderId: userId, kind: "text", text: draft.trim() });
     setDraft("");
   };
@@ -208,12 +248,26 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
     switch (gig.status) {
       case "OFFER_ACCEPTED":
         return {
-          label: `Fund escrow — ${formatMoney(gig.priceCents)}`,
+          label: `Pay creator — ${formatMoney(gig.priceCents)}`,
           icon: ShieldCheck,
           money: true,
-          fn: () => {
-            app.fundEscrow(gig.id);
-            toast("Escrow funded", { body: `${formatMoney(gig.priceCents)} held by MCC until you approve the work.`, tone: "success" });
+          fn: async () => {
+            haptics.step();
+            try {
+              await payForGig({
+                gigId: gig.id,
+                title: gig.title,
+                amountCents: gig.priceCents,
+                creatorAccountId: creator?.stripePayoutsEnabled ? creator.stripeAccountId : undefined,
+                creatorName: creator?.name,
+              });
+            } catch (e) {
+              haptics.error();
+              toast("Couldn’t start payment", {
+                body: e instanceof Error ? e.message : "Try again in a moment.",
+                tone: "warning",
+              });
+            }
           },
         };
       case "FUNDED_IN_ESCROW":
@@ -231,12 +285,12 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
         return { label: "Confirm product delivered", icon: Package, fn: () => app.transition(gig.id, "PRODUCT_DELIVERED") };
       case "DELIVERED":
         return {
-          label: `Approve & release ${formatMoney(creatorPayoutCents(gig.priceCents))}`,
+          label: `Approve work — ${formatMoney(creatorPayoutCents(gig.priceCents))}`,
           icon: CheckCircle2,
           money: true,
           fn: () => {
             app.approveAndRelease(gig.id);
-            toast("Payment released", { body: `${formatMoney(creatorPayoutCents(gig.priceCents))} sent to ${creator?.name}. 10% fee retained.`, tone: "success" });
+            toast("Work approved", { body: `${creator?.name ?? "Creator"} keeps ${formatMoney(creatorPayoutCents(gig.priceCents))}. MCC keeps ${PLATFORM_FEE_PCT}%.`, tone: "success" });
           },
         };
       default:
@@ -279,7 +333,7 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
                 </>
               ) : (
                 <>
-                  <Avatar name={creator?.name ?? "?"} hue={creator?.avatarHue ?? 0} size="md" />
+                  <Avatar name={creator?.name ?? "?"} hue={creator?.avatarHue ?? 0} src={creator?.avatarUrl} size="md" />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold">{creator?.name}</p>
                     <p className="text-xs text-text-tertiary">@{creator?.handle}</p>
@@ -292,11 +346,11 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
             </CardContent>
           </Card>
 
-          {/* Escrow timeline */}
+          {/* Payment timeline */}
           <Card>
             <CardContent className="p-4">
               <div className="mb-3 flex items-center justify-between">
-                <p className="text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Escrow status</p>
+                <p className="text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Payment status</p>
                 <span className="num text-sm font-semibold">{formatMoney(gig.priceCents)}</span>
               </div>
               <ol className="space-y-0">
@@ -343,7 +397,7 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
                   <span className="num font-semibold text-money">{formatMoney(creatorPayoutCents(gig.priceCents))}</span>
                 </p>
                 <p className="flex justify-between">
-                  <span>Platform fee (10%)</span>
+                  <span>MCC commission ({PLATFORM_FEE_PCT}%)</span>
                   <span className="num">{formatMoney(platformFeeCents(gig.priceCents))}</span>
                 </p>
                 {!isCreator && (
@@ -469,15 +523,15 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
             {msgs.map((m) => {
               const mine = m.senderId === userId;
               const sender = m.senderId === gig.companyId
-                ? { name: companyName, hue: companyHue }
+                ? { name: companyName, hue: companyHue, src: undefined }
                 : (() => {
                     const c = app.creators.find((c) => c.id === m.senderId);
-                    return { name: c?.name ?? "Creator", hue: c?.avatarHue ?? 0 };
+                    return { name: c?.name ?? "Creator", hue: c?.avatarHue ?? 0, src: c?.avatarUrl };
                   })();
               const msgScript = m.scriptId ? app.scripts.find((s) => s.id === m.scriptId) : null;
               return (
                 <div key={m.id} className={cn("flex gap-2.5", mine && "flex-row-reverse")}>
-                  <Avatar name={sender.name} hue={sender.hue} size="xs" className="mt-1" />
+                  <Avatar name={sender.name} hue={sender.hue} src={sender.src} size="xs" className="mt-1" />
                   <div className={cn("max-w-[85%] sm:max-w-[70%]", mine && "items-end")}>
                     {/* Text */}
                     {m.kind === "text" && (
@@ -530,7 +584,7 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
                             {m.offer.rawFootageIncluded && " · raw footage included"}
                           </p>
                           <p className="text-text-tertiary">
-                            Creator nets <span className="num">{formatMoney(creatorPayoutCents(m.offer.priceCents))}</span> after the 10% fee
+                            Creator nets <span className="num">{formatMoney(creatorPayoutCents(m.offer.priceCents))}</span> after the {PLATFORM_FEE_PCT}% commission
                           </p>
                         </div>
                         {m.offer.state === "pending" && isCreator && (
@@ -540,7 +594,7 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
                               size="sm"
                               onClick={() => {
                                 app.respondToOffer(m.id, true);
-                                toast("Offer accepted", { body: "Contract generated. Waiting on escrow funding.", tone: "success" });
+                                toast("Offer accepted", { body: "Contract generated. Waiting on the brand to pay.", tone: "success" });
                               }}
                             >
                               Accept
@@ -577,7 +631,10 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
               )}
               <Textarea
                 value={draft}
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={(e) => {
+                  haptics.tap();
+                  setDraft(e.target.value);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -593,7 +650,7 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
               </Button>
             </div>
             <p className="mt-1.5 text-[10px] text-text-tertiary">
-              Enter to send · negotiation stays on-platform so escrow can protect both sides
+              Enter to send · offers, scripts, files, and payments stay attached to this gig
             </p>
           </div>
         </Card>
@@ -629,8 +686,8 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
               <input type="checkbox" checked={offerRaw} onChange={(e) => setOfferRaw(e.target.checked)} className="h-4 w-4 accent-[#3e7b5e]" />
             </label>
             <div className="rounded-[8px] bg-surface-2 p-3 text-[12px] text-text-secondary">
-              <p className="flex justify-between"><span>You fund</span><span className="num font-semibold">{formatMoney(offerPrice * 100)}</span></p>
-              <p className="flex justify-between"><span>Creator nets (after 10%)</span><span className="num font-semibold text-money">{formatMoney(creatorPayoutCents(offerPrice * 100))}</span></p>
+              <p className="flex justify-between"><span>You pay</span><span className="num font-semibold">{formatMoney(offerPrice * 100)}</span></p>
+              <p className="flex justify-between"><span>Creator nets (after {PLATFORM_FEE_PCT}%)</span><span className="num font-semibold text-money">{formatMoney(creatorPayoutCents(offerPrice * 100))}</span></p>
             </div>
             <Button className="w-full" onClick={sendOffer}>Send offer — {formatMoney(offerPrice * 100)}</Button>
           </div>
@@ -647,7 +704,7 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
               {[
                 ["Parties", `${companyName} (“Brand”) and ${creator?.name ?? "Creator"} (“Creator”)`],
                 ["Deliverables", contract.terms.deliverables],
-                ["Compensation", `${formatMoney(contract.terms.priceCents)} held in escrow; released on approval minus the 10% platform fee.`],
+                ["Compensation", `${formatMoney(contract.terms.priceCents)} brand payment; creator keeps ${formatMoney(creatorPayoutCents(contract.terms.priceCents))} after MCC's ${PLATFORM_FEE_PCT}% commission.`],
                 ["Usage rights", `${contract.terms.usageRightsDays} days of paid digital usage from approval${gig.usageExpiresAt ? `, expiring ${formatDate(gig.usageExpiresAt)}` : ""}. Both parties are reminded 7 days before expiry.`],
                 ["Raw footage", contract.terms.rawFootageIncluded ? "Included with final delivery." : "Not included."],
                 ["Exclusivity", contract.terms.exclusivity ? "Creator will not promote directly competing products for the usage period." : "None."],

@@ -27,6 +27,9 @@ interface ProfileRow {
   location: string | null;
   status: "open" | "busy" | "away";
   avatar_hue?: number | null;
+  mcc_tag?: string | null;
+  stripe_account_id?: string | null;
+  stripe_payouts_enabled?: boolean | null;
   created_at: string;
 }
 
@@ -115,6 +118,9 @@ export function mapCreator(p: ProfileRow, d?: DetailsRow | null, platforms: Plat
     portfolio: [],
     mediaKitUrl: d?.media_kit_url ?? undefined,
     joinedAt: p.created_at,
+    mccTag: p.mcc_tag ?? undefined,
+    stripeAccountId: p.stripe_account_id ?? undefined,
+    stripePayoutsEnabled: p.stripe_payouts_enabled ?? undefined,
   };
 }
 
@@ -235,6 +241,22 @@ export async function fetchMyWorld() {
   }
 
   return { gigs, messages, deliverables, transactions, creators };
+}
+
+/** Fetch a single creator by MCC tag or handle — used by the public profile page. */
+export async function fetchCreatorByHandle(handleOrTag: string): Promise<Creator | null> {
+  const sb = supabase();
+  const [{ data: byTag }, { data: byHandle }] = await Promise.all([
+    sb.from("profiles").select("*").eq("mcc_tag", handleOrTag).eq("role", "creator").maybeSingle(),
+    sb.from("profiles").select("*").eq("handle", handleOrTag).eq("role", "creator").maybeSingle(),
+  ]);
+  const profile = (byTag ?? byHandle) as ProfileRow | null;
+  if (!profile) return null;
+  const [{ data: details }, { data: platforms }] = await Promise.all([
+    sb.from("creator_details").select("*").eq("profile_id", profile.id).maybeSingle(),
+    sb.from("creator_platforms").select("*").eq("creator_id", profile.id),
+  ]);
+  return mapCreator(profile, details as DetailsRow | null, (platforms as PlatformRow[] | null) ?? []);
 }
 
 /** Company profile names for chat headers. */

@@ -51,7 +51,7 @@ export function EarningsCard({ releases }: { releases: Transaction[] }) {
             <CountUpMoney cents={totalEarnedCents} className="mt-2 block font-serif text-4xl font-extrabold text-[#a8d98a] sm:text-6xl" />
             {totalEarnedCents === 0 && (
               <p className="mt-1 text-xs font-bold text-[#faf6ef]/50">
-                Your first escrow release lands here.
+                Your first approved payout lands here.
               </p>
             )}
           </div>

@@ -211,7 +211,7 @@ export default function DiscoverPage() {
                   <Card interactive className="h-full p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-3">
-                        <Avatar name={c.name} hue={c.avatarHue} size="md" />
+                        <Avatar name={c.name} hue={c.avatarHue} src={c.avatarUrl} size="md" />
                         <div>
                           <p className="text-sm font-semibold">{c.name}</p>
                           <p className="text-xs text-text-tertiary">@{c.handle}</p>

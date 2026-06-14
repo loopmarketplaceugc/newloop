@@ -75,7 +75,7 @@ export function CommandPalette({
                   onSelect={() => go(`/creator/${c.handle}`)}
                   className="flex cursor-pointer items-center gap-2.5 rounded-[8px] px-2.5 py-2 text-sm data-[selected=true]:bg-surface-2"
                 >
-                  <Avatar name={c.name} hue={c.avatarHue} size="xs" />
+                  <Avatar name={c.name} hue={c.avatarHue} src={c.avatarUrl} size="xs" />
                   <span className="font-medium">{c.name}</span>
                   <span className="text-text-tertiary">@{c.handle}</span>
                   <span className="ml-auto flex items-center gap-2">

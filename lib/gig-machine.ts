@@ -1,6 +1,14 @@
 import type { Gig, GigStatus } from "./types";
 
-export const PLATFORM_FEE_RATE = 0.1;
+/**
+ * Platform commission, adjustable via NEXT_PUBLIC_PLATFORM_FEE_PCT (default 10%).
+ * MCC keeps this cut of every gig; the rest goes to the creator.
+ */
+export const PLATFORM_FEE_PCT: number = (() => {
+  const raw = Number(process.env.NEXT_PUBLIC_PLATFORM_FEE_PCT);
+  return Number.isFinite(raw) && raw >= 0 && raw <= 90 ? raw : 10;
+})();
+export const PLATFORM_FEE_RATE = PLATFORM_FEE_PCT / 100;
 export const MAX_REVISIONS = 2;
 export const AUTO_APPROVE_DAYS = 14;
 export const USAGE_REMINDER_DAYS = 7;
@@ -31,7 +39,7 @@ export function nextStatuses(from: GigStatus): GigStatus[] {
   return TRANSITIONS[from];
 }
 
-/** 10% commission, deducted automatically at payout. */
+/** Platform commission (PLATFORM_FEE_PCT%), deducted automatically at payout. */
 export function platformFeeCents(priceCents: number): number {
   return Math.round(priceCents * PLATFORM_FEE_RATE);
 }
@@ -44,7 +52,7 @@ export const STATUS_LABELS: Record<GigStatus, string> = {
   DRAFT: "Draft",
   OFFER_SENT: "Offer sent",
   OFFER_ACCEPTED: "Offer accepted",
-  FUNDED_IN_ESCROW: "Funded in escrow",
+  FUNDED_IN_ESCROW: "Payment secured",
   PRODUCT_SHIPPED: "Product shipped",
   PRODUCT_DELIVERED: "Product delivered",
   IN_PRODUCTION: "In production",
@@ -81,7 +89,7 @@ export const STATUS_TONES: Record<GigStatus, StatusToneName> = {
 export const KANBAN_LANES: { label: string; statuses: GigStatus[] }[] = [
   { label: "Invited", statuses: ["DRAFT", "OFFER_SENT", "OFFER_ACCEPTED"] },
   {
-    label: "Funded",
+    label: "Paid",
     statuses: ["FUNDED_IN_ESCROW", "PRODUCT_SHIPPED", "PRODUCT_DELIVERED"],
   },
   { label: "In Production", statuses: ["IN_PRODUCTION", "REVISION_REQUESTED"] },
@@ -89,7 +97,7 @@ export const KANBAN_LANES: { label: string; statuses: GigStatus[] }[] = [
   { label: "Approved", statuses: ["APPROVED", "PAID_OUT", "COMPLETED"] },
 ];
 
-/** Escrow currently holds funds in these states. */
+/** Payment has been secured in these states. */
 export const ESCROW_HELD_STATUSES: GigStatus[] = [
   "FUNDED_IN_ESCROW",
   "PRODUCT_SHIPPED",
@@ -132,11 +140,11 @@ export function refundPolicy(status: GigStatus): {
     case "REVISION_REQUESTED":
       return { companyRefundPct: 0, note: "No refund after delivery — open a dispute instead." };
     default:
-      return { companyRefundPct: 100, note: "No funds in escrow yet." };
+      return { companyRefundPct: 100, note: "No payment captured yet." };
   }
 }
 
-/** Ordered main-path steps for the escrow timeline UI. */
+/** Ordered main-path steps for the payment timeline UI. */
 export function mainPath(physicalProduct: boolean): GigStatus[] {
   return [
     "OFFER_SENT",

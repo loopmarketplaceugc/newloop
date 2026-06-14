@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Building2, Check, Clapperboard, Loader2 } from "lucide-react";
 import { z } from "zod";
 import { signUpWithEmail } from "@/lib/auth";
+import { haptics } from "@/lib/haptics";
 import { toast } from "@/components/ui/toast";
 import { TypeOnce } from "@/components/shared/typewriter";
 import { cn } from "@/lib/utils";
@@ -36,20 +37,18 @@ function SignupInner() {
     setError(null);
     const r = schema.safeParse({ email, password });
     if (!r.success) {
+      haptics.error();
       setError(r.error.issues[0].message);
       return;
     }
     setBusy(true);
+    haptics.step();
     try {
-      const { hasSession } = await signUpWithEmail(email, password, role);
-      if (!hasSession) {
-        toast("Confirm your email", {
-          body: "We sent you a link — confirm it to log in next time. Onboarding continues now.",
-          tone: "info",
-        });
-      }
+      await signUpWithEmail(email, password, role);
+      haptics.success();
       router.push(role === "creator" ? "/onboarding/creator" : "/onboarding/company");
     } catch (e) {
+      haptics.error();
       setError(e instanceof Error ? e.message : "Signup failed");
       setBusy(false);
     }
@@ -59,15 +58,17 @@ function SignupInner() {
     <main className="relative z-10 flex flex-1 items-center justify-center px-6 pb-24">
       <div className="w-full max-w-xl">
         <h1 className="font-serif min-h-[1.2em] text-4xl font-extrabold sm:text-6xl">
-          <TypeOnce text="Pick your side." speed={40} />
+          <TypeOnce text="Pick your side." speed={40} className="text-gradient" caret={false} />
         </h1>
-        <p className="mt-3 font-medium text-[#faf6ef]/50">One account. Real escrow. No spreadsheets.</p>
+        <p className="mt-3 font-medium text-[#faf6ef]/50">
+          Creator sign up unlocks paid job listings. Brand sign up lets you hire creators.
+        </p>
 
         <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {(
             [
-              { value: "creator" as Role, icon: Clapperboard, title: "Creator", body: "Make content. Get paid.", tint: "#a8d98a" },
-              { value: "company" as Role, icon: Building2, title: "Brand", body: "Find creators. Ship campaigns.", tint: "#f2a3df" },
+              { value: "creator" as Role, icon: Clapperboard, title: "Creator", body: "See briefs, scripts, pay, and bonuses.", tint: "#a8d98a" },
+              { value: "company" as Role, icon: Building2, title: "Brand", body: "Post offers and pay through Stripe.", tint: "#f2a3df" },
             ]
           ).map((opt, i) => {
             const on = role === opt.value;
@@ -76,7 +77,10 @@ function SignupInner() {
                 key={opt.value}
                 whileHover={{ scale: 1.04, rotate: i % 2 ? 1.5 : -1.5 }}
                 whileTap={{ scale: 0.96 }}
-                onClick={() => setRole(opt.value)}
+                onClick={() => {
+                  haptics.select();
+                  setRole(opt.value);
+                }}
                 className={cn(
                   "relative rounded-[24px] border-[3px] p-6 text-left transition-colors cursor-pointer",
                   on ? "border-transparent text-ink" : "border-[#faf6ef]/20 text-[#faf6ef] hover:border-[#faf6ef]/50",
@@ -96,6 +100,14 @@ function SignupInner() {
           })}
         </div>
 
+        <div className="mt-6 rounded-[20px] border-2 border-[#faf6ef]/15 bg-[#faf6ef]/[0.04] p-4">
+          <p className="text-sm font-bold leading-relaxed text-[#faf6ef]/70">
+            {role === "creator"
+              ? "You will land in creator onboarding, then your dashboard shows paid opportunities with deliverables, platform, script direction, base pay, and view bonuses."
+              : "You will land in brand onboarding, then you can browse creators, send offer cards, and pay creators through MCC."}
+          </p>
+        </div>
+
         <div className="mt-8 space-y-6">
           <div>
             <label htmlFor="email" className="text-xs font-bold uppercase tracking-widest text-[#faf6ef]/40">Email</label>
@@ -104,7 +116,10 @@ function SignupInner() {
               type="email"
               value={email}
               placeholder={role === "creator" ? "you@studio.com" : "you@brand.com"}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                haptics.tap();
+                setEmail(e.target.value);
+              }}
               onKeyDown={(e) => e.key === "Enter" && submit()}
               className="mt-2 w-full border-b-4 border-[#faf6ef]/20 bg-transparent pb-2 font-serif text-2xl font-bold text-[#a8d98a] placeholder:text-[#faf6ef]/15 focus:border-[#f2a3df] focus:outline-none sm:text-3xl"
               style={{ boxShadow: "none", borderRadius: 0 }}
@@ -117,7 +132,10 @@ function SignupInner() {
               type="password"
               value={password}
               placeholder="8+ characters"
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                haptics.tap();
+                setPassword(e.target.value);
+              }}
               onKeyDown={(e) => e.key === "Enter" && submit()}
               className="mt-2 w-full border-b-4 border-[#faf6ef]/20 bg-transparent pb-2 font-serif text-2xl font-bold text-[#a8d98a] placeholder:text-[#faf6ef]/15 focus:border-[#f2a3df] focus:outline-none sm:text-3xl"
               style={{ boxShadow: "none", borderRadius: 0 }}
@@ -149,7 +167,7 @@ function SignupInner() {
               className="flex items-center gap-2 rounded-full bg-[#a8d98a] px-8 py-4 font-serif text-lg font-bold text-ink disabled:opacity-50 cursor-pointer"
             >
               {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
-              Create account
+              {role === "creator" ? "Create creator account" : "Create brand account"}
             </motion.button>
             <span className="text-sm font-bold text-[#faf6ef]/40">
               Have one?{" "}

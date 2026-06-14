@@ -92,6 +92,12 @@ export interface Creator {
   portfolio: PortfolioItem[];
   mediaKitUrl?: string;
   joinedAt: string;
+  /** Unique MCC creator tag minted at certification, e.g. "MCC-7K2P-9QX4". */
+  mccTag?: string;
+  /** Stripe Connect (Express) account id once the creator sets up payouts. */
+  stripeAccountId?: string;
+  /** Whether Stripe has cleared the creator to receive payouts. */
+  stripePayoutsEnabled?: boolean;
 }
 
 export interface Company {
