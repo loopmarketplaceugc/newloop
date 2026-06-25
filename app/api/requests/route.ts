@@ -8,6 +8,30 @@ function sb() {
   );
 }
 
+type AnyRow = Record<string, unknown>;
+
+/** Attach a human brand_name (company_name → profile name) to each request row. */
+async function withBrandNames(client: ReturnType<typeof sb>, rows: AnyRow[]) {
+  const companyIds = [...new Set(rows.map((r) => r.company_id).filter(Boolean))] as string[];
+  if (companyIds.length === 0) return rows;
+
+  const [{ data: companies }, { data: profiles }] = await Promise.all([
+    client.from("companies").select("profile_id, company_name").in("profile_id", companyIds),
+    client.from("profiles").select("id, name").in("id", companyIds),
+  ]);
+
+  const byId = new Map<string, string>();
+  for (const p of profiles ?? []) byId.set(p.id as string, (p.name as string) || "");
+  for (const c of companies ?? []) {
+    if (c.company_name) byId.set(c.profile_id as string, c.company_name as string);
+  }
+
+  return rows.map((r) => ({
+    ...r,
+    brand_name: byId.get(r.company_id as string) || "Brand",
+  }));
+}
+
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const companyId = url.searchParams.get("companyId");
@@ -17,7 +41,8 @@ export async function GET(req: Request) {
   if (id) {
     const { data, error } = await client.from("requests").select("*").eq("id", id).single();
     if (error) return NextResponse.json({ error: error.message }, { status: 404 });
-    return NextResponse.json({ request: data });
+    const [withName] = await withBrandNames(client, [data as AnyRow]);
+    return NextResponse.json({ request: withName });
   }
 
   let query = client.from("requests").select("*").order("created_at", { ascending: false });
@@ -28,7 +53,8 @@ export async function GET(req: Request) {
   }
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json({ requests: data });
+  const requests = await withBrandNames(client, (data ?? []) as AnyRow[]);
+  return NextResponse.json({ requests });
 }
 
 export async function POST(req: Request) {

@@ -115,7 +115,7 @@ function CompanyRequestsView({ userId }: { userId: string }) {
 
       <form
         onSubmit={(e) => { void handleSubmit(e); }}
-        className="rounded-[24px] border-[3px] border-ink bg-[#faf6ef] p-6 shadow-[6px_6px_0_0_#101805] space-y-5"
+        className="rounded-[28px] border border-ink/10 bg-surface p-6 shadow-[0_2px_12px_rgba(16,24,5,0.06)] space-y-5"
       >
         <h2 className="font-serif text-2xl font-extrabold">New request</h2>
 
@@ -246,7 +246,7 @@ function CompanyRequestsView({ userId }: { userId: string }) {
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-full bg-ink px-8 py-4 font-serif text-lg font-bold text-[#f2a3df] transition-opacity disabled:opacity-50 cursor-pointer"
+          className="rounded-full bg-ink px-8 py-4 font-serif text-lg font-bold text-[#f2a3df] shadow-[0_6px_20px_-6px_rgba(16,24,5,0.5)] transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 cursor-pointer"
         >
           {submitting ? "Posting…" : "Post request →"}
         </button>
@@ -257,7 +257,7 @@ function CompanyRequestsView({ userId }: { userId: string }) {
           <h2 className="font-serif text-2xl font-extrabold">Your requests</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             {requests.map((r) => (
-              <div key={r.id} className="rounded-[20px] border-[2.5px] border-ink bg-[#faf6ef] p-5 shadow-[4px_4px_0_0_#101805]">
+              <div key={r.id} className="rounded-[24px] border border-ink/10 bg-surface p-5 shadow-[0_1px_3px_rgba(16,24,5,0.05)] transition-all hover:-translate-y-0.5 hover:shadow-[0_12px_32px_-10px_rgba(16,24,5,0.18)]">
                 <div className="flex items-start justify-between gap-2">
                   <p className="font-serif text-lg font-extrabold">{r.title}</p>
                   <span
@@ -342,22 +342,20 @@ function CreatorRequestsView({ userId: _userId }: { userId: string }) {
           <Link
             key={r.id}
             href={`/dashboard/requests/${r.id}`}
-            className="group flex items-center justify-between gap-4 rounded-[20px] border-[2.5px] border-ink bg-[#faf6ef] px-5 py-4 shadow-[4px_4px_0_0_#101805] transition-shadow hover:shadow-[6px_6px_0_0_#101805]"
+            className="group flex items-center justify-between gap-4 rounded-[24px] border border-ink/10 bg-surface px-5 py-4 shadow-[0_1px_3px_rgba(16,24,5,0.05)] transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/20 hover:shadow-[0_12px_32px_-10px_rgba(16,24,5,0.20)]"
           >
             <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-text-tertiary">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-text-tertiary">
                 {r.brand_name ?? "Brand"}
               </p>
-              <p className="mt-0.5 truncate font-serif text-lg font-extrabold leading-tight">{r.title}</p>
-            </div>
-            <div className="flex shrink-0 items-center gap-3">
-              <p className="num font-serif text-xl font-extrabold text-[#3e7b5e]">
-                ${(r.pay_per_creator_cents / 100).toFixed(0)}
+              <p className="mt-1 truncate font-serif text-lg font-extrabold leading-tight">{r.title}</p>
+              <p className="num mt-0.5 text-sm font-bold text-money">
+                ${(r.pay_per_creator_cents / 100).toFixed(0)} <span className="text-text-tertiary">/ creator</span>
               </p>
-              <span className="rounded-full bg-[#f2a3df] px-5 py-2.5 font-serif text-sm font-bold text-ink transition-transform group-hover:scale-105">
-                Apply →
-              </span>
             </div>
+            <span className="shrink-0 rounded-full bg-[#f2a3df] px-7 py-3.5 font-serif text-[15px] font-bold text-ink shadow-[0_4px_14px_-4px_rgba(242,163,223,0.7)] transition-transform group-hover:scale-[1.04]">
+              Apply →
+            </span>
           </Link>
         ))}
       </div>

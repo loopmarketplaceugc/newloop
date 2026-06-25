@@ -86,7 +86,7 @@ export default function OpportunityDetailPage({
     }
     setApplied(true);
     toast("Application sent!", {
-      body: `${op.brand} will be in touch via Messages.`,
+      body: `${op.brand} will review your profile and reach out soon.`,
       tone: "success",
     });
   };
@@ -216,17 +216,21 @@ export default function OpportunityDetailPage({
                 {applied ? (
                   <motion.div
                     key="success"
-                    initial={{ opacity: 0, scale: 0.95 }}
+                    initial={{ opacity: 0, scale: 0.7 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="rounded-[20px] border-[2.5px] border-[#a8d98a] bg-[#a8d98a]/15 p-5"
+                    transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                    className="flex flex-col items-center gap-3 py-6"
                   >
-                    <p className="flex items-center gap-2 font-serif text-lg font-bold text-ink">
-                      <Check className="h-5 w-5 text-[#3e7b5e]" />
-                      Application sent to {op.brand}
-                    </p>
-                    <p className="mt-1 text-sm font-medium text-text-secondary">
-                      Check Messages — they&apos;ll reply there.
-                    </p>
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: "spring", stiffness: 500, damping: 18, delay: 0.05 }}
+                      className="flex h-20 w-20 items-center justify-center rounded-full bg-[#a8d98a]"
+                    >
+                      <Check className="h-10 w-10 stroke-[3] text-ink" />
+                    </motion.div>
+                    <p className="font-serif text-xl font-extrabold text-ink">Applied to {op.brand}</p>
+                    <p className="text-sm font-medium text-text-secondary">They&apos;ll be in touch soon.</p>
                   </motion.div>
                 ) : (
                   <motion.button

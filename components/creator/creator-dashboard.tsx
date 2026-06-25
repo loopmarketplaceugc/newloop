@@ -173,8 +173,6 @@ export function CreatorDashboard() {
           </CardContent>
         </Card>
 
-        {/* Idea Studio — AI scripts & ideas chatbot */}
-        <IdeaChat niches={me.niches as string[]} platforms={me.platforms.map((p) => p.platform)} />
 
         {/* Due soon */}
         <Card className="md:col-span-3">

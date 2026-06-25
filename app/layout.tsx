@@ -4,9 +4,13 @@ import { ToastViewport } from "@/components/ui/toast";
 import { AuthHashCatcher } from "@/components/shared/auth-hash-catcher";
 
 export const metadata: Metadata = {
-  title: { default: "MCC — The Marketplace for Content Creation", template: "%s · MCC" },
-  description:
-    "UGC creators and brands, matched. AI scripting, auto-contracts, Stripe payments, and delivery tracking in one workspace.",
+  title: { default: "loop — The UGC Marketplace", template: "%s · loop" },
+  description: "UGC creators and brands, matched. Stripe payments and delivery tracking in one workspace.",
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+  },
 };
 
 export default function RootLayout({

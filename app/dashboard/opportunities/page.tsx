@@ -34,13 +34,14 @@ export default function OpportunitiesPage() {
         {OPPORTUNITIES.map((op) => {
           const matched = matches(op.niche);
           return (
-            <div
+            <Link
               key={op.id}
-              className="flex items-center gap-4 rounded-[20px] border-[2.5px] border-ink bg-[#faf6ef] px-5 py-4 shadow-[4px_4px_0_0_#101805]"
+              href={`/dashboard/opportunities/${op.id}`}
+              className="group flex items-center gap-4 rounded-[24px] border border-ink/10 bg-surface px-5 py-4 shadow-[0_1px_3px_rgba(16,24,5,0.05)] transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/20 hover:shadow-[0_12px_32px_-10px_rgba(16,24,5,0.20)]"
             >
               {/* Logo */}
               <div className="shrink-0">
-                <BrandLogo brand={op.brand} size={40} />
+                <BrandLogo brand={op.brand} size={44} />
               </div>
 
               {/* Brand + campaign */}
@@ -56,24 +57,16 @@ export default function OpportunitiesPage() {
                 <p className="mt-0.5 truncate text-[13px] font-bold text-text-secondary">
                   {op.campaign}
                 </p>
+                <p className="num mt-0.5 text-sm font-bold text-money">
+                  {formatPay(op.basePayCents)} <span className="text-text-tertiary">base pay</span>
+                </p>
               </div>
 
-              {/* Pay + Apply */}
-              <div className="flex shrink-0 items-center gap-3">
-                <div className="text-right">
-                  <p className="num font-serif text-xl font-extrabold text-[#3e7b5e]">
-                    {formatPay(op.basePayCents)}
-                  </p>
-                  <p className="text-[10px] font-bold text-text-tertiary">base pay</p>
-                </div>
-                <Link
-                  href={`/dashboard/opportunities/${op.id}`}
-                  className="rounded-full bg-[#f2a3df] px-6 py-3 font-serif text-base font-bold text-ink transition-transform hover:scale-105 active:scale-95"
-                >
-                  Apply →
-                </Link>
-              </div>
-            </div>
+              {/* Apply */}
+              <span className="shrink-0 rounded-full bg-[#f2a3df] px-7 py-3.5 font-serif text-[15px] font-bold text-ink shadow-[0_4px_14px_-4px_rgba(242,163,223,0.7)] transition-transform group-hover:scale-[1.04]">
+                Apply →
+              </span>
+            </Link>
           );
         })}
       </div>

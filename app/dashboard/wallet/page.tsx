@@ -1,7 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, BadgeCheck, ExternalLink, FileWarning, Landmark, Loader2, Receipt } from "lucide-react";
+import {
+  loadConnectAndInitialize,
+  type StripeConnectInstance,
+} from "@stripe/connect-js";
+import {
+  ConnectAccountOnboarding,
+  ConnectComponentsProvider,
+} from "@stripe/react-connect-js";
 import { useApp, useHydrated } from "@/lib/store/app";
 import { useSession } from "@/lib/store/session";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,12 +22,11 @@ import { companyById } from "@/lib/seed";
 import {
   creatorPayoutCents,
   ESCROW_HELD_STATUSES,
-  PLATFORM_FEE_PCT,
   USAGE_REMINDER_DAYS,
 } from "@/lib/gig-machine";
 import { daysUntil, formatDate, formatMoney } from "@/lib/format";
 import { toast } from "@/components/ui/toast";
-import { startPayoutOnboarding, refreshPayoutStatus, getExpressDashboardUrl } from "@/lib/payments";
+import { refreshPayoutStatus, getExpressDashboardUrl } from "@/lib/payments";
 import { haptics } from "@/lib/haptics";
 
 export default function WalletPage() {
@@ -29,25 +36,9 @@ export default function WalletPage() {
   const isDemo = useSession((s) => s.isDemo);
   const { gigs, transactions, creators } = useApp();
   const me = creators.find((c) => c.id === userId);
-  const [connecting, setConnecting] = useState(false);
   const [openingDashboard, setOpeningDashboard] = useState(false);
-
-  // Coming back from Stripe payout onboarding — refresh verified status.
-  useEffect(() => {
-    if (!hydrated || !userId || isDemo) return;
-    const sp = new URLSearchParams(window.location.search);
-    if (sp.get("payouts") && me?.stripeAccountId) {
-      void refreshPayoutStatus({ creatorId: userId, accountId: me.stripeAccountId }).then((ok) => {
-        if (ok) {
-          useApp.getState().updateCreator(userId, { stripePayoutsEnabled: true });
-          haptics.success();
-          toast("Payouts active", { body: "You're all set to get paid directly. 🎉", tone: "success" });
-        }
-      });
-      window.history.replaceState({}, "", "/dashboard/wallet");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, userId, isDemo, me?.stripeAccountId]);
+  const [connectInstance, setConnectInstance] = useState<StripeConnectInstance | null>(null);
+  const [connectLoading, setConnectLoading] = useState(false);
 
   if (!hydrated || !userId) return <CardSkeleton />;
 
@@ -63,26 +54,66 @@ export default function WalletPage() {
   const expiring = myGigs.filter((g) => g.usageExpiresAt && daysUntil(g.usageExpiresAt) > 0);
   const payoutsReady = Boolean(me?.stripePayoutsEnabled);
 
-  const connectPayouts = async () => {
+  const fetchAccountSession = async (accountId?: string) => {
+    const res = await fetch("/api/stripe/account-session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ creatorId: userId, email: email || undefined, accountId }),
+    });
+    const data = (await res.json()) as { clientSecret?: string; accountId?: string; error?: string };
+    if (!data.clientSecret) throw new Error(data.error ?? "Could not start payout setup.");
+    return data;
+  };
+
+  const startEmbeddedConnect = async () => {
     if (isDemo) {
       toast("Demo mode", { body: "Sign up for a real account to connect payouts.", tone: "info" });
       return;
     }
-    setConnecting(true);
+    const pk = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
+    if (!pk) {
+      toast("Payments not configured", { tone: "warning" });
+      return;
+    }
+    setConnectLoading(true);
     haptics.step();
     try {
-      await startPayoutOnboarding({
-        creatorId: userId,
-        email: email || undefined,
-        existingAccountId: me?.stripeAccountId,
+      // Pre-flight: surface real Stripe errors before the embedded component mounts.
+      const initial = await fetchAccountSession(me?.stripeAccountId);
+      if (initial.accountId && !me?.stripeAccountId) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        useApp.getState().updateCreator(userId, { stripeAccountId: initial.accountId } as any);
+      }
+
+      let firstSecret: string | null = initial.clientSecret!;
+      const resolvedAccountId = initial.accountId ?? me?.stripeAccountId;
+
+      const instance = loadConnectAndInitialize({
+        publishableKey: pk,
+        fetchClientSecret: async () => {
+          if (firstSecret) {
+            const s = firstSecret;
+            firstSecret = null;
+            return s;
+          }
+          // Session expired — fetch a fresh one.
+          const d = await fetchAccountSession(resolvedAccountId);
+          return d.clientSecret!;
+        },
+        appearance: {
+          overlays: "dialog",
+          variables: { colorPrimary: "#f2a3df", fontFamily: "system-ui, sans-serif" },
+        },
       });
+      setConnectInstance(instance);
     } catch (e) {
       haptics.error();
-      setConnecting(false);
       toast("Couldn't start payout setup", {
         body: e instanceof Error ? e.message : "Try again shortly.",
         tone: "warning",
       });
+    } finally {
+      setConnectLoading(false);
     }
   };
 
@@ -111,7 +142,7 @@ export default function WalletPage() {
             Your <span className="text-gradient-ink">money</span>
           </h1>
           <p className="mt-2 text-sm font-bold text-text-secondary">
-            Brands pay through MCC escrow. We keep {PLATFORM_FEE_PCT}% — the rest lands in your bank.
+            Brand payments land in your bank automatically once approved.
           </p>
         </div>
         {payoutsReady && me?.stripeAccountId && (
@@ -143,14 +174,14 @@ export default function WalletPage() {
               </p>
               <p className="mt-0.5 max-w-md text-sm font-bold text-ink/70">
                 {payoutsReady
-                  ? `Brand payments hit your bank automatically. MCC keeps ${PLATFORM_FEE_PCT}% — that's it.`
-                  : `Set up Stripe Express once. Every future gig pays you directly, minus MCC's ${PLATFORM_FEE_PCT}% cut.`}
+                  ? "Brand payments hit your bank automatically via Stripe."
+                  : "Connect once — every brand payment goes straight to your bank via Stripe."}
               </p>
             </div>
           </div>
-          {!payoutsReady && (
-            <Button onClick={connectPayouts} disabled={connecting}>
-              {connecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Landmark className="h-4 w-4" />}
+          {!payoutsReady && !connectInstance && (
+            <Button onClick={() => void startEmbeddedConnect()} disabled={connectLoading}>
+              {connectLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Landmark className="h-4 w-4" />}
               {me?.stripeAccountId ? "Finish payout setup" : "Connect bank account"}
             </Button>
           )}
@@ -163,24 +194,35 @@ export default function WalletPage() {
         </CardContent>
       </Card>
 
-      {/* Fee breakdown */}
-      <Card className="border-ink/20 bg-surface-2">
-        <CardContent className="flex flex-wrap items-center gap-6">
-          {[
-            { label: "Brand pays", pct: 100, color: "text-text-primary" },
-            { label: `MCC fee (${PLATFORM_FEE_PCT}%)`, pct: PLATFORM_FEE_PCT, color: "text-[#d6409f]" },
-            { label: "You receive", pct: 100 - PLATFORM_FEE_PCT, color: "text-money" },
-          ].map(({ label, pct, color }, i) => (
-            <div key={label} className="flex items-center gap-3">
-              {i > 0 && <span className="text-text-tertiary">→</span>}
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-text-tertiary">{label}</p>
-                <p className={`num font-serif text-2xl font-extrabold ${color}`}>{pct}%</p>
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      {connectInstance && (
+        <ConnectComponentsProvider connectInstance={connectInstance}>
+          <Card>
+            <CardContent className="p-0 overflow-hidden rounded-[inherit]">
+              <ConnectAccountOnboarding
+                onLoadError={({ error }) => {
+                  toast("Stripe Connect error", {
+                    body: error.message ?? error.type ?? "Authentication failed",
+                    tone: "warning",
+                  });
+                  setConnectInstance(null);
+                }}
+                onExit={() => {
+                  setConnectInstance(null);
+                  if (userId) {
+                    void refreshPayoutStatus({ creatorId: userId, accountId: me?.stripeAccountId ?? "" }).then((ok) => {
+                      if (ok) {
+                        useApp.getState().updateCreator(userId, { stripePayoutsEnabled: true });
+                        haptics.success();
+                        toast("Payouts active", { body: "You're all set to get paid directly.", tone: "success" });
+                      }
+                    });
+                  }
+                }}
+              />
+            </CardContent>
+          </Card>
+        </ConnectComponentsProvider>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card className="border-ink bg-ink text-[#faf6ef]">
@@ -240,7 +282,7 @@ export default function WalletPage() {
             <EmptyState
               icon={Receipt}
               title="No transactions yet"
-              body={`Payouts and MCC's ${PLATFORM_FEE_PCT}% commission show here the moment a brand approves your work.`}
+              body="Payouts show here the moment a brand approves your work."
             />
           ) : (
             <div className="divide-y divide-border">
@@ -254,7 +296,7 @@ export default function WalletPage() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[13px] font-bold">
-                        {isRelease ? "Payout" : `MCC commission (${PLATFORM_FEE_PCT}%)`} — {gig?.title}
+                        {isRelease ? "Payout" : "Platform fee"} — {gig?.title}
                       </p>
                       <p className="num text-xs text-text-tertiary">
                         {formatDate(t.createdAt)}{t.stripeRef ? ` · ${t.stripeRef}` : ""}

@@ -39,8 +39,6 @@ interface NavItem {
 const creatorNav: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
   { href: "/dashboard/opportunities", label: "Opportunities", icon: Compass },
-  { href: "/dashboard/gigs", label: "Gigs", icon: Briefcase },
-  { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
   { href: "/dashboard/profile", label: "Profile", icon: User },
   { href: "/dashboard/wallet", label: "Wallet", icon: Wallet },
 ];
