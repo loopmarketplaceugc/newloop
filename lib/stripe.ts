@@ -2,14 +2,14 @@ import Stripe from "stripe";
 import { PLATFORM_FEE_PCT } from "./gig-machine";
 
 /**
- * Stripe money movement for MCC.
+ * Stripe money movement for Loop.
  *
- * Model: a paying brand checks out for the gig amount. MCC keeps a
+ * Model: a paying brand checks out for the gig amount. Loop keeps a
  * PLATFORM_FEE_PCT commission; the remainder goes to the creator.
  *  - If the creator has a connected (Stripe Express) account, we use a
  *    DESTINATION CHARGE so the split happens automatically and the creator is
- *    paid directly (MCC keeps `application_fee_amount`).
- *  - Otherwise the charge lands in MCC's balance and the creator's net is
+ *    paid directly (Loop keeps `application_fee_amount`).
+ *  - Otherwise the charge lands in Loop's balance and the creator's net is
  *    recorded as owed (pay out once they connect). This lets payments work
  *    before Stripe Connect is enabled / before a creator onboards.
  */
@@ -54,7 +54,7 @@ export async function createAccountLink(
 
 /**
  * Brand pays for a gig. If `creatorAccountId` is set we route a destination
- * charge so the creator gets paid directly and MCC keeps the commission.
+ * charge so the creator gets paid directly and Loop keeps the commission.
  */
 export async function createGigCheckout(
   stripe: Stripe,
@@ -70,7 +70,7 @@ export async function createGigCheckout(
 ) {
   const fee = commissionCents(params.amountCents);
   const productData: Stripe.Checkout.SessionCreateParams.LineItem.PriceData.ProductData = {
-    name: params.title || "MCC gig",
+    name: params.title || "Loop gig",
   };
   if (params.creatorName) productData.description = `Content by ${params.creatorName}`;
 

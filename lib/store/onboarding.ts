@@ -81,8 +81,8 @@ export const useOnboarding = create<OnboardingState>()(
         })),
       reset: () => set(initial),
     }),
-    { name: "mcc-onboarding", version: 1 },
+    { name: "loop-onboarding", version: 1 },
   ),
 );
 
-export const TAKEN_HANDLES = ["mia.creates", "dev.darius", "soph.eats", "liftwithlena", "admin", "mcc"];
+export const TAKEN_HANDLES = ["mia.creates", "dev.darius", "soph.eats", "liftwithlena", "admin", "loop"];

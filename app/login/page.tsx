@@ -43,7 +43,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col bg-ink text-[#faf6ef]">
       <header className="flex items-center justify-between px-6 py-5">
-        <Link href="/" className="font-serif text-xl font-extrabold text-[#f2a3df]">MCC®</Link>
+        <Link href="/" className="font-serif text-xl font-extrabold text-[#f2a3df]">Loop®</Link>
         <Link href="/signup" className="rounded-full border-2 border-[#faf6ef]/30 px-4 py-1.5 text-sm font-bold transition-colors hover:border-[#a8d98a] hover:text-[#a8d98a]">
           Sign up
         </Link>

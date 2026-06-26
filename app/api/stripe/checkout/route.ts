@@ -5,11 +5,11 @@ import { stripeClient, createGigCheckout, commissionCents } from "@/lib/stripe";
 /**
  * Brand pays for a gig. Returns a Stripe Checkout URL. If the creator has a
  * connected account, the payment is split automatically (creator paid directly,
- * MCC keeps the commission). Otherwise the charge lands in MCC's balance.
+ * Loop keeps the commission). Otherwise the charge lands in Loop's balance.
  */
 const schema = z.object({
   gigId: z.string().min(1),
-  title: z.string().max(200).default("MCC gig"),
+  title: z.string().max(200).default("Loop gig"),
   amountCents: z.number().int().positive().max(5_000_000), // ≤ $50k sanity cap
   creatorAccountId: z.string().optional().nullable(),
   creatorName: z.string().max(120).optional(),

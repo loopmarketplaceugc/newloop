@@ -14,6 +14,7 @@ import {
   dbSendMessage,
   dbUpdateGig,
   dbUpdateOfferState,
+  dbUpsertCreatorDetails,
 } from "@/lib/sync";
 import * as seed from "@/lib/seed";
 import type {
@@ -145,10 +146,20 @@ export const useApp = create<AppState>()(
           ),
         })),
 
-      updateCreator: (id, partial) =>
+      updateCreator: (id, partial) => {
         set((s) => ({
           creators: s.creators.map((c) => (c.id === id ? { ...c, ...partial } : c)),
-        })),
+        }));
+        // Persist profile fields to Supabase so the 3-second poll doesn't overwrite local changes.
+        const db: Parameters<typeof dbUpsertCreatorDetails>[0] = {};
+        if (partial.bio !== undefined) db.bio = partial.bio;
+        if (partial.status !== undefined) db.status = partial.status;
+        if (partial.niches !== undefined) db.niches = partial.niches;
+        if (partial.baseRateCents !== undefined) db.baseRateCents = partial.baseRateCents;
+        if (partial.capacityPerWeek !== undefined) db.capacityPerWeek = partial.capacityPerWeek;
+        if (partial.compensationPref !== undefined) db.compensationPref = partial.compensationPref;
+        if (Object.keys(db).length > 0) void dbUpsertCreatorDetails(db);
+      },
 
       ensureCreator: (id, partial) =>
         set((s) => {
@@ -375,7 +386,7 @@ export const useApp = create<AppState>()(
 
       resetDemo: () => set(seedState()),
     }),
-    { name: "mcc-demo-data", version: 6, migrate: () => ({ ...seedState() }) as never },
+    { name: "loop-demo-data", version: 6, migrate: () => ({ ...seedState() }) as never },
   ),
 );
 

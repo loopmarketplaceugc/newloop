@@ -46,7 +46,7 @@ export default function CreatorOnboarding() {
   const [nickname, setNickname] = useState("");
   const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [followers, setFollowers] = useState<Record<Platform, string>>({ tiktok: "", reels: "", shorts: "" });
-  const [mccTag, setMccTag] = useState<string | null>(null);
+  const [loopTag, setMccTag] = useState<string | null>(null);
   const [origin, setOrigin] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -96,19 +96,19 @@ export default function CreatorOnboarding() {
   }, [stepIdx]);
 
   useEffect(() => {
-    if (step.kind !== "done" || mccTag) return;
+    if (step.kind !== "done" || loopTag) return;
     let cancelled = false;
     void certifyCreator().then((tag) => {
       if (cancelled) return;
       setMccTag(tag);
       haptics.celebrate();
       const id = session.isDemo ? DEMO_CREATOR_ID : session.userId ?? DEMO_CREATOR_ID;
-      useApp.getState().updateCreator(id, { mccTag: tag, name: nickname });
+      useApp.getState().updateCreator(id, { loopTag: tag, name: nickname });
     });
     return () => {
       cancelled = true;
     };
-  }, [step.kind, mccTag, session.isDemo, session.userId, nickname]);
+  }, [step.kind, loopTag, session.isDemo, session.userId, nickname]);
 
   const next = () => {
     setError(null);
@@ -177,7 +177,7 @@ export default function CreatorOnboarding() {
       </div>
 
       <header className="flex items-center justify-between px-6 py-5">
-        <span className="font-serif text-xl font-extrabold text-[#f2a3df]">MCC®</span>
+        <span className="font-serif text-xl font-extrabold text-[#f2a3df]">Loop®</span>
         <span className="num text-xs font-bold uppercase tracking-widest text-[#faf6ef]/40">
           {Math.min(stepIdx + 1, steps.length)} / {steps.length}
         </span>
@@ -330,20 +330,20 @@ export default function CreatorOnboarding() {
                     <div className="flex-1">
                       <span className="sticker bg-[#f2a3df] text-[11px] text-ink">certified creator</span>
                       <p className="mt-3 text-xs font-bold uppercase tracking-widest text-[#faf6ef]/40">
-                        Your MCC tag
+                        Your Loop tag
                       </p>
                       <p className="num mt-1 font-serif text-3xl font-extrabold text-[#a8d98a] sm:text-4xl">
-                        {mccTag ?? "minting…"}
+                        {loopTag ?? "minting…"}
                       </p>
                       <p className="mt-3 max-w-xs text-sm font-medium leading-relaxed text-[#faf6ef]/55">
                         Brands scan this to instantly see your verified profile — your name, tier, and portfolio in one tap.
                       </p>
                     </div>
-                    {mccTag && (
+                    {loopTag && (
                       <QrCode
-                        value={`${origin}/creator/${mccTag}`}
+                        value={`${origin}/creator/${loopTag}`}
                         size={150}
-                        label={`MCC tag ${mccTag}`}
+                        label={`Loop tag ${loopTag}`}
                       />
                     )}
                   </div>

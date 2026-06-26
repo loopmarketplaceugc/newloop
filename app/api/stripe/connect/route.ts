@@ -68,7 +68,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error: needsConnect
-          ? "Stripe Connect isn't enabled on the MCC account yet. Enable it at dashboard.stripe.com/connect, then try again."
+          ? "Stripe Connect isn't enabled on the Loop account yet. Enable it at dashboard.stripe.com/connect, then try again."
           : msg,
         needsConnect,
       },

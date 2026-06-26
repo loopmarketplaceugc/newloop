@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, BadgeCheck, ExternalLink, FileWarning, Landmark, Loader2, Receipt } from "lucide-react";
+import { ArrowDownLeft, BadgeCheck, ExternalLink, FileWarning, Landmark, Loader2, Receipt } from "lucide-react";
 import {
   loadConnectAndInitialize,
   type StripeConnectInstance,
@@ -26,7 +26,7 @@ import {
 } from "@/lib/gig-machine";
 import { daysUntil, formatDate, formatMoney } from "@/lib/format";
 import { toast } from "@/components/ui/toast";
-import { refreshPayoutStatus, getExpressDashboardUrl } from "@/lib/payments";
+import { DEV_PAYMENTS, refreshPayoutStatus, getExpressDashboardUrl } from "@/lib/payments";
 import { haptics } from "@/lib/haptics";
 
 export default function WalletPage() {
@@ -45,7 +45,7 @@ export default function WalletPage() {
   const myGigs = gigs.filter((g) => g.creatorId === userId);
   const myGigIds = new Set(myGigs.map((g) => g.id));
   const myTx = transactions
-    .filter((t) => myGigIds.has(t.gigId) && (t.type === "release" || t.type === "fee"))
+    .filter((t) => myGigIds.has(t.gigId) && t.type === "release")
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const released = myTx.filter((t) => t.type === "release").reduce((s, t) => s + t.amountCents, 0);
   const pending = myGigs
@@ -68,6 +68,16 @@ export default function WalletPage() {
   const startEmbeddedConnect = async () => {
     if (isDemo) {
       toast("Demo mode", { body: "Sign up for a real account to connect payouts.", tone: "info" });
+      return;
+    }
+    if (DEV_PAYMENTS) {
+      setConnectLoading(true);
+      await new Promise<void>((r) => setTimeout(r, 800));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      useApp.getState().updateCreator(userId, { stripePayoutsEnabled: true, stripeAccountId: "dev_acct_loop" } as any);
+      haptics.success();
+      toast("Dev mode — payouts simulated", { body: "No real bank account connected.", tone: "info" });
+      setConnectLoading(false);
       return;
     }
     const pk = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
@@ -288,23 +298,18 @@ export default function WalletPage() {
             <div className="divide-y divide-border">
               {myTx.map((t) => {
                 const gig = myGigs.find((g) => g.id === t.gigId);
-                const isRelease = t.type === "release";
                 return (
                   <div key={t.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                    <span className={isRelease ? "rounded-full bg-money-soft p-1.5 text-money" : "rounded-full bg-surface-2 p-1.5 text-text-tertiary"}>
-                      {isRelease ? <ArrowDownLeft className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
+                    <span className="rounded-full bg-money-soft p-1.5 text-money">
+                      <ArrowDownLeft className="h-4 w-4" />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-bold">
-                        {isRelease ? "Payout" : "Platform fee"} — {gig?.title}
-                      </p>
+                      <p className="truncate text-[13px] font-bold">Payout — {gig?.title}</p>
                       <p className="num text-xs text-text-tertiary">
                         {formatDate(t.createdAt)}{t.stripeRef ? ` · ${t.stripeRef}` : ""}
                       </p>
                     </div>
-                    <span className={`num text-sm font-bold ${isRelease ? "text-money" : "text-text-tertiary"}`}>
-                      {isRelease ? "+" : "−"}{formatMoney(t.amountCents)}
-                    </span>
+                    <span className="num text-sm font-bold text-money">+{formatMoney(t.amountCents)}</span>
                   </div>
                 );
               })}

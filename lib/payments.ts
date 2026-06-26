@@ -3,6 +3,14 @@
 import { supabase } from "@/lib/supabase";
 
 /**
+ * When true, all payment buttons auto-succeed with no real Stripe charge.
+ * Flip NEXT_PUBLIC_DEV_PAYMENTS=false (or remove it) to restore production Stripe.
+ */
+export const DEV_PAYMENTS = process.env.NEXT_PUBLIC_DEV_PAYMENTS === "true";
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/**
  * Start (or resume) Stripe payout onboarding for the signed-in creator.
  * Persists the Stripe account id on their profile, then redirects to Stripe.
  */
@@ -57,6 +65,15 @@ export async function payForGig(params: {
   creatorAccountId?: string;
   creatorName?: string;
 }) {
+  if (DEV_PAYMENTS) {
+    await sleep(700);
+    // Mirror the real Stripe return URL so the gig page's useEffect picks it up normally.
+    const url = new URL(window.location.href);
+    url.searchParams.set("paid", "1");
+    url.searchParams.set("session_id", `dev_session_${Date.now()}`);
+    window.location.href = url.toString();
+    return;
+  }
   const res = await fetch("/api/stripe/checkout", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -101,6 +118,9 @@ export async function getExpressDashboardUrl(accountId: string): Promise<string>
 
 /** Verify a completed Checkout session with Stripe before updating local gig state. */
 export async function confirmGigPayment(params: { gigId: string; sessionId: string }) {
+  if (DEV_PAYMENTS && params.sessionId.startsWith("dev_session_")) {
+    return { paymentIntentId: `dev_pi_${Date.now()}` };
+  }
   const qs = new URLSearchParams({ gigId: params.gigId, session_id: params.sessionId });
   const res = await fetch(`/api/stripe/checkout?${qs.toString()}`);
   const body = (await res.json()) as {

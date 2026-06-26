@@ -40,11 +40,9 @@ import { confirmGigPayment, payForGig } from "@/lib/payments";
 import {
   AUTO_APPROVE_DAYS,
   MAX_REVISIONS,
-  PLATFORM_FEE_PCT,
   STATUS_LABELS,
   creatorPayoutCents,
   mainPath,
-  platformFeeCents,
   refundPolicy,
 } from "@/lib/gig-machine";
 import { daysUntil, formatDate, formatMoney, formatTime } from "@/lib/format";
@@ -290,7 +288,7 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
           money: true,
           fn: () => {
             app.approveAndRelease(gig.id);
-            toast("Work approved", { body: `${creator?.name ?? "Creator"} keeps ${formatMoney(creatorPayoutCents(gig.priceCents))}. MCC keeps ${PLATFORM_FEE_PCT}%.`, tone: "success" });
+            toast("Work approved", { body: `${creator?.name ?? "Creator"} receives ${formatMoney(creatorPayoutCents(gig.priceCents))}.`, tone: "success" });
           },
         };
       default:
@@ -393,12 +391,12 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
               )}
               <div className="mt-3 space-y-1 border-t border-border pt-3 text-[12px] text-text-secondary">
                 <p className="flex justify-between">
-                  <span>Creator receives</span>
-                  <span className="num font-semibold text-money">{formatMoney(creatorPayoutCents(gig.priceCents))}</span>
+                  <span>Deal Value</span>
+                  <span className="num font-semibold">{formatMoney(gig.priceCents)}</span>
                 </p>
                 <p className="flex justify-between">
-                  <span>MCC commission ({PLATFORM_FEE_PCT}%)</span>
-                  <span className="num">{formatMoney(platformFeeCents(gig.priceCents))}</span>
+                  <span>Creator receives</span>
+                  <span className="num font-semibold text-money">{formatMoney(creatorPayoutCents(gig.priceCents))}</span>
                 </p>
                 {!isCreator && (
                   <p className="flex justify-between text-text-tertiary">
@@ -584,7 +582,7 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
                             {m.offer.rawFootageIncluded && " · raw footage included"}
                           </p>
                           <p className="text-text-tertiary">
-                            Creator nets <span className="num">{formatMoney(creatorPayoutCents(m.offer.priceCents))}</span> after the {PLATFORM_FEE_PCT}% commission
+                            Creator receives <span className="num font-medium text-money">{formatMoney(creatorPayoutCents(m.offer.priceCents))}</span>
                           </p>
                         </div>
                         {m.offer.state === "pending" && isCreator && (
@@ -686,8 +684,8 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
               <input type="checkbox" checked={offerRaw} onChange={(e) => setOfferRaw(e.target.checked)} className="h-4 w-4 accent-[#3e7b5e]" />
             </label>
             <div className="rounded-[8px] bg-surface-2 p-3 text-[12px] text-text-secondary">
-              <p className="flex justify-between"><span>You pay</span><span className="num font-semibold">{formatMoney(offerPrice * 100)}</span></p>
-              <p className="flex justify-between"><span>Creator nets (after {PLATFORM_FEE_PCT}%)</span><span className="num font-semibold text-money">{formatMoney(creatorPayoutCents(offerPrice * 100))}</span></p>
+              <p className="flex justify-between"><span>Deal Value</span><span className="num font-semibold">{formatMoney(offerPrice * 100)}</span></p>
+              <p className="flex justify-between"><span>Creator receives</span><span className="num font-semibold text-money">{formatMoney(creatorPayoutCents(offerPrice * 100))}</span></p>
             </div>
             <Button className="w-full" onClick={sendOffer}>Send offer — {formatMoney(offerPrice * 100)}</Button>
           </div>
@@ -704,7 +702,7 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
               {[
                 ["Parties", `${companyName} (“Brand”) and ${creator?.name ?? "Creator"} (“Creator”)`],
                 ["Deliverables", contract.terms.deliverables],
-                ["Compensation", `${formatMoney(contract.terms.priceCents)} brand payment; creator keeps ${formatMoney(creatorPayoutCents(contract.terms.priceCents))} after MCC's ${PLATFORM_FEE_PCT}% commission.`],
+                ["Compensation", `Deal Value: ${formatMoney(contract.terms.priceCents)} · Creator Receives: ${formatMoney(creatorPayoutCents(contract.terms.priceCents))}`],
                 ["Usage rights", `${contract.terms.usageRightsDays} days of paid digital usage from approval${gig.usageExpiresAt ? `, expiring ${formatDate(gig.usageExpiresAt)}` : ""}. Both parties are reminded 7 days before expiry.`],
                 ["Raw footage", contract.terms.rawFootageIncluded ? "Included with final delivery." : "Not included."],
                 ["Exclusivity", contract.terms.exclusivity ? "Creator will not promote directly competing products for the usage period." : "None."],

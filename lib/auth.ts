@@ -5,33 +5,52 @@ import { useSession } from "@/lib/store/session";
 import type { Role } from "@/lib/types";
 
 /**
- * Sign up with email+password; role stored in auth metadata.
- * Uses the `signup_instant` RPC (pre-confirmed user, no confirmation email — the
- * built-in mailer is rate-limited) and immediately signs in for a live session.
+ * Sign up with email+password.
+ * First checks for cross-role email conflicts server-side, then calls the
+ * standard Supabase signUp which sends a confirmation email. Returns
+ * `needsVerification: true` so the UI can show the "check your inbox" screen.
+ * If the Supabase project has email confirmations disabled a session is returned
+ * immediately and needsVerification is false.
  */
 export async function signUpWithEmail(email: string, password: string, role: Role) {
-  const sb = supabase();
-  const { data: rpcData, error: rpcError } = await sb.rpc("signup_instant", {
-    p_email: email,
-    p_password: password,
-    p_role: role,
+  const check = await fetch("/api/auth/signup", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email, role }),
   });
-  if (rpcError) throw new Error(rpcError.message.replace(/^.*?:\s*/, "") || "Signup failed — try again.");
-  const existed = (rpcData as { status?: string } | null)?.status === "exists";
+  if (!check.ok) {
+    const body = (await check.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? "Signup failed — try again.");
+  }
 
-  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  const sb = supabase();
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const { data, error } = await sb.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { role },
+      emailRedirectTo: `${origin}/auth/callback`,
+    },
+  });
+
   if (error) {
-    if (existed) {
+    if (/already registered|user already exists/i.test(error.message)) {
       throw new Error("There is already an account with this email. Log in instead, or reset your password.");
     }
     throw new Error(error.message);
   }
-  const userId = data.user.id;
-  useSession.getState().setAuthed({ userId, role, email, onboarded: false });
-  return { hasSession: true, userId };
+
+  // Email confirmations disabled — session returned immediately
+  if (data.session && data.user) {
+    useSession.getState().setAuthed({ userId: data.user.id, role, email, onboarded: false });
+    return { needsVerification: false as const };
+  }
+
+  return { needsVerification: true as const };
 }
 
-const PENDING_KEY = "mcc-pending-profile";
+const PENDING_KEY = "loop-pending-profile";
 
 function makeHandle(input: string, fallback: string) {
   const base = input
@@ -127,29 +146,29 @@ export async function updatePassword(password: string) {
   if (error) throw new Error(error.message);
 }
 
-/** Local MCC-tag generator — used for demo accounts and as an offline fallback. */
-export function generateMccTag() {
+/** Local Loop-tag generator — used for demo accounts and as an offline fallback. */
+export function generateLoopTag() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous 0/O/1/I
   const block = () =>
     Array.from({ length: 4 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
-  return `MCC-${block()}-${block()}`;
+  return `LOOP-${block()}-${block()}`;
 }
 
 /**
- * Mint (or fetch) the caller's unique MCC tag at certification.
- * Uses the `mint_mcc_tag` RPC for live accounts; falls back to a local tag when
+ * Mint (or fetch) the caller's unique Loop tag at certification.
+ * Uses the `mint_loop_tag` RPC for live accounts; falls back to a local tag when
  * there's no session (demo mode), so the certificate screen always has a code.
  */
 export async function certifyCreator(): Promise<string> {
   try {
     const sb = supabase();
     const { data: auth } = await sb.auth.getUser();
-    if (!auth.user) return generateMccTag();
-    const { data, error } = await sb.rpc("mint_mcc_tag");
-    if (error || typeof data !== "string") return generateMccTag();
+    if (!auth.user) return generateLoopTag();
+    const { data, error } = await sb.rpc("mint_loop_tag");
+    if (error || typeof data !== "string") return generateLoopTag();
     return data;
   } catch {
-    return generateMccTag();
+    return generateLoopTag();
   }
 }
 
@@ -242,7 +261,7 @@ export async function saveCreatorProfile(p: {
 export async function saveCompanyProfile(p: {
   companyName: string;
   website: string;
-  niche: string;
+  niches: string[];
   budgetRange: string;
   email?: string;
   firstName?: string;
@@ -270,7 +289,7 @@ export async function saveCompanyProfile(p: {
     profile_id: uid,
     company_name: p.companyName,
     website: p.website,
-    niche: p.niche,
+    niches: p.niches,
     budget_range: p.budgetRange,
   });
   return true;

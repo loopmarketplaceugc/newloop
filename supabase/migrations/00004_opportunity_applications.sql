@@ -6,7 +6,7 @@ create table if not exists public.opportunity_applications (
   creator_id text not null,
   creator_email text,
   creator_name text,
-  mcc_tag text,
+  loop_tag text,
   opportunity_id text not null,
   brand text not null,
   campaign text not null,

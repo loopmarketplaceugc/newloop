@@ -4,9 +4,10 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowRight, Building2, Check, Clapperboard, Loader2 } from "lucide-react";
+import { ArrowRight, Building2, Check, Clapperboard, Loader2, Mail } from "lucide-react";
 import { z } from "zod";
 import { signUpWithEmail } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
 import { haptics } from "@/lib/haptics";
 import { toast } from "@/components/ui/toast";
 import { TypeOnce } from "@/components/shared/typewriter";
@@ -26,6 +27,9 @@ function SignupInner() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendMsg, setResendMsg] = useState<string | null>(null);
   const accountExists = /already an account/i.test(error ?? "");
 
   useEffect(() => {
@@ -44,15 +48,85 @@ function SignupInner() {
     setBusy(true);
     haptics.step();
     try {
-      await signUpWithEmail(email, password, role);
+      const result = await signUpWithEmail(email, password, role);
       haptics.success();
-      router.push(role === "creator" ? "/onboarding/creator" : "/onboarding/company");
+      if (result.needsVerification) {
+        setSent(true);
+      } else {
+        router.push(role === "creator" ? "/onboarding/creator" : "/onboarding/company");
+      }
     } catch (e) {
       haptics.error();
       setError(e instanceof Error ? e.message : "Signup failed");
       setBusy(false);
     }
   };
+
+  const resend = async () => {
+    setResendBusy(true);
+    setResendMsg(null);
+    try {
+      await supabase().auth.resend({ type: "signup", email });
+      setResendMsg("Sent! Check your inbox again.");
+    } catch {
+      setResendMsg("Couldn't resend — try again in a moment.");
+    } finally {
+      setResendBusy(false);
+    }
+  };
+
+  if (sent) {
+    return (
+      <main className="relative z-10 flex flex-1 items-center justify-center px-6 pb-24">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-xl"
+        >
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#a8d98a]/20">
+            <Mail className="h-8 w-8 text-[#a8d98a]" />
+          </div>
+          <h1 className="font-serif mt-6 text-4xl font-extrabold sm:text-5xl">
+            Check your inbox.
+          </h1>
+          <p className="mt-4 text-lg font-bold text-[#faf6ef]/60">
+            We sent a confirmation link to{" "}
+            <span className="font-mono text-[#a8d98a]">{email}</span>.
+          </p>
+          <p className="mt-2 text-sm font-bold text-[#faf6ef]/40">
+            Click the link in that email to activate your Loop account and get started.
+            Check your spam folder if you don&apos;t see it within a minute.
+          </p>
+
+          <div className="mt-8 flex flex-wrap items-center gap-4">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={resend}
+              disabled={resendBusy}
+              className="flex items-center gap-2 rounded-full border-2 border-[#faf6ef]/20 px-6 py-3 text-sm font-bold text-[#faf6ef]/70 hover:border-[#a8d98a]/50 hover:text-[#a8d98a] disabled:opacity-40 cursor-pointer transition-colors"
+            >
+              {resendBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Resend email
+            </motion.button>
+            <Link href="/login" className="text-sm font-bold text-[#f2a3df] underline underline-offset-4">
+              Already verified? Log in
+            </Link>
+          </div>
+
+          {resendMsg && (
+            <motion.p
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="mt-4 text-sm font-bold text-[#a8d98a]"
+            >
+              {resendMsg}
+            </motion.p>
+          )}
+        </motion.div>
+      </main>
+    );
+  }
 
   return (
     <main className="relative z-10 flex flex-1 items-center justify-center px-6 pb-24">
@@ -104,7 +178,7 @@ function SignupInner() {
           <p className="text-sm font-bold leading-relaxed text-[#faf6ef]/70">
             {role === "creator"
               ? "You will land in creator onboarding, then your dashboard shows paid opportunities with deliverables, platform, script direction, base pay, and view bonuses."
-              : "You will land in brand onboarding, then you can browse creators, send offer cards, and pay creators through MCC."}
+              : "You will land in brand onboarding, then you can browse creators, send offer cards, and pay creators through Loop."}
           </p>
         </div>
 
@@ -184,7 +258,7 @@ export default function SignupPage() {
   return (
     <div className="flex min-h-screen flex-col bg-ink text-[#faf6ef]">
       <header className="flex items-center justify-between px-6 py-5">
-        <Link href="/" className="font-serif text-xl font-extrabold text-[#f2a3df]">MCC®</Link>
+        <Link href="/" className="font-serif text-xl font-extrabold text-[#f2a3df]">Loop®</Link>
       </header>
       <Suspense fallback={null}>
         <SignupInner />

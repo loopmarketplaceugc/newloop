@@ -6,7 +6,7 @@ const schema = z.object({
   creatorId: z.string().min(1),
   creatorEmail: z.string().email().optional().or(z.literal("")),
   creatorName: z.string().max(160).optional().or(z.literal("")),
-  mccTag: z.string().max(80).optional().or(z.literal("")),
+  loopTag: z.string().max(80).optional().or(z.literal("")),
   opportunity: z.object({
     id: z.string().min(1),
     brand: z.string().min(1).max(120),
@@ -21,7 +21,7 @@ const schema = z.object({
 });
 
 const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://vqbykppxpplctrrrpomg.supabase.co";
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://nylivxiyzxjdjsbdmrnw.supabase.co";
 
 function escapeHtml(value: string) {
   return value
@@ -47,7 +47,7 @@ function applicationEmailHtml(params: z.infer<typeof schema>) {
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #ded8cb;border-radius:20px;overflow:hidden;">
             <tr>
               <td style="padding:28px 30px 8px;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:900;">
-                MCC<span style="font-size:11px;vertical-align:super;">&reg;</span>
+                Loop<span style="font-size:11px;vertical-align:super;">&reg;</span>
               </td>
             </tr>
             <tr>
@@ -57,7 +57,7 @@ function applicationEmailHtml(params: z.infer<typeof schema>) {
             </tr>
             <tr>
               <td style="padding:16px 30px 0;font-size:15px;line-height:1.55;color:#4d5642;">
-                Your MCC application for <strong>${escapeHtml(op.brand)}</strong> - ${escapeHtml(op.campaign)} is marked as applied.
+                Your Loop application for <strong>${escapeHtml(op.brand)}</strong> - ${escapeHtml(op.campaign)} is marked as applied.
               </td>
             </tr>
             <tr>
@@ -83,7 +83,7 @@ function applicationEmailHtml(params: z.infer<typeof schema>) {
             </tr>
             <tr>
               <td style="padding:0 30px 28px;font-size:13px;line-height:1.5;color:#737b68;">
-                This is a sample MCC listing unless the brand confirms the offer in your Messages tab.
+                This is a sample Loop listing unless the brand confirms the offer in your Messages tab.
               </td>
             </tr>
           </table>
@@ -99,7 +99,7 @@ async function sendConfirmationEmail(params: z.infer<typeof schema>) {
   const to = params.creatorEmail;
   if (!apiKey || !to) return { emailed: false, reason: "email-not-configured" as const };
 
-  const from = process.env.EMAIL_FROM ?? "MCC <onboarding@resend.dev>";
+  const from = process.env.EMAIL_FROM ?? "Loop <onboarding@resend.dev>";
   const replyTo = process.env.EMAIL_REPLY_TO;
   const op = params.opportunity;
   const res = await fetch("https://api.resend.com/emails", {
@@ -111,7 +111,7 @@ async function sendConfirmationEmail(params: z.infer<typeof schema>) {
     body: JSON.stringify({
       from,
       to,
-      subject: `MCC application confirmed: ${op.brand} - ${op.campaign}`,
+      subject: `Loop application confirmed: ${op.brand} - ${op.campaign}`,
       html: applicationEmailHtml(params),
       ...(replyTo ? { reply_to: replyTo } : {}),
     }),
@@ -136,7 +136,7 @@ async function storeApplication(params: z.infer<typeof schema>) {
       creator_id: params.creatorId,
       creator_email: params.creatorEmail || null,
       creator_name: params.creatorName || null,
-      mcc_tag: params.mccTag || null,
+      loop_tag: params.loopTag || null,
       opportunity_id: op.id,
       brand: op.brand,
       campaign: op.campaign,

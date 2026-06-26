@@ -55,6 +55,6 @@ export const useSession = create<SessionState>()(
         set({ userId: null, role: null, name: "", email: "", onboarded: false, isDemo: false });
       },
     }),
-    { name: "mcc-session", version: 2 },
+    { name: "loop-session", version: 2 },
   ),
 );

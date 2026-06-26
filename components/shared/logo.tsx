@@ -8,10 +8,10 @@ export function Logo({ className, href = "/" }: { className?: string; href?: str
       className={cn("flex items-center gap-2 font-serif text-lg font-semibold tracking-tight", className)}
     >
       <span className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-text-primary font-sans text-[11px] font-bold text-bg">
-        M
+        L
       </span>
       <span>
-        MCC<span className="text-text-tertiary font-sans text-[13px] font-normal ml-2 hidden sm:inline">Marketplace for Content Creation</span>
+        Loop<span className="text-text-tertiary font-sans text-[13px] font-normal ml-2 hidden sm:inline">Creator Marketplace</span>
       </span>
     </Link>
   );

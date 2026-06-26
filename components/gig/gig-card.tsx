@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusPill } from "@/components/ui/status-pill";
 import { companyById, creatorById } from "@/lib/seed";
+import { creatorPayoutCents } from "@/lib/gig-machine";
 import { daysUntil, formatMoney, formatShortDate } from "@/lib/format";
 import type { Gig } from "@/lib/types";
 
@@ -39,14 +40,14 @@ export function GigCard({
 
           <p className="line-clamp-2 text-sm leading-relaxed text-text-secondary">{gig.brief}</p>
 
-          <div className="grid grid-cols-3 gap-2 rounded-[10px] border border-border bg-bg p-3">
+          <div className="grid grid-cols-2 gap-2 rounded-[10px] border border-border bg-bg p-3">
             <div>
-              <p className="text-[11px] text-text-tertiary">Payment</p>
-              <p className="num mt-0.5 text-sm font-semibold text-money">{formatMoney(gig.priceCents)}</p>
-            </div>
-            <div>
-              <p className="text-[11px] text-text-tertiary">Fee</p>
-              <p className="num mt-0.5 text-sm font-semibold">{formatMoney(gig.feeCents)}</p>
+              <p className="text-[11px] text-text-tertiary">
+                {perspective === "creator" ? "Creator Receives" : "Deal Value"}
+              </p>
+              <p className="num mt-0.5 text-sm font-semibold text-money">
+                {formatMoney(perspective === "creator" ? creatorPayoutCents(gig.priceCents) : gig.priceCents)}
+              </p>
             </div>
             <div>
               <p className="text-[11px] text-text-tertiary">Usage</p>

@@ -36,7 +36,7 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
   const [origin, setOrigin] = useState("");
 
   const key = decodeURIComponent(handle);
-  const fromStore = creators.find((x) => x.handle === key || x.mccTag === key);
+  const fromStore = creators.find((x) => x.handle === key || x.loopTag === key);
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -59,16 +59,17 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
   }
 
   if (!c) {
+    const notFoundBackHref = role === "company" ? "/dashboard/discover" : role === "creator" ? "/dashboard" : "/";
     return (
       <div className="mx-auto flex min-h-screen max-w-3xl flex-col items-center justify-center gap-4 px-5">
         <p className="font-serif text-2xl font-semibold">Creator not found</p>
-        <Button asChild variant="outline"><Link href="/dashboard/discover">Back to Discover</Link></Button>
+        <Button asChild variant="outline"><Link href={notFoundBackHref}>Back</Link></Button>
       </div>
     );
   }
 
-  // Use the mccTag QR link if available, otherwise handle
-  const profileUrl = `${origin}/creator/${c.mccTag ?? c.handle}`;
+  // Use the loopTag QR link if available, otherwise handle
+  const profileUrl = `${origin}/creator/${c.loopTag ?? c.handle}`;
   const isOwnProfile = userId === c.id;
 
   const myReviews = reviews.filter((r) => r.targetId === c.id);
@@ -105,7 +106,7 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
   return (
     <div className="mx-auto w-full max-w-3xl px-5 py-8">
       <Link
-        href={role ? "/dashboard/discover" : "/"}
+        href={role === "company" ? "/dashboard/discover" : role === "creator" ? "/dashboard" : "/"}
         className="mb-6 inline-flex items-center gap-1.5 text-[13px] text-text-secondary hover:text-text-primary"
       >
         <ArrowLeft className="h-3.5 w-3.5" /> Back
@@ -141,12 +142,12 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
         )}
       </div>
 
-      {/* MCC tag + QR — shown to everyone, especially useful for brands scanning creator's code */}
-      {c.mccTag && (
+      {/* Loop tag + QR — shown to everyone, especially useful for brands scanning creator's code */}
+      {c.loopTag && (
         <div className="mt-6 flex flex-col gap-4 rounded-[20px] border-2 border-ink bg-surface p-5 sm:flex-row sm:items-center">
           <div className="flex-1">
-            <p className="text-[10px] font-extrabold uppercase tracking-widest text-text-tertiary">MCC creator tag</p>
-            <p className="num mt-1 font-serif text-2xl font-extrabold">{c.mccTag}</p>
+            <p className="text-[10px] font-extrabold uppercase tracking-widest text-text-tertiary">Loop creator tag</p>
+            <p className="num mt-1 font-serif text-2xl font-extrabold">{c.loopTag}</p>
             <p className="mt-1.5 text-xs font-medium text-text-secondary">
               Scan to open this profile instantly — verified tier, platforms, and portfolio in one tap.
             </p>

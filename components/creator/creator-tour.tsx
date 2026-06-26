@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { haptics } from "@/lib/haptics";
 
-const TOUR_KEY = "mcc-creator-tour-v1";
+const TOUR_KEY = "loop-creator-tour-v1";
 
 const STEPS: { icon: LucideIcon; title: string; body: string; tint: string }[] = [
   {
@@ -43,8 +43,8 @@ const STEPS: { icon: LucideIcon; title: string; body: string; tint: string }[] =
   },
   {
     icon: QrIcon,
-    title: "Your MCC tag is your identity",
-    body: "You've been certified with a unique MCC tag and QR code. Brands scan it to pull up your verified profile instantly.",
+    title: "Your Loop tag is your identity",
+    body: "You've been certified with a unique Loop tag and QR code. Brands scan it to pull up your verified profile instantly.",
     tint: "#a8d98a",
   },
   {

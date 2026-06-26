@@ -28,7 +28,6 @@ import {
   ACTIVE_STATUSES,
   ESCROW_HELD_STATUSES,
   KANBAN_LANES,
-  PLATFORM_FEE_PCT,
   creatorPayoutCents,
 } from "@/lib/gig-machine";
 import { daysUntil, formatMoney } from "@/lib/format";
@@ -123,9 +122,9 @@ export function CreatorDashboard() {
               <span className="sticker ml-3 bg-[#a8d98a] text-xs text-ink">open to work</span>
             )}
           </p>
-          {me.mccTag && (
+          {me.loopTag && (
             <p className="num mt-2 inline-flex items-center gap-2 rounded-full border-2 border-ink/15 bg-surface px-3 py-1 text-xs font-bold text-text-secondary">
-              <span className="text-[#d6409f]">●</span> MCC tag: <span className="font-extrabold text-text-primary">{me.mccTag}</span>
+              <span className="text-[#d6409f]">●</span> Loop tag: <span className="font-extrabold text-text-primary">{me.loopTag}</span>
             </p>
           )}
         </div>
@@ -215,19 +214,19 @@ export function CreatorDashboard() {
           </CardContent>
         </Card>
 
-        {/* MCC tag certificate */}
-        {me.mccTag && (
+        {/* Loop tag certificate */}
+        {me.loopTag && (
           <Card className="bg-[#f2a3df] md:col-span-1">
             <CardContent className="flex h-full flex-col items-center justify-center gap-3 p-5 text-center text-ink">
               <span className="sticker bg-ink text-[11px] text-[#f2a3df]">certified</span>
-              <QrCode value={`${origin}/creator/${me.mccTag}`} size={120} label={`MCC tag ${me.mccTag}`} />
-              <p className="num font-serif text-lg font-extrabold">{me.mccTag}</p>
+              <QrCode value={`${origin}/creator/${me.loopTag}`} size={120} label={`Loop tag ${me.loopTag}`} />
+              <p className="num font-serif text-lg font-extrabold">{me.loopTag}</p>
               <p className="text-xs font-bold opacity-70">Brands scan this to open your verified profile.</p>
             </CardContent>
           </Card>
         )}
 
-        <Card className={cn("border-ink bg-[#a8d98a]", me.mccTag ? "md:col-span-2" : "md:col-span-3")}>
+        <Card className={cn("border-ink bg-[#a8d98a]", me.loopTag ? "md:col-span-2" : "md:col-span-3")}>
           <CardContent className="flex h-full flex-col justify-between gap-5 text-ink sm:flex-row sm:items-center">
             <div>
               <div className="flex items-center gap-2">
@@ -240,10 +239,7 @@ export function CreatorDashboard() {
                 {me.stripePayoutsEnabled ? "Stripe is connected." : "Connect Stripe to get paid."}
               </h2>
               <p className="mt-2 max-w-xl text-sm font-bold leading-relaxed text-ink/70">
-                Brands pay through MCC. You keep{" "}
-                <span className="num font-extrabold">{100 - PLATFORM_FEE_PCT}%</span>; MCC keeps a{" "}
-                <span className="num font-extrabold">{PLATFORM_FEE_PCT}%</span> commission. Change the commission with{" "}
-                <span className="num">NEXT_PUBLIC_PLATFORM_FEE_PCT</span>.
+                Brands pay through Loop and your earnings land in your account automatically once the work is approved.
               </p>
             </div>
             <Link

@@ -77,7 +77,7 @@ export default function AuthCallbackPage() {
   return (
     <div className="flex min-h-screen flex-col bg-ink text-[#faf6ef]">
       <header className="flex items-center justify-between px-6 py-5">
-        <Link href="/" className="font-serif text-xl font-extrabold text-[#f2a3df]">MCC®</Link>
+        <Link href="/" className="font-serif text-xl font-extrabold text-[#f2a3df]">Loop®</Link>
       </header>
       <main className="relative z-10 flex flex-1 items-center justify-center px-6 pb-24">
         <div className="w-full max-w-xl text-center">

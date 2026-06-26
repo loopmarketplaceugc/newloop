@@ -40,7 +40,7 @@ export function EscrowTimeline({ gig }: { gig: Gig }) {
                   : status === "APPROVED"
                     ? "Approval unlocks payout and original deliverables."
                     : status === "COMPLETED"
-                      ? "MCC fee is deducted and creator payout is released."
+                      ? "Creator payout is released and original files are unlocked."
                       : "Tracked automatically in the shared workspace."}
               </p>
             </div>

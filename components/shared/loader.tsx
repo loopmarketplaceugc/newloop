@@ -31,7 +31,7 @@ export function Loader({
   return (
     <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-7 bg-bg">
       <span className="font-serif text-5xl font-extrabold tracking-tight text-ink">
-        MCC<span className="align-super text-base text-[#d6409f]">®</span>
+        Loop<span className="align-super text-base text-[#d6409f]">®</span>
       </span>
       {inner}
     </div>

@@ -7,9 +7,9 @@ const schema = z.object({
 });
 
 const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://vqbykppxpplctrrrpomg.supabase.co";
+  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://nylivxiyzxjdjsbdmrnw.supabase.co";
 const SUPABASE_ANON_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "sb_publishable_vwNlA2H1SGDO3PhTIvTq5g_klN55qDj";
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55bGl2eGl5enhqZGpzYmRtcm53Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0Mzc3ODUsImV4cCI6MjA5ODAxMzc4NX0.gr4KBqv9Wdjk_JG3cUb4MkJtjILvwjQarlOe6k5LDkQ";
 
 function siteUrl(req: Request) {
   return (
@@ -40,7 +40,7 @@ function resetEmailHtml(resetUrl: string, email: string) {
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;border:3px solid #faf6ef;border-radius:28px;background:#f2a3df;color:#101805;overflow:hidden;">
             <tr>
               <td style="padding:28px 28px 8px;font-family:Georgia,'Times New Roman',serif;font-size:28px;font-weight:900;line-height:1;">
-                MCC<span style="font-size:12px;vertical-align:super;">&reg;</span>
+                Loop<span style="font-size:12px;vertical-align:super;">&reg;</span>
               </td>
             </tr>
             <tr>
@@ -82,7 +82,7 @@ async function sendResendEmail(params: { to: string; resetUrl: string }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return false;
 
-  const from = process.env.EMAIL_FROM ?? "MCC <onboarding@resend.dev>";
+  const from = process.env.EMAIL_FROM ?? "Loop <onboarding@resend.dev>";
   const replyTo = process.env.EMAIL_REPLY_TO;
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -93,7 +93,7 @@ async function sendResendEmail(params: { to: string; resetUrl: string }) {
     body: JSON.stringify({
       from,
       to: params.to,
-      subject: "Reset your MCC password",
+      subject: "Reset your Loop password",
       html: resetEmailHtml(params.resetUrl, params.to),
       ...(replyTo ? { reply_to: replyTo } : {}),
     }),

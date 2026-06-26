@@ -14,6 +14,7 @@ import {
 } from "@stripe/react-stripe-js";
 import { useSession } from "@/lib/store/session";
 import { saveCompanyProfile } from "@/lib/auth";
+import { DEV_PAYMENTS } from "@/lib/payments";
 import { TypeOnce } from "@/components/shared/typewriter";
 import { NICHES } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -48,6 +49,33 @@ type Step =
 const BUDGETS = ["under $1k / mo", "$1k–5k / mo", "$5k–20k / mo", "$20k+ / mo"];
 const BALANCE_OPTIONS = ["$0", "$50", "$100", "$250+"];
 type PaidBalance = "$50" | "$100" | "$250+";
+
+// ── Dev-mode mock — simulates a successful payment without Stripe ─────────────
+function DevBalanceSection({ balanceLabel, onPaid }: { balanceLabel: string; onPaid: () => void }) {
+  const [simulating, setSimulating] = useState(false);
+  const simulate = async () => {
+    setSimulating(true);
+    await new Promise<void>((r) => setTimeout(r, 800));
+    onPaid();
+  };
+  return (
+    <div className="mt-5 rounded-[20px] border-2 border-dashed border-[#faf6ef]/20 bg-[#faf6ef]/[0.03] p-5">
+      <p className="mb-3 text-xs font-bold uppercase tracking-widest text-[#faf6ef]/30">
+        Dev mode — no real charge
+      </p>
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.97 }}
+        onClick={() => void simulate()}
+        disabled={simulating}
+        className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-[#f2a3df] py-4 font-serif text-lg font-bold text-ink disabled:opacity-50"
+      >
+        {simulating && <Loader2 className="h-5 w-5 animate-spin" />}
+        {simulating ? "Simulating…" : `Simulate ${balanceLabel} payment →`}
+      </motion.button>
+    </div>
+  );
+}
 
 // ── Stripe inner form — must live inside <Elements> ──────────────────────────
 function StripeBalanceInner({ balanceLabel, onPaid }: { balanceLabel: string; onPaid: () => void }) {
@@ -184,7 +212,7 @@ export default function CompanyOnboarding() {
   const [dir, setDir] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [values, setValues] = useState({ companyName: "", website: "" });
-  const [niche, setNiche] = useState<string | null>(null);
+  const [niches, setNiches] = useState<string[]>([]);
   const [budget, setBudget] = useState<string | null>(null);
   const [balance, setBalance] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -203,7 +231,7 @@ export default function CompanyOnboarding() {
         q: `Where can creators find ${values.companyName || "you"}?`,
         placeholder: "lumenskin.co",
       },
-      { kind: "niche", q: "What space are you in?" },
+      { kind: "niche", q: "What spaces are you in?" },
       { kind: "budget", q: "Monthly UGC budget?" },
       {
         kind: "balance",
@@ -234,8 +262,8 @@ export default function CompanyOnboarding() {
         return;
       }
     }
-    if (step.kind === "niche" && !niche) {
-      setError("pick the closest one");
+    if (step.kind === "niche" && niches.length === 0) {
+      setError("pick at least one");
       return;
     }
     if (step.kind === "budget" && !budget) {
@@ -251,7 +279,7 @@ export default function CompanyOnboarding() {
       void saveCompanyProfile({
         companyName: values.companyName,
         website: values.website,
-        niche: niche ?? "",
+        niches,
         budgetRange: budget ?? "",
         balance: balance ?? "$0",
       });
@@ -323,7 +351,7 @@ export default function CompanyOnboarding() {
               {step.kind === "niche" && (
                 <div className="flex flex-wrap gap-3">
                   {NICHES.map((n, i) => {
-                    const on = niche === n;
+                    const on = niches.includes(n);
                     return (
                       <motion.button
                         key={n}
@@ -332,7 +360,11 @@ export default function CompanyOnboarding() {
                         transition={{ delay: 0.03 * i }}
                         whileHover={{ scale: 1.08, rotate: i % 2 ? 2 : -2 }}
                         whileTap={{ scale: 0.94 }}
-                        onClick={() => setNiche(n)}
+                        onClick={() =>
+                          setNiches((prev) =>
+                            prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n],
+                          )
+                        }
                         className={cn(
                           "rounded-full border-[3px] px-5 py-2.5 font-serif text-lg font-bold transition-colors cursor-pointer",
                           on ? "border-transparent bg-[#a8d98a] text-ink" : "border-[#faf6ef]/20 text-[#faf6ef] hover:border-[#faf6ef]/50",
@@ -398,7 +430,7 @@ export default function CompanyOnboarding() {
                     })}
                   </div>
 
-                  {/* Stripe payment form — only for paid amounts */}
+                  {/* Payment form — only for paid amounts */}
                   <AnimatePresence>
                     {balance && balance !== "$0" && userId && (
                       <motion.div
@@ -407,12 +439,19 @@ export default function CompanyOnboarding() {
                         exit={{ opacity: 0, y: 8 }}
                         transition={{ duration: 0.25 }}
                       >
-                        <StripeBalanceSection
-                          balance={balance as PaidBalance}
-                          brandId={userId}
-                          email={email ?? undefined}
-                          onPaid={handleBalancePaid}
-                        />
+                        {DEV_PAYMENTS ? (
+                          <DevBalanceSection
+                            balanceLabel={balance}
+                            onPaid={handleBalancePaid}
+                          />
+                        ) : (
+                          <StripeBalanceSection
+                            balance={balance as PaidBalance}
+                            brandId={userId}
+                            email={email ?? undefined}
+                            onPaid={handleBalancePaid}
+                          />
+                        )}
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -421,7 +460,9 @@ export default function CompanyOnboarding() {
 
               {step.kind === "done" && (
                 <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="flex flex-wrap items-center gap-3">
-                  <span className="sticker bg-[#f2a3df] text-ink">{niche}</span>
+                  {niches.map((n) => (
+                    <span key={n} className="sticker bg-[#f2a3df] text-ink">{n}</span>
+                  ))}
                   <span className="sticker bg-[#a8d98a] text-ink">{budget}</span>
                   <span className="rounded-full bg-[#faf6ef]/10 px-4 py-2 text-sm font-bold">{values.website}</span>
                   {balance && balance !== "$0" && (

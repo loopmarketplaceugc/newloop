@@ -2,7 +2,7 @@ import type { Gig, GigStatus } from "./types";
 
 /**
  * Platform commission, adjustable via NEXT_PUBLIC_PLATFORM_FEE_PCT (default 10%).
- * MCC keeps this cut of every gig; the rest goes to the creator.
+ * Loop keeps this cut of every gig; the rest goes to the creator.
  */
 export const PLATFORM_FEE_PCT: number = (() => {
   const raw = Number(process.env.NEXT_PUBLIC_PLATFORM_FEE_PCT);

@@ -72,6 +72,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       router.replace(role === "creator" ? "/onboarding/creator" : "/onboarding/company");
   }, [hydrated, userId, onboarded, role, router]);
 
+  // Role-based route guards — redirect to dashboard root if wrong role accesses a locked page.
+  useEffect(() => {
+    if (!hydrated || !userId || !role) return;
+    const CREATOR_ONLY = ["/dashboard/profile", "/dashboard/wallet", "/dashboard/opportunities"];
+    const COMPANY_ONLY = ["/dashboard/discover", "/dashboard/billing", "/dashboard/requests"];
+    if (role === "company" && CREATOR_ONLY.some((p) => pathname.startsWith(p))) {
+      router.replace("/dashboard");
+    }
+    if (role === "creator" && COMPANY_ONLY.some((p) => pathname.startsWith(p))) {
+      router.replace("/dashboard");
+    }
+  }, [hydrated, userId, role, pathname, router]);
+
   useEffect(() => {
     if (hydrated && userId && role === "creator" && !isDemo) {
       ensureCreator(userId, name ? { name } : undefined);
@@ -85,10 +98,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     enterLiveMode();
     if (role === "creator") ensureCreator(userId, name ? { name } : undefined);
     const loadLiveData = async () => {
-      const [creatorRows, world] = await Promise.all([fetchCreators(), fetchMyWorld()]);
-      if (cancelled) return;
-      setCreatorsFromDb(creatorRows);
-      if (world) setLiveWorld(world);
+      try {
+        const [creatorRows, world] = await Promise.all([fetchCreators(), fetchMyWorld()]);
+        if (cancelled) return;
+        setCreatorsFromDb(creatorRows);
+        if (world) setLiveWorld(world);
+      } catch {
+        // Supabase may be temporarily unreachable (project wake-up, network blip).
+        // The app continues to work from local Zustand state.
+      }
     };
 
     void loadLiveData();

@@ -27,7 +27,7 @@ interface ProfileRow {
   location: string | null;
   status: "open" | "busy" | "away";
   avatar_hue?: number | null;
-  mcc_tag?: string | null;
+  loop_tag?: string | null;
   stripe_account_id?: string | null;
   stripe_payouts_enabled?: boolean | null;
   created_at: string;
@@ -118,7 +118,7 @@ export function mapCreator(p: ProfileRow, d?: DetailsRow | null, platforms: Plat
     portfolio: [],
     mediaKitUrl: d?.media_kit_url ?? undefined,
     joinedAt: p.created_at,
-    mccTag: p.mcc_tag ?? undefined,
+    loopTag: p.loop_tag ?? undefined,
     stripeAccountId: p.stripe_account_id ?? undefined,
     stripePayoutsEnabled: p.stripe_payouts_enabled ?? undefined,
   };
@@ -166,25 +166,30 @@ export function mapMessage(m: MessageRow): Message {
 
 /** All creators with a published profile — powers Discover. */
 export async function fetchCreators(): Promise<Creator[]> {
-  const sb = supabase();
-  const { data: profiles } = await sb.from("profiles").select("*").eq("role", "creator");
-  if (!profiles?.length) return [];
-  const ids = profiles.map((p) => p.id);
-  const [{ data: details }, { data: platforms }] = await Promise.all([
-    sb.from("creator_details").select("*").in("profile_id", ids),
-    sb.from("creator_platforms").select("*").in("creator_id", ids),
-  ]);
-  return (profiles as ProfileRow[]).map((p) =>
-    mapCreator(
-      p,
-      (details as DetailsRow[] | null)?.find((d) => d.profile_id === p.id),
-      ((platforms as PlatformRow[] | null) ?? []).filter((x) => x.creator_id === p.id),
-    ),
-  );
+  try {
+    const sb = supabase();
+    const { data: profiles } = await sb.from("profiles").select("*").eq("role", "creator");
+    if (!profiles?.length) return [];
+    const ids = profiles.map((p) => p.id);
+    const [{ data: details }, { data: platforms }] = await Promise.all([
+      sb.from("creator_details").select("*").in("profile_id", ids),
+      sb.from("creator_platforms").select("*").in("creator_id", ids),
+    ]);
+    return (profiles as ProfileRow[]).map((p) =>
+      mapCreator(
+        p,
+        (details as DetailsRow[] | null)?.find((d) => d.profile_id === p.id),
+        ((platforms as PlatformRow[] | null) ?? []).filter((x) => x.creator_id === p.id),
+      ),
+    );
+  } catch {
+    return [];
+  }
 }
 
 /** Everything the signed-in user can see: their gigs, those threads, and counterparty profiles. */
 export async function fetchMyWorld() {
+  try {
   const sb = supabase();
   const { data: auth } = await sb.auth.getUser();
   if (!auth.user) return null;
@@ -241,13 +246,16 @@ export async function fetchMyWorld() {
   }
 
   return { gigs, messages, deliverables, transactions, creators };
+  } catch {
+    return null;
+  }
 }
 
-/** Fetch a single creator by MCC tag or handle — used by the public profile page. */
+/** Fetch a single creator by Loop tag or handle — used by the public profile page. */
 export async function fetchCreatorByHandle(handleOrTag: string): Promise<Creator | null> {
   const sb = supabase();
   const [{ data: byTag }, { data: byHandle }] = await Promise.all([
-    sb.from("profiles").select("*").eq("mcc_tag", handleOrTag).eq("role", "creator").maybeSingle(),
+    sb.from("profiles").select("*").eq("loop_tag", handleOrTag).eq("role", "creator").maybeSingle(),
     sb.from("profiles").select("*").eq("handle", handleOrTag).eq("role", "creator").maybeSingle(),
   ]);
   const profile = (byTag ?? byHandle) as ProfileRow | null;

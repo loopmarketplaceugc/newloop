@@ -92,8 +92,8 @@ export interface Creator {
   portfolio: PortfolioItem[];
   mediaKitUrl?: string;
   joinedAt: string;
-  /** Unique MCC creator tag minted at certification, e.g. "MCC-7K2P-9QX4". */
-  mccTag?: string;
+  /** Unique Loop creator tag minted at certification, e.g. "LOOP-7K2P-9QX4". */
+  loopTag?: string;
   /** Stripe Connect (Express) account id once the creator sets up payouts. */
   stripeAccountId?: string;
   /** Whether Stripe has cleared the creator to receive payouts. */
@@ -104,7 +104,7 @@ export interface Company {
   id: string;
   name: string;
   website: string;
-  niche: Niche;
+  niches: Niche[];
   budgetRange: string;
   logoHue: number;
   about: string;

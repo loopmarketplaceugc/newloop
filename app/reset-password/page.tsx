@@ -40,7 +40,7 @@ export default function ResetPasswordPage() {
     <div className="flex min-h-screen flex-col bg-ink text-[#faf6ef]">
       <header className="flex items-center justify-between px-6 py-5">
         <Link href="/" className="font-serif text-xl font-extrabold text-[#f2a3df]">
-          MCC®
+          Loop®
         </Link>
         <Link
           href="/login"
@@ -58,7 +58,7 @@ export default function ResetPasswordPage() {
           <p className="mt-3 font-medium text-[#faf6ef]/50">
             {sent
               ? "Open the reset link and choose a new password."
-              : "Enter the email on your MCC account. We’ll send a secure reset link."}
+              : "Enter the email on your Loop account. We’ll send a secure reset link."}
           </p>
 
           {!sent ? (

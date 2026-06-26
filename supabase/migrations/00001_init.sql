@@ -1,4 +1,4 @@
--- MCC schema — RLS on every table.
+-- Loop schema — RLS on every table.
 -- Principle: creators read/write only their rows; companies only theirs;
 -- both parties read shared gigs/messages/contracts; transactions read-only to participants.
 
@@ -59,7 +59,7 @@ create table companies (
   profile_id uuid primary key references profiles on delete cascade,
   company_name text not null,
   website text,
-  niche text,
+  niches text[] not null default '{}',
   budget_range text
 );
 

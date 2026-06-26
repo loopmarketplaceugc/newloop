@@ -104,13 +104,21 @@ export default function MessagesPage() {
             <div>
               <p className="font-serif text-2xl font-extrabold">No conversations yet</p>
               <p className="mt-1.5 max-w-xs text-sm font-medium text-[#faf6ef]/60">
-                Apply to an opportunity to start your first brand conversation — it opens automatically.
+                {role === "creator"
+                  ? "Apply to an opportunity to start your first brand conversation — it opens automatically."
+                  : "Find a creator on Discover and open a workspace to start chatting."}
               </p>
             </div>
             <Button asChild className="bg-[#f2a3df] text-ink hover:bg-[#f2a3df]/90">
-              <Link href="/dashboard/opportunities">
-                <Compass className="h-4 w-4" /> Browse opportunities
-              </Link>
+              {role === "creator" ? (
+                <Link href="/dashboard/opportunities">
+                  <Compass className="h-4 w-4" /> Browse opportunities
+                </Link>
+              ) : (
+                <Link href="/dashboard/discover">
+                  <Compass className="h-4 w-4" /> Discover creators
+                </Link>
+              )}
             </Button>
           </div>
         </div>

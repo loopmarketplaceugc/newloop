@@ -1,16 +1,35 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Check, Clock, Film, Lightbulb, ListChecks, Sparkles, TrendingUp } from "lucide-react";
-import { useApp, useHydrated } from "@/lib/store/app";
+import { ArrowLeft, Check } from "lucide-react";
 import { useSession } from "@/lib/store/session";
-import { BrandLogo } from "@/components/shared/brand-logos";
-import { toast } from "@/components/ui/toast";
+import { useHydrated } from "@/lib/store/app";
 import { haptics } from "@/lib/haptics";
-import { getOpportunity, formatPay } from "@/lib/opportunities";
-import { cn } from "@/lib/utils";
+import { toast } from "@/components/ui/toast";
+
+const PLATFORM_LABELS: Record<string, string> = {
+  tiktok: "TikTok",
+  reels: "Instagram Reels",
+  shorts: "YouTube Shorts",
+};
+
+interface Request {
+  id: string;
+  company_id: string;
+  title: string;
+  description: string;
+  platforms: string[];
+  num_creators: number;
+  reels_per_creator: number;
+  pay_per_creator_cents: number;
+  deadline_at: string | null;
+  merch_included: boolean;
+  merch_description: string | null;
+  status: string;
+  brand_name?: string;
+}
 
 export default function OpportunityDetailPage({
   params,
@@ -21,12 +40,53 @@ export default function OpportunityDetailPage({
   const router = useRouter();
   const hydrated = useHydrated();
   const userId = useSession((s) => s.userId);
-  const isDemo = useSession((s) => s.isDemo);
+
+  const [request, setRequest] = useState<Request | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [note, setNote] = useState("");
+  const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState(false);
 
-  const op = getOpportunity(id);
+  useEffect(() => {
+    if (!id || !userId) return;
+    void Promise.all([
+      fetch(`/api/requests?id=${id}`).then((r) => r.json() as Promise<{ request?: Request }>),
+      fetch(`/api/requests/apply?creatorId=${userId}`).then(
+        (r) => r.json() as Promise<{ applications?: { request_id: string }[] }>,
+      ),
+    ])
+      .then(([reqData, appData]) => {
+        if (reqData.request) setRequest(reqData.request);
+        const ids = new Set((appData.applications ?? []).map((a) => a.request_id));
+        if (ids.has(id)) setApplied(true);
+      })
+      .catch(() => null)
+      .finally(() => setLoading(false));
+  }, [id, userId]);
 
-  if (!hydrated || !userId) {
+  const handleApply = async () => {
+    if (!userId || !request || applied) return;
+    haptics.success();
+    setApplying(true);
+    try {
+      const res = await fetch("/api/requests/apply", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ requestId: request.id, creatorId: userId, note: note || null }),
+      });
+      if (res.ok) {
+        setApplied(true);
+        toast("Application sent!", {
+          body: `${request.brand_name ?? "The brand"} will review your profile and reach out soon.`,
+          tone: "success",
+        });
+      }
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  if (!hydrated || loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-ink/20 border-t-ink" />
@@ -34,7 +94,7 @@ export default function OpportunityDetailPage({
     );
   }
 
-  if (!op) {
+  if (!request) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
         <p className="font-serif text-2xl font-extrabold">Campaign not found</p>
@@ -48,48 +108,7 @@ export default function OpportunityDetailPage({
     );
   }
 
-  const maxPay = op.basePayCents + op.viewBonus.capCents;
-
-  const handleApply = () => {
-    haptics.success();
-    const app = useApp.getState();
-    const gigId = `demo-gig-${op.id}`;
-    const alreadyExists = app.gigs.some((g) => g.id === gigId);
-    if (!alreadyExists) {
-      const now = new Date().toISOString();
-      app.upsertGig({
-        id: gigId,
-        companyId: op.companyId,
-        creatorId: userId,
-        status: "DRAFT",
-        title: `${op.brand} × ${op.campaign}`,
-        brief: op.brief,
-        platform: "tiktok",
-        priceCents: op.basePayCents,
-        feeCents: Math.round(op.basePayCents * 0.075),
-        usageDays: 90,
-        rawFootage: false,
-        physicalProduct: false,
-        revisionCount: 0,
-        createdAt: now,
-      });
-      if (isDemo) {
-        app.upsertMessage({
-          id: `demo-msg-${op.id}`,
-          gigId,
-          senderId: op.companyId,
-          kind: "text",
-          text: `Hey! We're excited to work with you on the "${op.campaign}" campaign. Take a look at the brief and let us know if you have any questions before we send an offer.`,
-          createdAt: now,
-        });
-      }
-    }
-    setApplied(true);
-    toast("Application sent!", {
-      body: `${op.brand} will review your profile and reach out soon.`,
-      tone: "success",
-    });
-  };
+  const payAmount = (request.pay_per_creator_cents / 100).toFixed(0);
 
   return (
     <div className="mx-auto max-w-lg py-2 pb-20">
@@ -105,7 +124,6 @@ export default function OpportunityDetailPage({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: "spring", stiffness: 280, damping: 24 }}
       >
-        {/* Outer glow + ball shadow */}
         <div
           className="relative rounded-[32px]"
           style={{
@@ -133,17 +151,12 @@ export default function OpportunityDetailPage({
             />
           </div>
 
-          {/* Card */}
           <div className="relative rounded-[30px] bg-[#faf6ef] px-6 pb-8 pt-7">
-
-            {/* Brand header */}
-            <div className="flex items-center gap-3">
-              <BrandLogo brand={op.brand} size={44} />
-              <div>
-                <p className="font-serif text-xl font-extrabold">{op.brand}</p>
-                <p className="text-[13px] font-bold text-text-secondary">{op.campaign}</p>
-              </div>
-            </div>
+            {/* Brand + title */}
+            <p className="text-[11px] font-bold uppercase tracking-widest text-text-tertiary">
+              {request.brand_name ?? "Brand"}
+            </p>
+            <p className="mt-1 font-serif text-2xl font-extrabold leading-tight">{request.title}</p>
 
             {/* Dark payout card */}
             <div className="mt-6 rounded-[22px] bg-ink px-5 py-5">
@@ -151,31 +164,40 @@ export default function OpportunityDetailPage({
                 your payout
               </p>
               <p className="num mt-1 font-serif text-[72px] font-extrabold leading-none tracking-tight text-[#a8d98a]">
-                {formatPay(op.basePayCents)}
+                ${payAmount}
               </p>
               <p className="mt-1 text-[13px] font-bold text-[#faf6ef]/55">
-                base pay · up to {formatPay(maxPay)} with view bonuses
+                per creator · paid via Stripe after approval
               </p>
               <div className="mt-3 flex items-center gap-2">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden className="shrink-0">
                   <rect width="16" height="16" rx="3" fill="#625BF6" />
                   <path d="M7.2 6.1c0-.5.4-.7.9-.7.8 0 1.7.3 2.3.6V4.1C9.8 3.8 9.1 3.6 8.1 3.6 6.3 3.6 5 4.6 5 6.2c0 2.4 3.3 2 3.3 3.1 0 .6-.5.8-1.1.8-.9 0-2-.4-2.8-.9v2c.8.4 1.8.7 2.8.7 1.8 0 3.2-.9 3.2-2.6 0-2.6-3.2-2.1-3.2-3.2Z" fill="#fff" />
                 </svg>
-                <span className="text-[11px] font-bold text-[#faf6ef]/40">Paid via Stripe after approval</span>
+                <span className="text-[11px] font-bold text-[#faf6ef]/40">Secured via Stripe Connect</span>
               </div>
             </div>
 
-            {/* Stats row */}
+            {/* Stats */}
             <div className="mt-5 grid grid-cols-3 gap-2.5">
               {[
-                { icon: Film, label: "Platform", value: op.platform },
-                { icon: ListChecks, label: "Deliverables", value: op.deliverables },
-                { icon: Clock, label: "Length", value: op.videoLength },
-              ].map(({ icon: Icon, label, value }) => (
+                { value: String(request.reels_per_creator), label: "reels" },
+                { value: String(request.num_creators), label: "creators" },
+                {
+                  value: request.deadline_at
+                    ? new Date(request.deadline_at).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })
+                    : "Open",
+                  label: "deadline",
+                },
+              ].map(({ value, label }) => (
                 <div key={label} className="rounded-[16px] bg-ink/5 px-3 py-3 text-center">
-                  <Icon className="mx-auto h-4 w-4 text-text-tertiary" />
-                  <p className="mt-1.5 text-[11px] font-extrabold leading-tight">{value}</p>
-                  <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-text-tertiary">{label}</p>
+                  <p className="num font-serif text-[22px] font-extrabold leading-none">{value}</p>
+                  <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-text-tertiary">
+                    {label}
+                  </p>
                 </div>
               ))}
             </div>
@@ -183,31 +205,23 @@ export default function OpportunityDetailPage({
             {/* Brief */}
             <div className="mt-5 rounded-[16px] border-2 border-ink/10 bg-ink/[0.03] p-4">
               <p className="text-[11px] font-bold uppercase tracking-wider text-text-tertiary">Brief</p>
-              <p className="mt-2 text-[14px] font-bold leading-relaxed text-ink">{op.brief}</p>
-            </div>
-
-            {/* Script / Trend / Idea */}
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              {[
-                { icon: Sparkles, label: "Script", body: op.script, bg: "bg-ink", text: "text-[#faf6ef]" },
-                { icon: TrendingUp, label: "Trend", body: op.trend, bg: "bg-[#f2a3df]", text: "text-ink" },
-                { icon: Lightbulb, label: "Idea", body: op.idea, bg: "bg-[#a8d98a]", text: "text-ink" },
-              ].map(({ icon: Icon, label, body, bg, text }) => (
-                <div key={label} className={cn("rounded-[16px] border-2 border-ink p-4", bg, text)}>
-                  <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider opacity-70">
-                    <Icon className="h-3.5 w-3.5" /> {label}
-                  </p>
-                  <p className="mt-2 text-[12px] font-bold leading-relaxed opacity-90">{body}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* View bonus */}
-            <div className="mt-4 rounded-[16px] bg-ink/5 px-4 py-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-text-tertiary">View bonus</p>
-              <p className="mt-1 text-[13px] font-extrabold text-ink">
-                +{formatPay(op.viewBonus.amountCents)} {op.viewBonus.trigger} · capped at +{formatPay(op.viewBonus.capCents)}
+              <p className="mt-2 text-[14px] font-bold leading-relaxed text-ink">
+                {request.description}
               </p>
+            </div>
+
+            {/* Platforms + merch */}
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {request.platforms.map((p) => (
+                <span key={p} className="rounded-full bg-ink/8 px-3 py-1.5 text-[12px] font-bold">
+                  {PLATFORM_LABELS[p] ?? p}
+                </span>
+              ))}
+              {request.merch_included && (
+                <span className="rounded-full bg-[#f2a3df] px-3 py-1.5 text-[12px] font-bold text-ink">
+                  {request.merch_description ?? "merch included"}
+                </span>
+              )}
             </div>
 
             {/* Apply */}
@@ -229,19 +243,38 @@ export default function OpportunityDetailPage({
                     >
                       <Check className="h-10 w-10 stroke-[3] text-ink" />
                     </motion.div>
-                    <p className="font-serif text-xl font-extrabold text-ink">Applied to {op.brand}</p>
-                    <p className="text-sm font-medium text-text-secondary">They&apos;ll be in touch soon.</p>
+                    <p className="font-serif text-xl font-extrabold text-ink">
+                      Applied to {request.brand_name ?? "the brand"}
+                    </p>
+                    <p className="text-sm font-medium text-text-secondary">
+                      They&apos;ll be in touch soon.
+                    </p>
                   </motion.div>
                 ) : (
-                  <motion.button
-                    key="apply"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.97 }}
-                    onClick={handleApply}
-                    className="w-full cursor-pointer rounded-full bg-[#f2a3df] py-5 font-serif text-xl font-bold text-ink hover:bg-[#f2a3df]/90"
-                  >
-                    Apply now →
-                  </motion.button>
+                  <motion.div key="form" className="space-y-4">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-text-tertiary">
+                        Note to brand{" "}
+                        <span className="normal-case font-medium text-text-tertiary/60">(optional)</span>
+                      </p>
+                      <textarea
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        placeholder="Tell them why you're a great fit, your content style, or any questions…"
+                        rows={3}
+                        className="mt-1.5 w-full resize-none rounded-xl border-2 border-ink/15 bg-white px-4 py-3 text-[14px] font-medium leading-relaxed focus:border-ink/40 focus:outline-none"
+                      />
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => void handleApply()}
+                      disabled={applying}
+                      className="w-full cursor-pointer rounded-full bg-[#f2a3df] py-5 font-serif text-xl font-bold text-ink hover:bg-[#f2a3df]/90 disabled:opacity-60"
+                    >
+                      {applying ? "Applying…" : "Apply now →"}
+                    </motion.button>
+                  </motion.div>
                 )}
               </AnimatePresence>
             </div>
