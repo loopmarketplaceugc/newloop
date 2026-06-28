@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { stripeClient } from "@/lib/stripe";
+import { authedUserId } from "@/lib/supabase-admin";
 
 const AMOUNT_MAP: Record<string, number> = {
   "$50": 5000,
@@ -10,11 +11,13 @@ const AMOUNT_MAP: Record<string, number> = {
 
 const schema = z.object({
   balance: z.enum(["$50", "$100", "$250+"]),
-  brandId: z.string().min(1),
   email: z.string().email().optional(),
 });
 
 export async function POST(req: Request) {
+  const callerId = await authedUserId(req);
+  if (!callerId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const stripe = stripeClient();
   if (!stripe) {
     return NextResponse.json({ error: "Payments are not configured." }, { status: 503 });
@@ -25,7 +28,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const { balance, brandId, email } = parsed.data;
+  const { balance, email } = parsed.data;
   const amountCents = AMOUNT_MAP[balance];
 
   try {
@@ -33,7 +36,8 @@ export async function POST(req: Request) {
       amount: amountCents,
       currency: "usd",
       automatic_payment_methods: { enabled: true },
-      metadata: { brandId, balance },
+      // brandId from verified token; kind identifies this as a balance top-up in the webhook.
+      metadata: { brandId: callerId, balance, kind: "balance_topup" },
       receipt_email: email,
       description: `Loop balance top-up (${balance})`,
     });

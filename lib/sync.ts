@@ -325,7 +325,7 @@ async function authedId(): Promise<string | null> {
 }
 
 /** Authorization header carrying the caller's access token for money routes. */
-async function authHeaders(): Promise<Record<string, string>> {
+export async function authHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase().auth.getSession();
   const token = data.session?.access_token;
   return {

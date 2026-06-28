@@ -34,7 +34,7 @@ const TRANSITIONS: Record<GigStatus, GigStatus[]> = {
 };
 
 export function canTransition(from: GigStatus, to: GigStatus): boolean {
-  return TRANSITIONS[from].includes(to);
+  return TRANSITIONS[from]?.includes(to) ?? false;
 }
 
 export function nextStatuses(from: GigStatus): GigStatus[] {

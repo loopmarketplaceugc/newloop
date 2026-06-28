@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { stripeClient, createConnectAccount } from "@/lib/stripe";
+import { admin, authedUserId } from "@/lib/supabase-admin";
 
 const schema = z.object({
-  creatorId: z.string().min(1),
   email: z.string().email().optional(),
-  accountId: z.string().optional(),
 });
 
 export async function POST(req: Request) {
+  const callerId = await authedUserId(req);
+  if (!callerId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const stripe = stripeClient();
   if (!stripe) {
     return NextResponse.json({ error: "Payments not configured." }, { status: 503 });
@@ -19,12 +21,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const { creatorId, email, accountId } = parsed.data;
+  const { email } = parsed.data;
 
   try {
-    const account = accountId
-      ? await stripe.accounts.retrieve(accountId)
-      : await createConnectAccount(stripe, { email, creatorId });
+    // Resolve the Stripe account from DB — never trust body accountId.
+    const { data: profile } = await admin()
+      .from("profiles")
+      .select("stripe_account_id")
+      .eq("id", callerId)
+      .maybeSingle();
+
+    const existingAccountId = profile?.stripe_account_id as string | undefined;
+
+    const account = existingAccountId
+      ? await stripe.accounts.retrieve(existingAccountId)
+      : await createConnectAccount(stripe, { email, creatorId: callerId });
+
+    // Persist account id if it's new.
+    if (!existingAccountId) {
+      await admin()
+        .from("profiles")
+        .update({ stripe_account_id: account.id })
+        .eq("id", callerId);
+    }
 
     const session = await stripe.accountSessions.create({
       account: account.id,

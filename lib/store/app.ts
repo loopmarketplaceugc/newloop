@@ -326,14 +326,15 @@ export const useApp = create<AppState>()(
           if (!r.ok) throw new Error(r.error ?? "Could not confirm payment.");
         }
         const usageExpiresAt = new Date(Date.now() + gig.usageDays * 86_400_000).toISOString();
+        const isDemo = useSession.getState().isDemo;
         set((s) => ({
           gigs: s.gigs.map((g) =>
             g.id === gigId ? { ...g, status: "FUNDED_IN_ESCROW" as GigStatus, usageExpiresAt } : g,
           ),
-          transactions: [
-            ...s.transactions,
-            { id: uid("t"), gigId, type: "fund", amountCents: gig.priceCents, stripeRef: opts?.sessionId ?? `pi_demo_${gigId}`, createdAt: now() },
-          ],
+          // Only write optimistic tx in demo mode; live mode gets the real row via the next poll.
+          transactions: isDemo
+            ? [...s.transactions, { id: uid("t"), gigId, type: "fund" as const, amountCents: gig.priceCents, stripeRef: opts?.sessionId ?? `pi_demo_${gigId}`, createdAt: now() }]
+            : s.transactions,
         }));
         get().notify({ userId: gig.creatorId, title: "Payment secured", body: "The brand paid — you're cleared to start.", href: `/gig/${gigId}` });
       },
@@ -441,15 +442,18 @@ export const useApp = create<AppState>()(
         const fee = platformFeeCents(gig.priceCents);
         const payout = creatorPayoutCents(gig.priceCents);
         const completedAt = now();
+        const isDemoRelease = useSession.getState().isDemo;
         set((s) => ({
           gigs: s.gigs.map((g) =>
             g.id === gigId ? { ...g, status: "COMPLETED" as GigStatus, feeCents: fee, completedAt } : g,
           ),
-          transactions: [
-            ...s.transactions,
-            { id: uid("t"), gigId, type: "fee", amountCents: fee, stripeRef: `fee_demo_${gigId}`, createdAt: now() },
-            { id: uid("t"), gigId, type: "release", amountCents: payout, stripeRef: `tr_demo_${gigId}`, createdAt: now() },
-          ],
+          transactions: isDemoRelease
+            ? [
+                ...s.transactions,
+                { id: uid("t"), gigId, type: "fee" as const, amountCents: fee, stripeRef: `fee_demo_${gigId}`, createdAt: now() },
+                { id: uid("t"), gigId, type: "release" as const, amountCents: payout, stripeRef: `tr_demo_${gigId}`, createdAt: now() },
+              ]
+            : s.transactions,
           deliverables: s.deliverables.map((d) =>
             d.gigId === gigId ? { ...d, watermarked: false } : d,
           ),
@@ -464,12 +468,13 @@ export const useApp = create<AppState>()(
           const r = await dbCancelGig(gigId);
           if (!r.ok) throw new Error(r.error ?? "Could not cancel gig.");
         }
+        const isDemoCancel = useSession.getState().isDemo;
         const funded = get().transactions.some((t) => t.gigId === gigId && t.type === "fund");
         const { companyRefundPct } = refundPolicy(gig.status);
         const refundCents = Math.round((gig.priceCents * companyRefundPct) / 100);
         set((s) => ({
           gigs: s.gigs.map((g) => (g.id === gigId ? { ...g, status: "CANCELLED" as GigStatus } : g)),
-          transactions: funded && refundCents > 0
+          transactions: isDemoCancel && funded && refundCents > 0
             ? [...s.transactions, { id: uid("t"), gigId, type: "refund" as const, amountCents: refundCents, stripeRef: `re_demo_${gigId}`, createdAt: now() }]
             : s.transactions,
         }));

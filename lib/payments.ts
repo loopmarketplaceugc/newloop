@@ -6,7 +6,9 @@ import { supabase } from "@/lib/supabase";
  * When true, all payment buttons auto-succeed with no real Stripe charge.
  * Flip NEXT_PUBLIC_DEV_PAYMENTS=false (or remove it) to restore production Stripe.
  */
-export const DEV_PAYMENTS = process.env.NEXT_PUBLIC_DEV_PAYMENTS === "true";
+export const DEV_PAYMENTS =
+  process.env.NODE_ENV !== "production" &&
+  process.env.NEXT_PUBLIC_DEV_PAYMENTS === "true";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 

@@ -51,15 +51,31 @@ export async function POST(req: Request) {
         }
         break;
       }
+
       case "payment_intent.succeeded": {
-        // Backstop in case the Checkout session event is missed.
         const pi = event.data.object as Stripe.PaymentIntent;
         const gigId = pi.metadata?.gigId;
-        if (gigId && pi.metadata?.kind === "gig_payment") {
+        const kind = pi.metadata?.kind;
+
+        if (gigId && kind === "gig_payment") {
+          // Backstop in case the Checkout session event is missed.
           await recordFunding({ gigId, amountCents: pi.amount_received ?? pi.amount ?? 0, stripeRef: pi.id });
+          break;
+        }
+
+        if (kind === "balance_topup") {
+          const brandId = pi.metadata?.brandId;
+          if (brandId) {
+            // Credit the brand's prepaid balance.
+            await admin().rpc("credit_balance", {
+              p_uid: brandId,
+              p_amount: pi.amount_received ?? pi.amount ?? 0,
+            });
+          }
         }
         break;
       }
+
       case "account.updated": {
         const acct = event.data.object as Stripe.Account;
         await admin()
@@ -68,12 +84,28 @@ export async function POST(req: Request) {
           .eq("stripe_account_id", acct.id);
         break;
       }
+
+      case "charge.dispute.created": {
+        const dispute = event.data.object as Stripe.Dispute;
+        console.error("[webhook] Dispute created:", dispute.id, "charge:", dispute.charge, "reason:", dispute.reason);
+        // TODO: move the gig to DISPUTED status and notify both parties.
+        break;
+      }
+
+      case "payout.failed":
+      case "payment_intent.payment_failed": {
+        console.error(`[webhook] Money failure event: ${event.type}`, event.data.object);
+        // TODO: surface failure to the creator/brand and allow retry.
+        break;
+      }
+
       default:
         break;
     }
   } catch (e) {
     // Log and 500 so Stripe retries — never silently drop a money event.
     const msg = e instanceof Error ? e.message : "handler error";
+    console.error(`[webhook] Handler error for ${event.type}:`, msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 

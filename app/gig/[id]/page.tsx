@@ -162,7 +162,9 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
       (updatedGig) => useApp.getState().upsertGig(updatedGig),
     );
     void refresh();
-    const timer = window.setInterval(() => void refresh(), 2000);
+    // Realtime subscription covers this gig's messages/status; the poll backstops
+    // other-gig updates and reconnects after brief network gaps.
+    const timer = window.setInterval(() => void refresh(), 15000);
 
     return () => {
       cancelled = true;

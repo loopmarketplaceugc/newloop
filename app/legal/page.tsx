@@ -276,8 +276,8 @@ export default function LegalPage() {
                   auto-approval deadline constitutes acceptance of the deliverable.
                 </li>
                 <li>
-                  Not contact Creators outside Loop to circumvent platform fees during or within
-                  12 months after an active gig.
+                  Not contact or engage Creators outside Loop in connection with any deal that
+                  originated on the platform, during or within 12 months after the gig is active.
                 </li>
               </ul>
             </div>

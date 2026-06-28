@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import { useSession } from "@/lib/store/session";
 import { useHydrated } from "@/lib/store/app";
+import { authHeaders } from "@/lib/sync";
 import { cn } from "@/lib/utils";
 
 const PLATFORMS = [
@@ -79,7 +80,10 @@ function CompanyRequestsView({ userId }: { userId: string }) {
   const handleDelete = async (id: string) => {
     setDeletingId(id);
     try {
-      await fetch(`/api/requests?id=${id}&companyId=${userId}`, { method: "DELETE" });
+      await fetch(`/api/requests?id=${id}`, {
+        method: "DELETE",
+        headers: await authHeaders(),
+      });
       setRequests((prev) => prev.filter((r) => r.id !== id));
     } finally {
       setDeletingId(null);
@@ -92,9 +96,8 @@ function CompanyRequestsView({ userId }: { userId: string }) {
     try {
       await fetch("/api/requests", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: await authHeaders(),
         body: JSON.stringify({
-          companyId: userId,
           title,
           description,
           platforms: selectedPlatforms,

@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Check, Users, X } from "lucide-react";
 import { useSession } from "@/lib/store/session";
 import { useHydrated } from "@/lib/store/app";
+import { authHeaders } from "@/lib/sync";
 import { cn } from "@/lib/utils";
 
 const PLATFORMS: { id: string; label: string }[] = [
@@ -188,7 +189,7 @@ function CompanyDetailView({ request }: { request: Request }) {
   const handleAction = async (applicationId: string, action: "approve" | "reject") => {
     const res = await fetch("/api/requests/apply", {
       method: "PATCH",
-      headers: { "content-type": "application/json" },
+      headers: await authHeaders(),
       body: JSON.stringify({ applicationId, action }),
     });
     if (!res.ok) throw new Error("Action failed");
@@ -317,8 +318,8 @@ function CreatorDetailView({ request, userId }: { request: Request; userId: stri
     try {
       const res = await fetch("/api/requests/apply", {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ requestId: request.id, creatorId: userId, note: note || null }),
+        headers: await authHeaders(),
+        body: JSON.stringify({ requestId: request.id, note: note || null }),
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { admin } from "@/lib/supabase-admin";
+import { admin, authedUserId } from "@/lib/supabase-admin";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -26,7 +26,6 @@ export async function GET(req: Request) {
     if (!apps || apps.length === 0) return NextResponse.json({ applications: [] });
 
     const ids = apps.map((a) => a.creator_id as string);
-    // bio and status live on profiles; creator_details holds niches and tier only
     const [{ data: profiles }, { data: details }] = await Promise.all([
       admin().from("profiles").select("id, name, handle, avatar_hue, bio").in("id", ids),
       admin().from("creator_details").select("profile_id, niches, tier").in("profile_id", ids),
@@ -75,6 +74,9 @@ export async function GET(req: Request) {
 }
 
 export async function PATCH(req: Request) {
+  const callerId = await authedUserId(req);
+  if (!callerId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const body = await req.json().catch(() => null) as Record<string, unknown> | null;
   if (!body?.applicationId || !body?.action) {
     return NextResponse.json({ error: "applicationId and action required" }, { status: 400 });
@@ -90,6 +92,19 @@ export async function PATCH(req: Request) {
     .single();
 
   if (appErr || !app) return NextResponse.json({ error: "Application not found" }, { status: 404 });
+
+  // Verify the caller owns the request this application belongs to.
+  const { data: request, error: reqErr } = await admin()
+    .from("requests")
+    .select("company_id, title, description, platforms, pay_per_creator_cents, deadline_at")
+    .eq("id", app.request_id as string)
+    .single();
+
+  if (reqErr || !request) return NextResponse.json({ error: "Request not found" }, { status: 404 });
+  if ((request.company_id as string) !== callerId) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   if ((app.status as string) !== "pending") {
     return NextResponse.json({ error: "Application already actioned" }, { status: 400 });
   }
@@ -107,15 +122,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ ok: true, status: "rejected" });
   }
 
-  // Approve: fetch request details and create a gig
-  const { data: request, error: reqErr } = await admin()
-    .from("requests")
-    .select("*")
-    .eq("id", app.request_id as string)
-    .single();
-
-  if (reqErr || !request) return NextResponse.json({ error: "Request not found" }, { status: 404 });
-
+  // Approve: create a gig between the company and the creator.
   const priceCents = request.pay_per_creator_cents as number;
   const feeCents = Math.round(priceCents * 0.1);
   const platforms = (request.platforms as string[]) ?? [];
@@ -123,7 +130,7 @@ export async function PATCH(req: Request) {
   const { data: gig, error: gigErr } = await admin()
     .from("gigs")
     .insert([{
-      company_id: request.company_id,
+      company_id: callerId,
       creator_id: app.creator_id,
       status: "OFFER_ACCEPTED",
       title: request.title,
@@ -146,20 +153,24 @@ export async function PATCH(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const callerId = await authedUserId(req);
+  if (!callerId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const body = await req.json().catch(() => null) as Record<string, unknown> | null;
-  if (!body?.requestId || !body?.creatorId) {
-    return NextResponse.json({ error: "requestId and creatorId required" }, { status: 400 });
+  if (!body?.requestId) {
+    return NextResponse.json({ error: "requestId required" }, { status: 400 });
   }
 
+  // creator_id always comes from the verified token, never from the body.
   const { error: appErr } = await admin().from("request_applications").upsert([{
     request_id: body.requestId,
-    creator_id: body.creatorId,
+    creator_id: callerId,
     note: body.note ?? null,
   }], { onConflict: "request_id,creator_id" });
   if (appErr) return NextResponse.json({ error: appErr.message }, { status: 400 });
 
   const { data: reqData } = await admin().from("requests").select("title, company_id").eq("id", body.requestId).single();
-  const { data: creatorData } = await admin().from("profiles").select("name").eq("id", body.creatorId).single();
+  const { data: creatorData } = await admin().from("profiles").select("name").eq("id", callerId).single();
   return NextResponse.json({
     ok: true,
     requestTitle: reqData?.title,

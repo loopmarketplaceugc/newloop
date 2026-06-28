@@ -66,10 +66,12 @@ export async function flushPendingProfile() {
   try {
     const pending = localStorage.getItem(PENDING_KEY);
     if (!pending) return;
-    const parsed = JSON.parse(pending) as { kind: "creator" | "company"; payload: never };
+    const parsed = JSON.parse(pending) as { kind: "creator" | "nickname" | "company"; payload: never };
     const ok =
       parsed.kind === "creator"
         ? await saveCreatorProfile(parsed.payload)
+        : parsed.kind === "nickname"
+        ? await saveCreatorNickname(parsed.payload)
         : await saveCompanyProfile(parsed.payload);
     if (ok) localStorage.removeItem(PENDING_KEY);
   } catch {
@@ -181,7 +183,11 @@ export async function saveCreatorNickname(p: {
   const sb = supabase();
   const { data } = await sb.auth.getUser();
   const uid = data.user?.id;
-  if (!uid) return false;
+  if (!uid) {
+    // No confirmed session yet — park it; flushed automatically on first login
+    localStorage.setItem(PENDING_KEY, JSON.stringify({ kind: "nickname", payload: p }));
+    return false;
+  }
   const handle = makeHandle(p.nickname, "creator");
   await sb.from("profiles").upsert({ id: uid, role: "creator", name: p.nickname, handle, status: "open" });
   await sb.from("creator_details").upsert({ profile_id: uid });

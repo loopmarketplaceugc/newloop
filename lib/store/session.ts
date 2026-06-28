@@ -55,6 +55,11 @@ export const useSession = create<SessionState>()(
         void supabase().auth.signOut();
         useOnboarding.getState().reset();
         set({ userId: null, role: null, name: "", email: "", onboarded: false, isDemo: false });
+        // Clear live gig/message data so the next user on this browser starts clean.
+        // Dynamic import avoids a circular dep (app.ts already imports session.ts).
+        void import("@/lib/store/app").then(({ useApp }) => {
+          useApp.getState().enterLiveMode();
+        });
       },
     }),
     { name: "loop-session", version: 2 },

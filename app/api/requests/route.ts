@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { admin } from "@/lib/supabase-admin";
+import { admin, authedUserId } from "@/lib/supabase-admin";
 
 type AnyRow = Record<string, unknown>;
 
@@ -50,13 +50,15 @@ export async function GET(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const callerId = await authedUserId(req);
+  if (!callerId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const url = new URL(req.url);
   const id = url.searchParams.get("id");
-  const companyId = url.searchParams.get("companyId");
-  if (!id || !companyId) return NextResponse.json({ error: "Missing id or companyId" }, { status: 400 });
+  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   const { data: existing } = await admin().from("requests").select("company_id").eq("id", id).single();
-  if (!existing || existing.company_id !== companyId) {
+  if (!existing || (existing.company_id as string) !== callerId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   const { error } = await admin().from("requests").delete().eq("id", id);
@@ -65,17 +67,20 @@ export async function DELETE(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const callerId = await authedUserId(req);
+  if (!callerId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const body = await req.json().catch(() => null) as Record<string, unknown> | null;
   if (!body) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
 
   const { data, error } = await admin().from("requests").insert([{
-    company_id: body.companyId,
+    company_id: callerId, // always from verified token, never from body
     title: body.title,
     description: body.description,
     platforms: body.platforms ?? [],
-    num_creators: body.numCreators ?? 1,
-    reels_per_creator: body.reelsPerCreator ?? 1,
-    pay_per_creator_cents: Math.round(((body.payPerCreator as number) ?? 0) * 100),
+    num_creators: Math.max(1, Number(body.numCreators) || 1),
+    reels_per_creator: Math.max(1, Number(body.reelsPerCreator) || 1),
+    pay_per_creator_cents: Math.round(Math.max(0, Number(body.payPerCreator) || 0) * 100),
     deadline_at: body.deadlineAt ?? null,
     merch_included: body.merchIncluded ?? false,
     merch_description: body.merchDescription ?? null,

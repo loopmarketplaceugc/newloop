@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { authedUserId } from "@/lib/supabase-admin";
 
 const schema = z.object({
-  creatorId: z.string().min(1),
   creatorEmail: z.string().email().optional().or(z.literal("")),
   creatorName: z.string().max(160).optional().or(z.literal("")),
   loopTag: z.string().max(80).optional().or(z.literal("")),
@@ -20,8 +20,7 @@ const schema = z.object({
   }),
 });
 
-const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://nylivxiyzxjdjsbdmrnw.supabase.co";
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 function escapeHtml(value: string) {
   return value
@@ -36,7 +35,7 @@ function formatPay(cents: number) {
   return `$${(cents / 100).toLocaleString("en-US")}`;
 }
 
-function applicationEmailHtml(params: z.infer<typeof schema>) {
+function applicationEmailHtml(params: z.infer<typeof schema> & { creatorId: string }) {
   const op = params.opportunity;
   return `<!doctype html>
 <html>
@@ -94,7 +93,7 @@ function applicationEmailHtml(params: z.infer<typeof schema>) {
 </html>`;
 }
 
-async function sendConfirmationEmail(params: z.infer<typeof schema>) {
+async function sendConfirmationEmail(params: z.infer<typeof schema> & { creatorId: string }) {
   const apiKey = process.env.RESEND_API_KEY;
   const to = params.creatorEmail;
   if (!apiKey || !to) return { emailed: false, reason: "email-not-configured" as const };
@@ -123,17 +122,17 @@ async function sendConfirmationEmail(params: z.infer<typeof schema>) {
   return { emailed: true, reason: null };
 }
 
-async function storeApplication(params: z.infer<typeof schema>) {
+async function storeApplication(params: z.infer<typeof schema> & { creatorId: string }) {
   const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!serviceRole) return { stored: false, reason: "service-role-not-configured" as const };
+  if (!serviceRole || !SUPABASE_URL) return { stored: false, reason: "service-role-not-configured" as const };
 
-  const admin = createClient(SUPABASE_URL, serviceRole, {
+  const adminClient = createClient(SUPABASE_URL, serviceRole, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
   const op = params.opportunity;
-  const { error } = await admin.from("opportunity_applications").upsert(
+  const { error } = await adminClient.from("opportunity_applications").upsert(
     {
-      creator_id: params.creatorId,
+      creator_id: params.creatorId, // from verified token
       creator_email: params.creatorEmail || null,
       creator_name: params.creatorName || null,
       loop_tag: params.loopTag || null,
@@ -153,14 +152,19 @@ async function storeApplication(params: z.infer<typeof schema>) {
 }
 
 export async function POST(req: Request) {
+  const callerId = await authedUserId(req);
+  if (!callerId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid application." }, { status: 400 });
   }
 
+  const params = { ...parsed.data, creatorId: callerId };
+
   const [stored, email] = await Promise.all([
-    storeApplication(parsed.data),
-    sendConfirmationEmail(parsed.data),
+    storeApplication(params),
+    sendConfirmationEmail(params),
   ]);
 
   return NextResponse.json({
