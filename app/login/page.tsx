@@ -30,9 +30,9 @@ export default function LoginPage() {
     setBusy(true);
     haptics.step();
     try {
-      const { onboarded } = await logInWithEmail(email, password);
+      const { onboarded, role } = await logInWithEmail(email, password);
       haptics.success();
-      router.push(onboarded ? "/dashboard" : "/onboarding/creator");
+      router.push(onboarded ? "/dashboard" : role === "company" ? "/onboarding/company" : "/onboarding/creator");
     } catch (e) {
       haptics.error();
       setError(e instanceof Error ? e.message : "Login failed");

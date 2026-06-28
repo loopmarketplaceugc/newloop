@@ -434,6 +434,7 @@ export async function dbUpdateGig(gigId: string, patch: Partial<Gig> & { status?
   if (patch.revisionCount !== undefined) row.revision_count = patch.revisionCount;
   if (patch.usageDays !== undefined) row.usage_days = patch.usageDays;
   if (patch.rawFootage !== undefined) row.raw_footage = patch.rawFootage;
+  if (patch.physicalProduct !== undefined) row.physical_product = patch.physicalProduct;
   if (patch.platform !== undefined) row.platform = patch.platform;
   if (patch.minPostLifetimeDays !== undefined) row.min_post_lifetime_days = patch.minPostLifetimeDays;
   if (patch.revisionRounds !== undefined) row.revision_rounds = patch.revisionRounds;

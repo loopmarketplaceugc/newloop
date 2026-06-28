@@ -126,7 +126,14 @@ export async function POST(req: Request) {
         email,
         options: { redirectTo },
       });
-      if (error) throw new Error(error.message);
+      // "User not found" means the email isn't registered. Return success to
+      // prevent account enumeration — callers cannot tell if the email exists.
+      if (error) {
+        if (/user not found|no user found/i.test(error.message)) {
+          return NextResponse.json({ ok: true, mode: "branded" });
+        }
+        throw new Error(error.message);
+      }
       const resetUrl = data.properties?.action_link;
       if (!resetUrl) throw new Error("Supabase did not return a reset link.");
       await sendResendEmail({ to: email, resetUrl });

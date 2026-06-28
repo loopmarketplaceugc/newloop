@@ -315,12 +315,18 @@ function CreatorDetailView({ request, userId }: { request: Request; userId: stri
     if (applied) return;
     setApplying(true);
     try {
-      await fetch("/api/requests/apply", {
+      const res = await fetch("/api/requests/apply", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ requestId: request.id, creatorId: userId, note: note || null }),
       });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? "Could not submit application");
+      }
       setApplied(true);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to apply");
     } finally {
       setApplying(false);
     }

@@ -117,14 +117,15 @@ export async function logInWithEmail(email: string, password: string) {
     .eq("id", userId)
     .maybeSingle();
 
+  const resolvedRole = (profile?.role as Role | undefined) ?? metaRole;
   useSession.getState().setAuthed({
     userId,
-    role: (profile?.role as Role | undefined) ?? metaRole,
+    role: resolvedRole,
     name: profile?.name ?? "",
     email,
     onboarded: Boolean(profile),
   });
-  return { onboarded: Boolean(profile) };
+  return { onboarded: Boolean(profile), role: resolvedRole };
 }
 
 /** Send Supabase's password recovery email. */

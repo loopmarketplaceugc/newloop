@@ -7,6 +7,7 @@ import {
   creatorPayoutCents,
   MAX_REVISIONS,
   platformFeeCents,
+  refundPolicy,
 } from "@/lib/gig-machine";
 import {
   dbCancelGig,
@@ -145,17 +146,17 @@ export const useApp = create<AppState>()(
 
       setLiveWorld: (world) =>
         set((s) => {
-          // Merge contracts by gigId so locally-generated records aren't wiped
-          // in the window between the DB write and first successful read-back.
+          // Merge all arrays so optimistic local rows (written but not yet
+          // confirmed by the next poll) survive the 3-second refresh cycle.
           const contractMap = new Map(s.contracts.map((c) => [c.gigId, c]));
           for (const c of world.contracts) contractMap.set(c.gigId, c);
           const reviews = mergeById(s.reviews, world.reviews);
           const creators = recomputeStats(mergeById(s.creators, world.creators), reviews);
           return {
-            gigs: world.gigs,
-            messages: world.messages,
+            gigs: mergeById(s.gigs, world.gigs),
+            messages: mergeById(s.messages, world.messages),
             contracts: Array.from(contractMap.values()),
-            deliverables: world.deliverables,
+            deliverables: mergeById(s.deliverables, world.deliverables),
             transactions: world.transactions,
             reviews,
             creators,
@@ -464,10 +465,12 @@ export const useApp = create<AppState>()(
           if (!r.ok) throw new Error(r.error ?? "Could not cancel gig.");
         }
         const funded = get().transactions.some((t) => t.gigId === gigId && t.type === "fund");
+        const { companyRefundPct } = refundPolicy(gig.status);
+        const refundCents = Math.round((gig.priceCents * companyRefundPct) / 100);
         set((s) => ({
           gigs: s.gigs.map((g) => (g.id === gigId ? { ...g, status: "CANCELLED" as GigStatus } : g)),
-          transactions: funded
-            ? [...s.transactions, { id: uid("t"), gigId, type: "refund" as const, amountCents: gig.priceCents, stripeRef: `re_demo_${gigId}`, createdAt: now() }]
+          transactions: funded && refundCents > 0
+            ? [...s.transactions, { id: uid("t"), gigId, type: "refund" as const, amountCents: refundCents, stripeRef: `re_demo_${gigId}`, createdAt: now() }]
             : s.transactions,
         }));
       },
@@ -534,7 +537,7 @@ export const useApp = create<AppState>()(
 
       resetDemo: () => set(seedState()),
     }),
-    { name: "loop-demo-data", version: 6, migrate: () => ({ ...seedState() }) as never },
+    { name: "loop-demo-data", version: 6, migrate: (state) => (state ?? seedState()) as never },
   ),
 );
 
