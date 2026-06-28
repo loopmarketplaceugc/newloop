@@ -1,22 +1,14 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-function sb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
-  );
-}
+import { admin } from "@/lib/supabase-admin";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const creatorId = url.searchParams.get("creatorId");
   const requestId = url.searchParams.get("requestId");
   const companyId = url.searchParams.get("companyId");
-  const client = sb();
 
   if (creatorId) {
-    const { data, error } = await client
+    const { data, error } = await admin()
       .from("request_applications")
       .select("request_id, status, applied_at")
       .eq("creator_id", creatorId);
@@ -25,7 +17,7 @@ export async function GET(req: Request) {
   }
 
   if (requestId) {
-    const { data: apps, error } = await client
+    const { data: apps, error } = await admin()
       .from("request_applications")
       .select("id, creator_id, note, status, applied_at")
       .eq("request_id", requestId)
@@ -34,9 +26,10 @@ export async function GET(req: Request) {
     if (!apps || apps.length === 0) return NextResponse.json({ applications: [] });
 
     const ids = apps.map((a) => a.creator_id as string);
+    // bio and status live on profiles; creator_details holds niches and tier only
     const [{ data: profiles }, { data: details }] = await Promise.all([
-      client.from("profiles").select("id, name, handle, avatar_hue, bio").in("id", ids),
-      client.from("creator_details").select("profile_id, niches, tier").in("profile_id", ids),
+      admin().from("profiles").select("id, name, handle, avatar_hue, bio").in("id", ids),
+      admin().from("creator_details").select("profile_id, niches, tier").in("profile_id", ids),
     ]);
 
     const byId = new Map((profiles ?? []).map((p) => [p.id as string, p]));
@@ -55,9 +48,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ applications: enriched });
   }
 
-  // Company view: return pending application counts per request
   if (companyId) {
-    const { data: reqs } = await client
+    const { data: reqs } = await admin()
       .from("requests")
       .select("id")
       .eq("company_id", companyId);
@@ -65,7 +57,7 @@ export async function GET(req: Request) {
     const requestIds = (reqs ?? []).map((r) => r.id as string);
     if (requestIds.length === 0) return NextResponse.json({ counts: {} });
 
-    const { data: apps } = await client
+    const { data: apps } = await admin()
       .from("request_applications")
       .select("request_id, status")
       .in("request_id", requestIds)
@@ -91,9 +83,7 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "action must be approve or reject" }, { status: 400 });
   }
 
-  const client = sb();
-
-  const { data: app, error: appErr } = await client
+  const { data: app, error: appErr } = await admin()
     .from("request_applications")
     .select("id, request_id, creator_id, status")
     .eq("id", body.applicationId as string)
@@ -106,7 +96,7 @@ export async function PATCH(req: Request) {
 
   const newStatus = body.action === "approve" ? "accepted" : "rejected";
 
-  const { error: updateErr } = await client
+  const { error: updateErr } = await admin()
     .from("request_applications")
     .update({ status: newStatus })
     .eq("id", body.applicationId as string);
@@ -118,7 +108,7 @@ export async function PATCH(req: Request) {
   }
 
   // Approve: fetch request details and create a gig
-  const { data: request, error: reqErr } = await client
+  const { data: request, error: reqErr } = await admin()
     .from("requests")
     .select("*")
     .eq("id", app.request_id as string)
@@ -130,7 +120,7 @@ export async function PATCH(req: Request) {
   const feeCents = Math.round(priceCents * 0.1);
   const platforms = (request.platforms as string[]) ?? [];
 
-  const { data: gig, error: gigErr } = await client
+  const { data: gig, error: gigErr } = await admin()
     .from("gigs")
     .insert([{
       company_id: request.company_id,
@@ -160,15 +150,16 @@ export async function POST(req: Request) {
   if (!body?.requestId || !body?.creatorId) {
     return NextResponse.json({ error: "requestId and creatorId required" }, { status: 400 });
   }
-  const client = sb();
-  const { error: appErr } = await client.from("request_applications").upsert([{
+
+  const { error: appErr } = await admin().from("request_applications").upsert([{
     request_id: body.requestId,
     creator_id: body.creatorId,
     note: body.note ?? null,
   }], { onConflict: "request_id,creator_id" });
   if (appErr) return NextResponse.json({ error: appErr.message }, { status: 400 });
-  const { data: reqData } = await client.from("requests").select("title, company_id").eq("id", body.requestId).single();
-  const { data: creatorData } = await client.from("profiles").select("name").eq("id", body.creatorId).single();
+
+  const { data: reqData } = await admin().from("requests").select("title, company_id").eq("id", body.requestId).single();
+  const { data: creatorData } = await admin().from("profiles").select("name").eq("id", body.creatorId).single();
   return NextResponse.json({
     ok: true,
     requestTitle: reqData?.title,

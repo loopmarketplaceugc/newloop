@@ -5,6 +5,7 @@ import { persist } from "zustand/middleware";
 import type { Role } from "@/lib/types";
 import { DEMO_COMPANY_ID, DEMO_CREATOR_ID } from "@/lib/seed";
 import { supabase } from "@/lib/supabase";
+import { useOnboarding } from "@/lib/store/onboarding";
 
 interface SessionState {
   userId: string | null;
@@ -52,6 +53,7 @@ export const useSession = create<SessionState>()(
       completeOnboarding: () => set({ onboarded: true }),
       signOut: () => {
         void supabase().auth.signOut();
+        useOnboarding.getState().reset();
         set({ userId: null, role: null, name: "", email: "", onboarded: false, isDemo: false });
       },
     }),

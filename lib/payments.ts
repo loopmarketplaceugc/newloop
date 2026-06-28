@@ -19,14 +19,17 @@ export async function startPayoutOnboarding(params: {
   email?: string;
   existingAccountId?: string;
 }) {
+  const { data } = await supabase().auth.getSession();
+  const token = data.session?.access_token;
   const res = await fetch("/api/stripe/connect", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({
       action: "start",
-      creatorId: params.creatorId,
       email: params.email,
-      accountId: params.existingAccountId,
       origin: window.location.origin,
     }),
   });
@@ -34,19 +37,20 @@ export async function startPayoutOnboarding(params: {
   if (!res.ok || !body.url) {
     throw new Error(body.error ?? "Could not start payout setup.");
   }
-  // Save the account id so we reuse it next time (RLS: users update own profile).
-  if (body.accountId) {
-    await supabase().from("profiles").update({ stripe_account_id: body.accountId }).eq("id", params.creatorId);
-  }
   window.location.href = body.url;
 }
 
 /** Refresh whether the creator can receive payouts; persists the flag. */
-export async function refreshPayoutStatus(params: { creatorId: string; accountId: string }) {
+export async function refreshPayoutStatus(params: { creatorId: string; accountId?: string }) {
+  const { data } = await supabase().auth.getSession();
+  const token = data.session?.access_token;
   const res = await fetch("/api/stripe/connect", {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ action: "status", creatorId: params.creatorId, accountId: params.accountId }),
+    headers: {
+      "content-type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ action: "status" }),
   });
   const body = (await res.json()) as { payoutsEnabled?: boolean };
   const enabled = Boolean(body.payoutsEnabled);
@@ -91,14 +95,19 @@ export async function payForGig(params: { gigId: string }) {
 
 /** Open the Stripe Customer Portal for a brand to manage their payment methods + receipts. */
 export async function openBillingPortal(params: {
-  brandId: string;
+  brandId?: string;
   email?: string;
   existingCustomerId?: string;
 }) {
+  const { data } = await supabase().auth.getSession();
+  const token = data.session?.access_token;
   const res = await fetch("/api/stripe/portal", {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ ...params, origin: window.location.origin }),
+    headers: {
+      "content-type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ email: params.email, existingCustomerId: params.existingCustomerId, origin: window.location.origin }),
   });
   const body = (await res.json()) as { url?: string; customerId?: string; error?: string; needsPortal?: boolean };
   if (!res.ok || !body.url) {
@@ -108,11 +117,16 @@ export async function openBillingPortal(params: {
 }
 
 /** Get a login link to the creator's Stripe Express dashboard (manage bank + see balance). */
-export async function getExpressDashboardUrl(accountId: string): Promise<string> {
+export async function getExpressDashboardUrl(): Promise<string> {
+  const { data } = await supabase().auth.getSession();
+  const token = data.session?.access_token;
   const res = await fetch("/api/stripe/connect", {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ action: "login_link", creatorId: "self", accountId }),
+    headers: {
+      "content-type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ action: "login_link" }),
   });
   const body = (await res.json()) as { url?: string; error?: string };
   if (!res.ok || !body.url) throw new Error(body.error ?? "Could not open payout dashboard.");

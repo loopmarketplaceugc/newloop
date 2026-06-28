@@ -1,23 +1,16 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-function sb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
-  );
-}
+import { admin } from "@/lib/supabase-admin";
 
 type AnyRow = Record<string, unknown>;
 
 /** Attach a human brand_name (company_name → profile name) to each request row. */
-async function withBrandNames(client: ReturnType<typeof sb>, rows: AnyRow[]) {
+async function withBrandNames(rows: AnyRow[]) {
   const companyIds = [...new Set(rows.map((r) => r.company_id).filter(Boolean))] as string[];
   if (companyIds.length === 0) return rows;
 
   const [{ data: companies }, { data: profiles }] = await Promise.all([
-    client.from("companies").select("profile_id, company_name").in("profile_id", companyIds),
-    client.from("profiles").select("id, name").in("id", companyIds),
+    admin().from("companies").select("profile_id, company_name").in("profile_id", companyIds),
+    admin().from("profiles").select("id, name").in("id", companyIds),
   ]);
 
   const byId = new Map<string, string>();
@@ -36,16 +29,15 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const companyId = url.searchParams.get("companyId");
   const id = url.searchParams.get("id");
-  const client = sb();
 
   if (id) {
-    const { data, error } = await client.from("requests").select("*").eq("id", id).single();
+    const { data, error } = await admin().from("requests").select("*").eq("id", id).single();
     if (error) return NextResponse.json({ error: error.message }, { status: 404 });
-    const [withName] = await withBrandNames(client, [data as AnyRow]);
+    const [withName] = await withBrandNames([data as AnyRow]);
     return NextResponse.json({ request: withName });
   }
 
-  let query = client.from("requests").select("*").order("created_at", { ascending: false });
+  let query = admin().from("requests").select("*").order("created_at", { ascending: false });
   if (companyId) {
     query = query.eq("company_id", companyId);
   } else {
@@ -53,7 +45,7 @@ export async function GET(req: Request) {
   }
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  const requests = await withBrandNames(client, (data ?? []) as AnyRow[]);
+  const requests = await withBrandNames((data ?? []) as AnyRow[]);
   return NextResponse.json({ requests });
 }
 
@@ -62,13 +54,12 @@ export async function DELETE(req: Request) {
   const id = url.searchParams.get("id");
   const companyId = url.searchParams.get("companyId");
   if (!id || !companyId) return NextResponse.json({ error: "Missing id or companyId" }, { status: 400 });
-  const client = sb();
-  // Verify ownership before deleting
-  const { data: existing } = await client.from("requests").select("company_id").eq("id", id).single();
+
+  const { data: existing } = await admin().from("requests").select("company_id").eq("id", id).single();
   if (!existing || existing.company_id !== companyId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  const { error } = await client.from("requests").delete().eq("id", id);
+  const { error } = await admin().from("requests").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ ok: true });
 }
@@ -76,8 +67,8 @@ export async function DELETE(req: Request) {
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null) as Record<string, unknown> | null;
   if (!body) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
-  const client = sb();
-  const { data, error } = await client.from("requests").insert([{
+
+  const { data, error } = await admin().from("requests").insert([{
     company_id: body.companyId,
     title: body.title,
     description: body.description,

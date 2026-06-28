@@ -132,7 +132,7 @@ export default function WalletPage() {
     setOpeningDashboard(true);
     haptics.step();
     try {
-      const url = await getExpressDashboardUrl(me.stripeAccountId);
+      const url = await getExpressDashboardUrl();
       window.location.href = url;
     } catch (e) {
       haptics.error();
