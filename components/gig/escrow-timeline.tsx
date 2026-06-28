@@ -38,10 +38,12 @@ export function EscrowTimeline({ gig }: { gig: Gig }) {
                 {status === "FUNDED_IN_ESCROW"
                   ? "Brand funds the gig before production starts."
                   : status === "APPROVED"
-                    ? "Approval unlocks payout and original deliverables."
-                    : status === "COMPLETED"
-                      ? "Creator payout is released and original files are unlocked."
-                      : "Tracked automatically in the shared workspace."}
+                    ? "Draft approved — the creator publishes next."
+                    : status === "PUBLISHED"
+                      ? "Creator posted the live link; brand approves to release payment."
+                      : status === "COMPLETED"
+                        ? "Creator payout is released and original files are unlocked."
+                        : "Tracked automatically in the shared workspace."}
               </p>
             </div>
           </div>

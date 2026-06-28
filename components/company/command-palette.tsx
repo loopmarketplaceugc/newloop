@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Command } from "cmdk";
-import { Compass, FileText, MessageSquare, Search, Sparkles, User } from "lucide-react";
+import { Compass, MessageSquare, Search, User } from "lucide-react";
 import { useApp } from "@/lib/store/app";
 import { Avatar } from "@/components/ui/avatar";
 import { TierBadge } from "@/components/shared/tier-badge";
@@ -54,8 +54,6 @@ export function CommandPalette({
               {[
                 { label: "Discover creators", href: "/dashboard/discover", icon: Compass },
                 { label: "Messages", href: "/dashboard/messages", icon: MessageSquare },
-                { label: "Script library", href: "/dashboard/scripts", icon: FileText },
-                { label: "New AI script", href: "/dashboard/scripts?new=1", icon: Sparkles },
               ].map((item) => (
                 <Command.Item
                   key={item.href}

@@ -8,7 +8,6 @@ import type {
   Message,
   Notification,
   Review,
-  ScriptDoc,
   Transaction,
 } from "./types";
 import { platformFeeCents } from "./gig-machine";
@@ -1062,7 +1061,6 @@ export const gigs: Gig[] = [
     trackingNumber: "1Z999AA10123456784",
     deadline: d(6),
     createdAt: d(-12),
-    scriptId: "s1",
   }),
   g("g2", {
     companyId: "co2",
@@ -1080,7 +1078,6 @@ export const gigs: Gig[] = [
     deadline: d(-1),
     deliveredAt: d(-2),
     createdAt: d(-18),
-    scriptId: "s2",
   }),
   g("g3", {
     companyId: "co3",
@@ -1204,7 +1201,6 @@ export const messages: Message[] = [
   { id: "m2", gigId: "g1", senderId: "c1", kind: "text", text: "Hey! Just read the brief — the niacinamide explainer angle is right in my lane. Can do all three in one batch.", createdAt: d(-12, 11) },
   { id: "m3", gigId: "g1", senderId: "co1", kind: "offer", offer: { priceCents: 105_000, deliverables: "3 × 30s TikTok videos, 2 revision rounds", usageRightsDays: 90, rawFootageIncluded: false, state: "accepted" }, createdAt: d(-12, 14) },
   { id: "m4", gigId: "g1", senderId: "c1", kind: "text", text: "Accepted! Ship the serum to the address on file — I'll start scripting while it's in transit.", createdAt: d(-12, 15) },
-  { id: "m5", gigId: "g1", senderId: "co1", kind: "script", scriptId: "s1", createdAt: d(-10, 10) },
   { id: "m6", gigId: "g1", senderId: "c1", kind: "text", text: "Serum arrived. Texture close-ups are going to look great — filming Thursday.", createdAt: d(-5, 16) },
   // g2 — Forklift × Darius
   { id: "m7", gigId: "g2", senderId: "co2", kind: "text", text: "Darius — your CRM walkthrough video is exactly the energy we want for Forklift. Sent a brief for a 45s Short.", createdAt: d(-18, 9) },
@@ -1247,84 +1243,9 @@ export const reviews: Review[] = [
   { id: "r3", gigId: "g7", authorId: "co1", targetId: "c4", rating: 5, tags: ["high production", "on-time"], body: "Lena's sweat-proof demo is our best performing ad this quarter. 2.1% CTR.", createdAt: d(-6) },
 ];
 
-export const scripts: ScriptDoc[] = [
-  {
-    id: "s1",
-    companyId: "co1",
-    gigId: "g1",
-    inputs: {
-      productName: "Glow Serum",
-      productDescription: "Niacinamide + peptide serum that brightens in 7 days. $42, fragrance-free.",
-      audience: "Women 22–35 with combination skin who already use skincare",
-      tone: "aesthetic",
-      platform: "tiktok",
-      kind: "script",
-    },
-    output: {
-      kind: "script",
-      title: "Glow Serum — 7-Day Results",
-      blocks: [
-        { start: "0:00", end: "0:03", label: "HOOK", text: "POV: it's day 7 and you finally see what everyone meant by 'glass skin'. (Macro shot of serum dropper catching light.)" },
-        { start: "0:03", end: "0:25", label: "BODY", text: "Soft VO: 'I gave Glow Serum one week. Two pumps every morning, under SPF.' Show texture pull on back of hand. Day 1 vs day 7 split screen — same lighting, no filter. 'It's the niacinamide-peptide combo. No fragrance, no sting, just… this.' Slow pan across the bottle on the shelf." },
-        { start: "0:25", end: "0:30", label: "CTA", text: "'It's $42 and it's replacing three things on my shelf. Link's where you think it is.' End on the pump press, one bead of serum." },
-      ],
-    },
-    createdAt: d(-10),
-  },
-  {
-    id: "s2",
-    companyId: "co2",
-    gigId: "g2",
-    inputs: {
-      productName: "Forklift HQ",
-      productDescription: "Inventory management SaaS for small warehouses. Import a spreadsheet, get live stock counts, low-stock alerts.",
-      audience: "Warehouse managers and ops leads at companies with 5–50 employees",
-      tone: "educational",
-      platform: "shorts",
-      kind: "script",
-    },
-    output: {
-      kind: "script",
-      title: "Forklift HQ — Spreadsheet Graduation",
-      blocks: [
-        { start: "0:00", end: "0:03", label: "HOOK", text: "'This spreadsheet runs a $2M warehouse. That's the problem.' (Hold up printed 400-row spreadsheet, let it unroll to the floor.)" },
-        { start: "0:03", end: "0:35", label: "BODY", text: "Screen recording: drag the same spreadsheet into Forklift HQ. 'Watch — 1,200 SKUs imported in 40 seconds.' Cut to live dashboard. 'Every count updates when your team scans. Low stock pings you before it's a problem, not after.' Show phone notification: 'Pallet wrap — 3 days left at current burn.'" },
-        { start: "0:35", end: "0:45", label: "CTA", text: "'If your inventory lives in a spreadsheet, you're one typo from a bad week. Free for your first 100 SKUs — link in description.'" },
-      ],
-    },
-    createdAt: d(-17),
-  },
-  {
-    id: "s3",
-    companyId: "co1",
-    inputs: {
-      productName: "SPF Reapply Mist",
-      productDescription: "SPF 40 setting mist for reapplying sunscreen over makeup. Sweat-resistant.",
-      audience: "Gym-goers and commuters 20–40 who wear makeup or hate greasy sunscreen",
-      tone: "chaotic",
-      platform: "tiktok",
-      kind: "brief",
-    },
-    output: {
-      kind: "brief",
-      title: "SPF Mist — Gym Bag Brief",
-      bullets: [
-        "Open mid-workout, slightly out of breath — authenticity beats polish here",
-        "Must-mention: reapplies OVER makeup without smearing (demo on camera)",
-        "Show the sweat test: misted forearm vs bare forearm after 20 min cardio",
-        "One-handed spray while holding a dumbbell — the 'no excuses' visual",
-        "Mention SPF 40 exactly once; don't lecture about sun damage",
-        "CTA: 'It lives in my gym bag now' — keep it possessive, not salesy",
-      ],
-    },
-    createdAt: d(-22),
-  },
-];
-
 export const notifications: Notification[] = [
   { id: "n1", userId: "c1", title: "Payment secured", body: "Lumen Skincare paid $1,050.00 for 'Glow Serum launch'. You're cleared to film.", href: "/gig/g1", read: false, createdAt: d(-11) },
   { id: "n2", userId: "c1", title: "Usage rights expiring", body: "Lumen's rights to 'Night Cream Reel' (via @theglowarchive) expire in 52 days.", href: "/dashboard/wallet", read: true, createdAt: d(-2) },
-  { id: "n3", userId: "c1", title: "New message", body: "Lumen Skincare sent a script card in 'Glow Serum launch'.", href: "/gig/g1", read: true, createdAt: d(-10) },
   { id: "n4", userId: "co1", title: "Deliverable approaching deadline", body: "'Glow Serum launch' is due in 6 days. Mia is in production.", href: "/gig/g1", read: false, createdAt: d(-1) },
   { id: "n5", userId: "co1", title: "Auto-approve reminder", body: "Forklift HQ's demo gig auto-approves in 12 days if no action is taken.", href: "/gig/g2", read: false, createdAt: d(0, 8) },
   { id: "n6", userId: "co2", title: "Delivery received", body: "Darius Cole delivered 'forklift-demo-v1.mp4'. Review within 14 days or it auto-approves.", href: "/gig/g2", read: false, createdAt: d(-2, 17) },

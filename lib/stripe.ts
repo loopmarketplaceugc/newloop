@@ -1,28 +1,23 @@
 import Stripe from "stripe";
-import { PLATFORM_FEE_PCT } from "./gig-machine";
 
 /**
- * Stripe money movement for Loop.
+ * Stripe money movement for Loop — SEPARATE CHARGES & TRANSFERS (true escrow).
  *
- * Model: a paying brand checks out for the gig amount. Loop keeps a
- * PLATFORM_FEE_PCT commission; the remainder goes to the creator.
- *  - If the creator has a connected (Stripe Express) account, we use a
- *    DESTINATION CHARGE so the split happens automatically and the creator is
- *    paid directly (Loop keeps `application_fee_amount`).
- *  - Otherwise the charge lands in Loop's balance and the creator's net is
- *    recorded as owed (pay out once they connect). This lets payments work
- *    before Stripe Connect is enabled / before a creator onboards.
+ * 1. Funding: the brand checks out for the full gig amount, collected entirely
+ *    into Loop's platform balance. The money is genuinely held — nothing
+ *    reaches the creator yet.
+ * 2. Release: on brand approval, the server transfers the creator's net
+ *    (amount − commission) to their connected account. Loop retains the rest.
+ *
+ * This is what makes "funds release the moment a brand approves" literally true
+ * — unlike a destination charge, which would pay the creator at funding time.
+ * If the creator hasn't connected payouts yet, the transfer is deferred and the
+ * amount owed is tracked on their profile balance.
  */
 export function stripeClient(): Stripe | null {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) return null;
   return new Stripe(key);
-}
-
-export const PLATFORM_FEE_RATE = PLATFORM_FEE_PCT / 100;
-
-export function commissionCents(amountCents: number): number {
-  return Math.round(amountCents * PLATFORM_FEE_RATE);
 }
 
 /** Create (or fetch) a Stripe Express account for a creator's payouts. */
@@ -53,8 +48,10 @@ export async function createAccountLink(
 }
 
 /**
- * Brand pays for a gig. If `creatorAccountId` is set we route a destination
- * charge so the creator gets paid directly and Loop keeps the commission.
+ * Brand funds a gig's escrow. The full amount is collected into Loop's platform
+ * balance (no transfer_data) and held until the brand approves the work. The
+ * gig id is stamped on the PaymentIntent so the webhook can reconcile funding
+ * server-side even if the brand never returns to the success URL.
  */
 export async function createGigCheckout(
   stripe: Stripe,
@@ -62,13 +59,11 @@ export async function createGigCheckout(
     gigId: string;
     title: string;
     amountCents: number;
-    creatorAccountId?: string | null;
     creatorName?: string;
     successUrl: string;
     cancelUrl: string;
   },
 ) {
-  const fee = commissionCents(params.amountCents);
   const productData: Stripe.Checkout.SessionCreateParams.LineItem.PriceData.ProductData = {
     name: params.title || "Loop gig",
   };
@@ -90,27 +85,43 @@ export async function createGigCheckout(
     cancel_url: params.cancelUrl,
     metadata: { gigId: params.gigId, kind: "gig_payment" },
     payment_intent_data: {
-      metadata: {
-        gigId: params.gigId,
-        kind: "gig_payment",
-        feeCents: String(fee),
-      },
+      metadata: { gigId: params.gigId, kind: "gig_payment" },
     },
   };
 
-  if (params.creatorAccountId) {
-    sessionParams.payment_intent_data = {
-      application_fee_amount: fee,
-      transfer_data: { destination: params.creatorAccountId },
-      metadata: {
-        gigId: params.gigId,
-        kind: "gig_payment",
-        feeCents: String(fee),
-      },
-    };
-  } else {
-    sessionParams.payment_intent_data!.metadata!.creatorNetCents = String(params.amountCents - fee);
-  }
-
   return stripe.checkout.sessions.create(sessionParams);
+}
+
+/**
+ * Release a creator's net payout from escrow on brand approval. Idempotency key
+ * is keyed to the gig so a retried/duplicated release can never transfer twice.
+ */
+export async function createPayoutTransfer(
+  stripe: Stripe,
+  params: { amountCents: number; destination: string; gigId: string },
+) {
+  return stripe.transfers.create(
+    {
+      amount: params.amountCents,
+      currency: "usd",
+      destination: params.destination,
+      metadata: { gigId: params.gigId, kind: "gig_payout" },
+    },
+    { idempotencyKey: `release_${params.gigId}` },
+  );
+}
+
+/** Refund a brand from escrow on cancellation. Idempotency key keyed to the gig. */
+export async function createGigRefund(
+  stripe: Stripe,
+  params: { paymentIntentId: string; amountCents: number; gigId: string },
+) {
+  return stripe.refunds.create(
+    {
+      payment_intent: params.paymentIntentId,
+      amount: params.amountCents,
+      metadata: { gigId: params.gigId, kind: "gig_refund" },
+    },
+    { idempotencyKey: `refund_${params.gigId}` },
+  );
 }

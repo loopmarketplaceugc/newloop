@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local MCP config (contains project refs / API endpoints)
+.mcp.json
+
+# alternate package manager lockfiles (project uses npm)
+pnpm-lock.yaml
+yarn.lock

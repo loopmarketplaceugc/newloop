@@ -38,13 +38,16 @@ interface NavItem {
 
 const creatorNav: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
+  { href: "/dashboard/gigs", label: "Gigs", icon: Briefcase },
   { href: "/dashboard/opportunities", label: "Opportunities", icon: Compass },
+  { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
   { href: "/dashboard/profile", label: "Profile", icon: User },
   { href: "/dashboard/wallet", label: "Wallet", icon: Wallet },
 ];
 
 const companyNav: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard/gigs", label: "Gigs", icon: Briefcase },
   { href: "/dashboard/discover", label: "Discover", icon: Compass },
   { href: "/dashboard/requests", label: "Requests", icon: FileText },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
@@ -57,7 +60,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const { userId, role, name, onboarded, isDemo, signOut } = useSession();
   const creators = useApp((s) => s.creators);
-  const notifications = useApp((s) => s.notifications);
+  const allGigs = useApp((s) => s.gigs);
+  const allMessages = useApp((s) => s.messages);
+  const lastReadGigs = useApp((s) => s.lastReadGigs);
   const enterLiveMode = useApp((s) => s.enterLiveMode);
   const setCreatorsFromDb = useApp((s) => s.setCreatorsFromDb);
   const setLiveWorld = useApp((s) => s.setLiveWorld);
@@ -153,8 +158,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const displayName = name || me?.name || myCompany?.name || "You";
   const avatarHue = me?.avatarHue ?? myCompany?.logoHue ?? 285;
   const avatarUrl = me?.avatarUrl;
-  const myNotifs = notifications.filter((n) => n.userId === userId);
-  const unread = myNotifs.filter((n) => !n.read).length;
+  // Count threads where the last message is from the other party and hasn't been read yet.
+  const unread = (() => {
+    if (!userId || !role) return 0;
+    const myGigs = allGigs.filter((g) =>
+      role === "creator" ? g.creatorId === userId : g.companyId === userId,
+    );
+    const seenCounterparty = new Set<string>();
+    let count = 0;
+    for (const gig of myGigs) {
+      const cpId = role === "creator" ? gig.companyId : gig.creatorId;
+      if (seenCounterparty.has(cpId)) continue;
+      seenCounterparty.add(cpId);
+      const gigMsgs = allMessages.filter((m) => m.gigId === gig.id);
+      const last = gigMsgs[gigMsgs.length - 1];
+      if (!last || last.senderId === userId) continue;
+      const lastRead = lastReadGigs?.[gig.id];
+      if (!lastRead || last.createdAt > lastRead) count++;
+    }
+    return count;
+  })();
 
   return (
     <div className="flex min-h-screen w-full">
@@ -187,6 +210,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               >
                 <item.icon className="h-[18px] w-[18px]" />
                 {item.label}
+                {item.label === "Messages" && unread > 0 && (
+                  <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[#d6409f] px-1 font-bold text-[10px] text-white">
+                    {unread > 9 ? "9+" : unread}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -231,7 +259,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 active ? "text-[#f2a3df]" : "text-[#faf6ef]/40",
               )}
             >
-              <item.icon className="h-5 w-5" />
+              <div className="relative">
+                <item.icon className="h-5 w-5" />
+                {item.label === "Messages" && unread > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#d6409f] text-[9px] font-bold text-white">
+                    {unread > 9 ? "9+" : unread}
+                  </span>
+                )}
+              </div>
               {item.label}
             </Link>
           );

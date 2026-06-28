@@ -76,7 +76,7 @@ export function CreatorDashboard() {
     .filter((g) => ESCROW_HELD_STATUSES.includes(g.status))
     .reduce((s, g) => s + creatorPayoutCents(g.priceCents), 0);
   const myReviews = reviews.filter((r) => r.targetId === userId);
-  const completedGigs = myGigs.filter((g) => ["PAID_OUT", "COMPLETED"].includes(g.status));
+  const completedGigs = myGigs.filter((g) => ["PAID_OUT", "COMPLETED", "EXPIRED"].includes(g.status));
   const activeCount = myGigs.filter((g) => ACTIVE_STATUSES.includes(g.status)).length;
 
   const completeness = [
@@ -271,7 +271,7 @@ export function CreatorDashboard() {
             ) : (
               <div className="-mx-1 flex gap-2.5 overflow-x-auto pb-1">
                 {KANBAN_LANES.map((lane, li) => {
-                  const laneGigs = myGigs.filter((g) => lane.statuses.includes(g.status) && g.status !== "COMPLETED");
+                  const laneGigs = myGigs.filter((g) => lane.statuses.includes(g.status) && !["COMPLETED", "EXPIRED", "PAID_OUT"].includes(g.status));
                   const laneTints = ["#f2a3df", "#a8d98a", "#101805", "#f2a3df", "#a8d98a"];
                   return (
                     <div key={lane.label} className="w-40 shrink-0">

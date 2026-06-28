@@ -57,14 +57,12 @@ export async function refreshPayoutStatus(params: { creatorId: string; accountId
   return enabled;
 }
 
-/** Brand pays for a gig — redirects to Stripe Checkout. */
-export async function payForGig(params: {
-  gigId: string;
-  title: string;
-  amountCents: number;
-  creatorAccountId?: string;
-  creatorName?: string;
-}) {
+/**
+ * Brand funds a gig — redirects to Stripe Checkout. The amount and parties are
+ * resolved server-side from the gig row, so only the gig id (plus the caller's
+ * auth token) is sent.
+ */
+export async function payForGig(params: { gigId: string }) {
   if (DEV_PAYMENTS) {
     await sleep(700);
     // Mirror the real Stripe return URL so the gig page's useEffect picks it up normally.
@@ -74,10 +72,15 @@ export async function payForGig(params: {
     window.location.href = url.toString();
     return;
   }
+  const { data } = await supabase().auth.getSession();
+  const token = data.session?.access_token;
   const res = await fetch("/api/stripe/checkout", {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ ...params, origin: window.location.origin }),
+    headers: {
+      "content-type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ gigId: params.gigId, origin: window.location.origin }),
   });
   const body = (await res.json()) as { url?: string; error?: string };
   if (!res.ok || !body.url) {
@@ -114,22 +117,4 @@ export async function getExpressDashboardUrl(accountId: string): Promise<string>
   const body = (await res.json()) as { url?: string; error?: string };
   if (!res.ok || !body.url) throw new Error(body.error ?? "Could not open payout dashboard.");
   return body.url;
-}
-
-/** Verify a completed Checkout session with Stripe before updating local gig state. */
-export async function confirmGigPayment(params: { gigId: string; sessionId: string }) {
-  if (DEV_PAYMENTS && params.sessionId.startsWith("dev_session_")) {
-    return { paymentIntentId: `dev_pi_${Date.now()}` };
-  }
-  const qs = new URLSearchParams({ gigId: params.gigId, session_id: params.sessionId });
-  const res = await fetch(`/api/stripe/checkout?${qs.toString()}`);
-  const body = (await res.json()) as {
-    paid?: boolean;
-    paymentIntentId?: string | null;
-    error?: string;
-  };
-  if (!res.ok || !body.paid) {
-    throw new Error(body.error ?? "Payment was not completed.");
-  }
-  return { paymentIntentId: body.paymentIntentId ?? undefined };
 }

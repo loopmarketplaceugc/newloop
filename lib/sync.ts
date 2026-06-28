@@ -2,6 +2,7 @@
 
 import { supabase } from "@/lib/supabase";
 import type {
+  Contract,
   Creator,
   Deliverable,
   Gig,
@@ -10,6 +11,7 @@ import type {
   MessageKind,
   OfferBody,
   Platform,
+  Review,
   Transaction,
 } from "@/lib/types";
 import { tierForFollowers } from "@/lib/types";
@@ -30,6 +32,7 @@ interface ProfileRow {
   loop_tag?: string | null;
   stripe_account_id?: string | null;
   stripe_payouts_enabled?: boolean | null;
+  balance_cents?: number | null;
   created_at: string;
 }
 
@@ -71,7 +74,12 @@ interface GigRow {
   delivered_at?: string | null;
   tracking_number: string | null;
   revision_count?: number | null;
-  script_id?: string | null;
+  min_post_lifetime_days?: number | null;
+  revision_rounds?: number | null;
+  video_length_seconds?: number | null;
+  published_url?: string | null;
+  published_at?: string | null;
+  completed_at?: string | null;
   created_at: string;
 }
 
@@ -80,7 +88,7 @@ interface MessageRow {
   gig_id: string;
   sender_id: string;
   kind: MessageKind;
-  body: { text?: string; attachmentName?: string; scriptId?: string; offer?: OfferBody };
+  body: { text?: string; attachmentName?: string; offer?: OfferBody };
   created_at: string;
 }
 
@@ -121,6 +129,7 @@ export function mapCreator(p: ProfileRow, d?: DetailsRow | null, platforms: Plat
     loopTag: p.loop_tag ?? undefined,
     stripeAccountId: p.stripe_account_id ?? undefined,
     stripePayoutsEnabled: p.stripe_payouts_enabled ?? undefined,
+    balanceCents: p.balance_cents ?? 0,
   };
 }
 
@@ -144,7 +153,12 @@ export function mapGig(g: GigRow): Gig {
     deliveredAt: g.delivered_at ?? undefined,
     revisionCount: g.revision_count ?? 0,
     createdAt: g.created_at,
-    scriptId: g.script_id ?? undefined,
+    minPostLifetimeDays: g.min_post_lifetime_days ?? undefined,
+    revisionRounds: g.revision_rounds ?? undefined,
+    videoLengthSeconds: g.video_length_seconds ?? undefined,
+    publishedUrl: g.published_url ?? undefined,
+    publishedAt: g.published_at ?? undefined,
+    completedAt: g.completed_at ?? undefined,
   };
 }
 
@@ -156,7 +170,6 @@ export function mapMessage(m: MessageRow): Message {
     kind: m.kind,
     text: m.body?.text,
     attachmentName: m.body?.attachmentName,
-    scriptId: m.body?.scriptId,
     offer: m.body?.offer,
     createdAt: m.created_at,
   };
@@ -199,24 +212,37 @@ export async function fetchMyWorld() {
   const gigIds = gigs.map((g) => g.id);
 
   let messages: Message[] = [];
+  let contracts: Contract[] = [];
   let deliverables: Deliverable[] = [];
   let transactions: Transaction[] = [];
   if (gigIds.length) {
-    const [{ data: msgRows }, { data: delRows }, { data: txRows }] = await Promise.all([
+    const [{ data: msgRows }, { data: contractRows }, { data: delRows }, { data: txRows }] = await Promise.all([
       sb.from("messages").select("*").in("gig_id", gigIds).order("created_at"),
+      sb.from("contracts").select("*").in("gig_id", gigIds),
       sb.from("deliverables").select("*").in("gig_id", gigIds),
       sb.from("transactions").select("*").in("gig_id", gigIds),
     ]);
     messages = ((msgRows as MessageRow[] | null) ?? []).map(mapMessage);
-    deliverables = (delRows ?? []).map((d) => ({
-      id: d.id as string,
-      gigId: d.gig_id as string,
-      fileName: (d.storage_path as string).split("/").pop() ?? "deliverable.mp4",
-      version: d.version as number,
-      watermarked: d.watermarked as boolean,
-      submittedAt: d.submitted_at as string,
-      sizeMb: 0,
+    contracts = (contractRows ?? []).map((c) => ({
+      gigId: c.gig_id as string,
+      terms: c.terms as Contract["terms"],
+      companySignedAt: (c.company_signed_at as string) ?? undefined,
+      creatorSignedAt: (c.creator_signed_at as string) ?? undefined,
     }));
+    deliverables = (delRows ?? []).map((d) => {
+      const path = d.storage_path as string;
+      const isUrl = path.startsWith("http://") || path.startsWith("https://");
+      return {
+        id: d.id as string,
+        gigId: d.gig_id as string,
+        fileName: isUrl ? `v${d.version as number} draft` : (path.split("/").pop() ?? "deliverable.mp4"),
+        url: isUrl ? path : undefined,
+        version: d.version as number,
+        watermarked: d.watermarked as boolean,
+        submittedAt: d.submitted_at as string,
+        sizeMb: 0,
+      };
+    });
     transactions = (txRows ?? []).map((t) => ({
       id: t.id as string,
       gigId: t.gig_id as string,
@@ -226,6 +252,20 @@ export async function fetchMyWorld() {
       createdAt: t.created_at as string,
     }));
   }
+
+  // Reviews are publicly readable (RLS: using (true)) — fetch all so Discover
+  // ratings reflect the full platform, not just the current user's gigs.
+  const { data: reviewRows } = await sb.from("reviews").select("*");
+  const reviews: Review[] = (reviewRows ?? []).map((r) => ({
+    id: r.id as string,
+    gigId: r.gig_id as string,
+    authorId: r.author_id as string,
+    targetId: r.target_id as string,
+    rating: r.rating as number,
+    tags: (r.tags as string[]) ?? [],
+    body: (r.body as string) ?? "",
+    createdAt: r.created_at as string,
+  }));
 
   // counterparty profiles (creators on my gigs, plus me if creator)
   const counterpartIds = Array.from(new Set(gigs.flatMap((g) => [g.creatorId, g.companyId])));
@@ -245,7 +285,7 @@ export async function fetchMyWorld() {
     );
   }
 
-  return { gigs, messages, deliverables, transactions, creators };
+  return { gigs, messages, contracts, deliverables, transactions, reviews, creators };
   } catch {
     return null;
   }
@@ -284,6 +324,51 @@ async function authedId(): Promise<string | null> {
   return data.user?.id ?? null;
 }
 
+/** Authorization header carrying the caller's access token for money routes. */
+async function authHeaders(): Promise<Record<string, string>> {
+  const { data } = await supabase().auth.getSession();
+  const token = data.session?.access_token;
+  return {
+    "content-type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+interface MoneyResult {
+  ok: boolean;
+  error?: string;
+  alreadyDone?: boolean;
+}
+
+async function postMoney(path: string, body: Record<string, unknown>): Promise<MoneyResult> {
+  try {
+    const res = await fetch(path, {
+      method: "POST",
+      headers: await authHeaders(),
+      body: JSON.stringify(body),
+    });
+    const data = (await res.json().catch(() => ({}))) as { error?: string; alreadyDone?: boolean };
+    return { ok: res.ok, error: data.error, alreadyDone: data.alreadyDone };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}
+
+/** Brand funds a gig's escrow (server verifies payment + records it durably). */
+export function dbFundEscrow(p: { gigId: string; sessionId?: string | null }): Promise<MoneyResult> {
+  return postMoney("/api/gigs/fund", { gigId: p.gigId, sessionId: p.sessionId ?? undefined });
+}
+
+/** Brand approves work → server releases escrow to the creator. */
+export function dbReleaseFunds(gigId: string): Promise<MoneyResult> {
+  return postMoney("/api/gigs/approve", { gigId });
+}
+
+/** Cancel a gig → server refunds the brand per the stage-based policy. */
+export function dbCancelGig(gigId: string): Promise<MoneyResult> {
+  return postMoney("/api/gigs/cancel", { gigId });
+}
+
 /** Company opens a workspace with a creator. Returns the created gig. */
 export async function dbCreateGig(creatorId: string, creatorName: string): Promise<Gig | null> {
   const sb = supabase();
@@ -319,7 +404,6 @@ export async function dbSendMessage(m: Message): Promise<Message | null> {
       body: {
         ...(m.text ? { text: m.text } : {}),
         ...(m.attachmentName ? { attachmentName: m.attachmentName } : {}),
-        ...(m.scriptId ? { scriptId: m.scriptId } : {}),
         ...(m.offer ? { offer: m.offer } : {}),
       },
     })
@@ -350,8 +434,42 @@ export async function dbUpdateGig(gigId: string, patch: Partial<Gig> & { status?
   if (patch.revisionCount !== undefined) row.revision_count = patch.revisionCount;
   if (patch.usageDays !== undefined) row.usage_days = patch.usageDays;
   if (patch.rawFootage !== undefined) row.raw_footage = patch.rawFootage;
+  if (patch.platform !== undefined) row.platform = patch.platform;
+  if (patch.minPostLifetimeDays !== undefined) row.min_post_lifetime_days = patch.minPostLifetimeDays;
+  if (patch.revisionRounds !== undefined) row.revision_rounds = patch.revisionRounds;
+  if (patch.videoLengthSeconds !== undefined) row.video_length_seconds = patch.videoLengthSeconds;
+  if (patch.publishedUrl !== undefined) row.published_url = patch.publishedUrl;
+  if (patch.publishedAt !== undefined) row.published_at = patch.publishedAt;
+  if (patch.completedAt !== undefined) row.completed_at = patch.completedAt;
   if (Object.keys(row).length === 0) return;
   await supabase().from("gigs").update(row).eq("id", gigId);
+}
+
+/** Insert a new gig (e.g. a DRAFT started from inside a chat). */
+export async function dbInsertGig(g: Gig): Promise<Gig | null> {
+  const uid = await authedId();
+  if (!uid) return null;
+  const { data, error } = await supabase()
+    .from("gigs")
+    .insert({
+      company_id: g.companyId,
+      creator_id: g.creatorId,
+      status: g.status,
+      title: g.title,
+      brief: g.brief,
+      platform: g.platform,
+      price_cents: g.priceCents,
+      fee_cents: g.feeCents,
+      usage_days: g.usageDays,
+      raw_footage: g.rawFootage,
+      physical_product: g.physicalProduct,
+      min_post_lifetime_days: g.minPostLifetimeDays ?? 30,
+      revision_rounds: g.revisionRounds ?? 2,
+    })
+    .select("*")
+    .single();
+  if (error || !data) return null;
+  return mapGig(data as GigRow);
 }
 
 export async function dbInsertContract(gigId: string, terms: object) {
@@ -361,6 +479,22 @@ export async function dbInsertContract(gigId: string, terms: object) {
   await supabase()
     .from("contracts")
     .upsert({ gig_id: gigId, terms, company_signed_at: now, creator_signed_at: now });
+}
+
+export async function dbInsertReview(r: Omit<Review, "createdAt">) {
+  const uid = await authedId();
+  if (!uid) return;
+  await supabase()
+    .from("reviews")
+    .upsert({
+      id: r.id,
+      gig_id: r.gigId,
+      author_id: r.authorId,
+      target_id: r.targetId,
+      rating: r.rating,
+      tags: r.tags,
+      body: r.body,
+    });
 }
 
 export async function dbInsertDeliverable(d: { gigId: string; fileName: string; version: number }) {

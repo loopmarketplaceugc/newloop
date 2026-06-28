@@ -1,18 +1,16 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { stripeClient, createGigCheckout, commissionCents } from "@/lib/stripe";
+import { stripeClient, createGigCheckout } from "@/lib/stripe";
+import { admin, authedUserId } from "@/lib/supabase-admin";
 
 /**
- * Brand pays for a gig. Returns a Stripe Checkout URL. If the creator has a
- * connected account, the payment is split automatically (creator paid directly,
- * Loop keeps the commission). Otherwise the charge lands in Loop's balance.
+ * Brand funds a gig's escrow. The amount and parties are derived SERVER-SIDE
+ * from the gig row — never trusted from the request body — so a brand can't
+ * underpay, overpay, or redirect the payout. Only the gig's own company may
+ * fund it, and only while it's awaiting payment.
  */
 const schema = z.object({
-  gigId: z.string().min(1),
-  title: z.string().max(200).default("Loop gig"),
-  amountCents: z.number().int().positive().max(5_000_000), // ≤ $50k sanity cap
-  creatorAccountId: z.string().optional().nullable(),
-  creatorName: z.string().max(120).optional(),
+  gigId: z.string().uuid(),
   origin: z.string().url().optional(),
 });
 
@@ -21,28 +19,50 @@ export async function POST(req: Request) {
   if (!stripe) {
     return NextResponse.json({ error: "Payments are not configured yet." }, { status: 503 });
   }
+
+  const callerId = await authedUserId(req);
+  if (!callerId) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
-  const { gigId, title, amountCents, creatorAccountId, creatorName, origin } = parsed.data;
+  const { gigId, origin } = parsed.data;
   const base = origin ?? new URL(req.url).origin;
+
+  const { data: gig } = await admin()
+    .from("gigs")
+    .select("id, company_id, creator_id, status, title, price_cents")
+    .eq("id", gigId)
+    .maybeSingle();
+
+  if (!gig) return NextResponse.json({ error: "Gig not found" }, { status: 404 });
+  if (gig.company_id !== callerId) {
+    return NextResponse.json({ error: "Only the brand can pay for this gig" }, { status: 403 });
+  }
+  if (gig.status !== "OFFER_ACCEPTED") {
+    return NextResponse.json({ error: "This gig is not awaiting payment" }, { status: 409 });
+  }
+  if (!gig.price_cents || gig.price_cents <= 0) {
+    return NextResponse.json({ error: "Gig has no agreed price" }, { status: 409 });
+  }
+
+  const { data: creator } = await admin()
+    .from("profiles")
+    .select("name")
+    .eq("id", gig.creator_id)
+    .maybeSingle();
 
   try {
     const session = await createGigCheckout(stripe, {
-      gigId,
-      title,
-      amountCents,
-      creatorAccountId: creatorAccountId ?? undefined,
-      creatorName,
-      successUrl: `${base}/gig/${gigId}?paid=1&session_id={CHECKOUT_SESSION_ID}`,
-      cancelUrl: `${base}/gig/${gigId}?paid=0`,
+      gigId: gig.id,
+      title: gig.title,
+      amountCents: gig.price_cents,
+      creatorName: (creator?.name as string | undefined) ?? undefined,
+      successUrl: `${base}/gig/${gig.id}?paid=1&session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: `${base}/gig/${gig.id}?paid=0`,
     });
-    return NextResponse.json({
-      url: session.url,
-      commissionCents: commissionCents(amountCents),
-      split: Boolean(creatorAccountId),
-    });
+    return NextResponse.json({ url: session.url });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Stripe error";
     return NextResponse.json({ error: msg }, { status: 400 });
@@ -73,18 +93,14 @@ export async function GET(req: Request) {
     }
     const paymentIntent = session.payment_intent;
     const paymentIntentId =
-      typeof paymentIntent === "string"
-        ? paymentIntent
-        : paymentIntent?.id ?? null;
-    const amountCents = session.amount_total ?? 0;
+      typeof paymentIntent === "string" ? paymentIntent : paymentIntent?.id ?? null;
 
     return NextResponse.json({
       paid: session.payment_status === "paid",
       status: session.payment_status,
       gigId,
       paymentIntentId,
-      amountCents,
-      commissionCents: amountCents > 0 ? commissionCents(amountCents) : 0,
+      amountCents: session.amount_total ?? 0,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Stripe error";

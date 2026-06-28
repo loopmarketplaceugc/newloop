@@ -4,7 +4,7 @@ import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Check, Users } from "lucide-react";
+import { ArrowLeft, Check, Users, X } from "lucide-react";
 import { useSession } from "@/lib/store/session";
 import { useHydrated } from "@/lib/store/app";
 import { cn } from "@/lib/utils";
@@ -37,8 +37,140 @@ interface Applicant {
   note: string | null;
   status: string;
   applied_at: string;
-  profile: { id: string; name: string; handle: string; avatar_hue: number } | null;
-  creator_details: { niches: string[] | null; tier: string | null; bio: string | null; status: string | null } | null;
+  profile: { id: string; name: string; handle: string; avatar_hue: number; bio: string | null } | null;
+  creator_details: { niches: string[] | null; tier: string | null } | null;
+}
+
+type AppActionState = { type: "idle" } | { type: "loading" } | { type: "approved"; gigId: string } | { type: "rejected" };
+
+function ApplicantCard({ applicant, onAction }: {
+  applicant: Applicant;
+  onAction: (applicationId: string, action: "approve" | "reject") => Promise<{ gigId?: string }>;
+}) {
+  const [state, setState] = useState<AppActionState>(
+    applicant.status === "accepted"
+      ? { type: "approved", gigId: "" }
+      : applicant.status === "rejected"
+      ? { type: "rejected" }
+      : { type: "idle" },
+  );
+
+  const name = applicant.profile?.name ?? "Creator";
+  const handle = applicant.profile?.handle;
+  const tier = applicant.creator_details?.tier;
+  const niches = applicant.creator_details?.niches ?? [];
+  const hue = applicant.profile?.avatar_hue ?? 285;
+
+  const handleAction = async (action: "approve" | "reject") => {
+    setState({ type: "loading" });
+    try {
+      const result = await onAction(applicant.id, action);
+      if (action === "approve") {
+        setState({ type: "approved", gigId: result.gigId ?? "" });
+      } else {
+        setState({ type: "rejected" });
+      }
+    } catch {
+      setState({ type: "idle" });
+    }
+  };
+
+  return (
+    <motion.div
+      layout
+      className={cn(
+        "rounded-[20px] border bg-surface p-5 transition-colors",
+        state.type === "approved" ? "border-[#a8d98a] bg-[#a8d98a]/5" :
+        state.type === "rejected" ? "border-ink/8 opacity-50" :
+        "border-ink/10",
+      )}
+    >
+      <div className="flex items-start gap-4">
+        {/* Avatar */}
+        <div
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+          style={{ background: `hsl(${hue} 55% 50%)` }}
+        >
+          {name.charAt(0).toUpperCase()}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-serif text-[15px] font-extrabold">{name}</p>
+            {tier && (
+              <span className="rounded-full bg-ink/8 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                {tier}
+              </span>
+            )}
+            {state.type === "approved" && (
+              <span className="flex items-center gap-1 rounded-full bg-[#a8d98a] px-2.5 py-0.5 text-[11px] font-bold text-ink">
+                <Check className="h-3 w-3" /> Approved
+              </span>
+            )}
+            {state.type === "rejected" && (
+              <span className="rounded-full bg-ink/10 px-2.5 py-0.5 text-[11px] font-bold text-ink/50">
+                Declined
+              </span>
+            )}
+          </div>
+          {handle && <p className="text-[12px] text-text-tertiary">@{handle}</p>}
+          {niches.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {niches.slice(0, 4).map((n) => (
+                <span key={n} className="rounded-full bg-[#f2a3df]/30 px-2 py-0.5 text-[11px] font-bold text-ink">
+                  {n}
+                </span>
+              ))}
+            </div>
+          )}
+          {applicant.note && (
+            <p className="mt-2 rounded-[10px] bg-ink/5 px-3 py-2 text-[13px] leading-relaxed text-text-secondary">
+              &ldquo;{applicant.note}&rdquo;
+            </p>
+          )}
+
+          {/* Actions */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {state.type === "approved" && state.gigId && (
+              <Link
+                href={`/gig/${state.gigId}`}
+                className="rounded-full bg-ink px-4 py-2 text-[12px] font-bold text-[#a8d98a] transition-opacity hover:opacity-80"
+              >
+                View gig →
+              </Link>
+            )}
+            {state.type === "idle" && (
+              <>
+                <button
+                  onClick={() => void handleAction("approve")}
+                  className="flex items-center gap-1.5 rounded-full bg-[#a8d98a] px-4 py-2 text-[12px] font-bold text-ink transition-opacity hover:opacity-80 cursor-pointer"
+                >
+                  <Check className="h-3.5 w-3.5" /> Approve
+                </button>
+                <button
+                  onClick={() => void handleAction("reject")}
+                  className="flex items-center gap-1.5 rounded-full border border-ink/15 px-4 py-2 text-[12px] font-bold text-text-secondary transition-colors hover:border-ink/30 hover:text-text-primary cursor-pointer"
+                >
+                  <X className="h-3.5 w-3.5" /> Decline
+                </button>
+              </>
+            )}
+            {state.type === "loading" && (
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-ink/20 border-t-ink" />
+            )}
+            {handle && (
+              <Link
+                href={`/creator/${handle}`}
+                className="rounded-full border border-ink/15 px-3 py-2 text-[12px] font-bold text-text-secondary transition-colors hover:border-ink/40 hover:text-text-primary"
+              >
+                View profile →
+              </Link>
+            )}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
 }
 
 function CompanyDetailView({ request }: { request: Request }) {
@@ -52,6 +184,19 @@ function CompanyDetailView({ request }: { request: Request }) {
       .catch(() => null)
       .finally(() => setLoadingApps(false));
   }, [request.id]);
+
+  const handleAction = async (applicationId: string, action: "approve" | "reject") => {
+    const res = await fetch("/api/requests/apply", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ applicationId, action }),
+    });
+    if (!res.ok) throw new Error("Action failed");
+    const data = (await res.json()) as { gigId?: string };
+    return { gigId: data.gigId };
+  };
+
+  const pendingCount = applicants.filter((a) => a.status === "pending").length;
 
   return (
     <div className="space-y-6">
@@ -114,6 +259,12 @@ function CompanyDetailView({ request }: { request: Request }) {
               </span>
             )}
           </h2>
+          {!loadingApps && pendingCount > 0 && (
+            <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-bold text-amber-800">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+              {pendingCount} pending
+            </span>
+          )}
         </div>
 
         {loadingApps && (
@@ -134,64 +285,9 @@ function CompanyDetailView({ request }: { request: Request }) {
         )}
 
         <div className="space-y-3">
-          {applicants.map((a) => {
-            const name = a.profile?.name ?? "Creator";
-            const handle = a.profile?.handle;
-            const tier = a.creator_details?.tier;
-            const niches = a.creator_details?.niches ?? [];
-            const hue = a.profile?.avatar_hue ?? 285;
-            return (
-              <div
-                key={a.id}
-                className="rounded-[20px] border border-ink/10 bg-surface p-5"
-              >
-                <div className="flex items-start gap-4">
-                  {/* Avatar */}
-                  <div
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
-                    style={{ background: `hsl(${hue} 55% 50%)` }}
-                  >
-                    {name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-serif text-[15px] font-extrabold">{name}</p>
-                      {tier && (
-                        <span className="rounded-full bg-ink/8 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                          {tier}
-                        </span>
-                      )}
-                    </div>
-                    {handle && (
-                      <p className="text-[12px] text-text-tertiary">@{handle}</p>
-                    )}
-                    {niches.length > 0 && (
-                      <div className="mt-1.5 flex flex-wrap gap-1">
-                        {niches.slice(0, 4).map((n) => (
-                          <span key={n} className="rounded-full bg-[#f2a3df]/30 px-2 py-0.5 text-[11px] font-bold text-ink">
-                            {n}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {a.note && (
-                      <p className="mt-2 rounded-[10px] bg-ink/5 px-3 py-2 text-[13px] leading-relaxed text-text-secondary">
-                        &ldquo;{a.note}&rdquo;
-                      </p>
-                    )}
-                  </div>
-                  {handle && (
-                    <Link
-                      href={`/creator/${handle}`}
-                      className="shrink-0 rounded-full border border-ink/15 px-3 py-1.5 text-[12px] font-bold text-text-secondary transition-colors hover:border-ink/40 hover:text-text-primary"
-                    >
-                      View profile →
-                    </Link>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+          {applicants.map((a) => (
+            <ApplicantCard key={a.id} applicant={a} onAction={handleAction} />
+          ))}
         </div>
       </div>
     </div>

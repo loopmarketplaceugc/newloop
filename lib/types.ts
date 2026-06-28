@@ -98,6 +98,8 @@ export interface Creator {
   stripeAccountId?: string;
   /** Whether Stripe has cleared the creator to receive payouts. */
   stripePayoutsEnabled?: boolean;
+  /** Lifetime released earnings (cents), credited server-side on each payout. */
+  balanceCents?: number;
 }
 
 export interface Company {
@@ -121,8 +123,10 @@ export const GIG_STATUSES = [
   "DELIVERED",
   "REVISION_REQUESTED",
   "APPROVED",
+  "PUBLISHED",
   "PAID_OUT",
   "COMPLETED",
+  "EXPIRED",
   "DISPUTED",
   "CANCELLED",
 ] as const;
@@ -135,6 +139,10 @@ export interface ContractTerms {
   usageRightsDays: number;
   rawFootageIncluded: boolean;
   exclusivity: boolean;
+  platform?: Platform;
+  minPostLifetimeDays?: number;
+  revisionRounds?: number;
+  videoLengthSeconds?: number;
 }
 
 export interface Contract {
@@ -148,6 +156,7 @@ export interface Deliverable {
   id: string;
   gigId: string;
   fileName: string;
+  url?: string;
   version: number;
   watermarked: boolean;
   submittedAt: string;
@@ -173,7 +182,12 @@ export interface Gig {
   deliveredAt?: string;
   revisionCount: number;
   createdAt: string;
-  scriptId?: string;
+  minPostLifetimeDays?: number;
+  revisionRounds?: number;
+  videoLengthSeconds?: number;
+  publishedUrl?: string;
+  publishedAt?: string;
+  completedAt?: string;
 }
 
 export interface OfferBody {
@@ -182,9 +196,13 @@ export interface OfferBody {
   usageRightsDays: number;
   rawFootageIncluded: boolean;
   state: "pending" | "accepted" | "declined";
+  platform?: Platform;
+  minPostLifetimeDays?: number;
+  revisionRounds?: number;
+  videoLengthSeconds?: number;
 }
 
-export type MessageKind = "text" | "attachment" | "script" | "offer";
+export type MessageKind = "text" | "attachment" | "offer";
 
 export interface Message {
   id: string;
@@ -193,51 +211,7 @@ export interface Message {
   kind: MessageKind;
   text?: string;
   attachmentName?: string;
-  scriptId?: string;
   offer?: OfferBody;
-  createdAt: string;
-}
-
-export type ScriptTone = "chaotic" | "aesthetic" | "educational" | "testimonial";
-
-export const TONE_LABELS: Record<ScriptTone, string> = {
-  chaotic: "Chaotic",
-  aesthetic: "Aesthetic",
-  educational: "Educational",
-  testimonial: "Testimonial",
-};
-
-export type ScriptKind = "script" | "brief";
-
-export interface ScriptInputs {
-  productName: string;
-  productDescription: string;
-  audience: string;
-  tone: ScriptTone;
-  platform: Platform;
-  kind: ScriptKind;
-}
-
-export interface ScriptBlock {
-  start: string; // "0:00"
-  end: string; // "0:03"
-  label: "HOOK" | "BODY" | "CTA";
-  text: string;
-}
-
-export interface ScriptOutput {
-  kind: ScriptKind;
-  title: string;
-  blocks?: ScriptBlock[]; // full script
-  bullets?: string[]; // brief
-}
-
-export interface ScriptDoc {
-  id: string;
-  companyId: string;
-  gigId?: string;
-  inputs: ScriptInputs;
-  output: ScriptOutput;
   createdAt: string;
 }
 

@@ -24,9 +24,11 @@ const TRANSITIONS: Record<GigStatus, GigStatus[]> = {
   IN_PRODUCTION: ["DELIVERED", "DISPUTED", "CANCELLED"],
   DELIVERED: ["APPROVED", "REVISION_REQUESTED", "DISPUTED"],
   REVISION_REQUESTED: ["DELIVERED", "DISPUTED"],
-  APPROVED: ["PAID_OUT"],
+  APPROVED: ["PUBLISHED", "DISPUTED"],
+  PUBLISHED: ["COMPLETED", "DISPUTED"],
   PAID_OUT: ["COMPLETED"],
-  COMPLETED: [],
+  COMPLETED: ["EXPIRED"],
+  EXPIRED: [],
   DISPUTED: ["CANCELLED", "APPROVED"],
   CANCELLED: [],
 };
@@ -56,11 +58,13 @@ export const STATUS_LABELS: Record<GigStatus, string> = {
   PRODUCT_SHIPPED: "Product shipped",
   PRODUCT_DELIVERED: "Product delivered",
   IN_PRODUCTION: "In production",
-  DELIVERED: "Delivered",
+  DELIVERED: "In review",
   REVISION_REQUESTED: "Revision requested",
-  APPROVED: "Approved",
+  APPROVED: "Draft approved",
+  PUBLISHED: "Published — in review",
   PAID_OUT: "Paid out",
   COMPLETED: "Completed",
+  EXPIRED: "Expired",
   DISPUTED: "Disputed",
   CANCELLED: "Cancelled",
 };
@@ -79,8 +83,10 @@ export const STATUS_TONES: Record<GigStatus, StatusToneName> = {
   DELIVERED: "amber",
   REVISION_REQUESTED: "amber",
   APPROVED: "emerald",
+  PUBLISHED: "amber",
   PAID_OUT: "emerald",
   COMPLETED: "emerald",
+  EXPIRED: "neutral",
   DISPUTED: "danger",
   CANCELLED: "neutral",
 };
@@ -93,8 +99,8 @@ export const KANBAN_LANES: { label: string; statuses: GigStatus[] }[] = [
     statuses: ["FUNDED_IN_ESCROW", "PRODUCT_SHIPPED", "PRODUCT_DELIVERED"],
   },
   { label: "In Production", statuses: ["IN_PRODUCTION", "REVISION_REQUESTED"] },
-  { label: "Delivered", statuses: ["DELIVERED"] },
-  { label: "Approved", statuses: ["APPROVED", "PAID_OUT", "COMPLETED"] },
+  { label: "In Review", statuses: ["DELIVERED"] },
+  { label: "Live", statuses: ["APPROVED", "PUBLISHED", "PAID_OUT", "COMPLETED"] },
 ];
 
 /** Payment has been secured in these states. */
@@ -106,6 +112,7 @@ export const ESCROW_HELD_STATUSES: GigStatus[] = [
   "DELIVERED",
   "REVISION_REQUESTED",
   "APPROVED",
+  "PUBLISHED",
 ];
 
 export const ACTIVE_STATUSES: GigStatus[] = [
@@ -118,6 +125,7 @@ export const ACTIVE_STATUSES: GigStatus[] = [
   "DELIVERED",
   "REVISION_REQUESTED",
   "APPROVED",
+  "PUBLISHED",
 ];
 
 export function isEscrowHeld(gig: Gig): boolean {
@@ -138,6 +146,8 @@ export function refundPolicy(status: GigStatus): {
       return { companyRefundPct: 50, note: "50% kill fee — production underway." };
     case "DELIVERED":
     case "REVISION_REQUESTED":
+    case "APPROVED":
+    case "PUBLISHED":
       return { companyRefundPct: 0, note: "No refund after delivery — open a dispute instead." };
     default:
       return { companyRefundPct: 100, note: "No payment captured yet." };
@@ -154,7 +164,20 @@ export function mainPath(physicalProduct: boolean): GigStatus[] {
     "IN_PRODUCTION",
     "DELIVERED",
     "APPROVED",
-    "PAID_OUT",
+    "PUBLISHED",
     "COMPLETED",
   ];
+}
+
+/**
+ * The status a gig effectively presents as right now. A COMPLETED gig whose
+ * post has been live past its minimum lifetime reads as EXPIRED — durable
+ * persistence happens via the pg_cron sweep, this gives instant UI feedback.
+ */
+export function effectiveStatus(gig: Gig): GigStatus {
+  if (gig.status === "COMPLETED" && gig.completedAt && gig.minPostLifetimeDays != null) {
+    const expiresAt = new Date(gig.completedAt).getTime() + gig.minPostLifetimeDays * 86_400_000;
+    if (Date.now() > expiresAt) return "EXPIRED";
+  }
+  return gig.status;
 }

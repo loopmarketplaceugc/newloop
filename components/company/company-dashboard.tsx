@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Briefcase, Compass, FileText, Hourglass, Sparkles } from "lucide-react";
+import { Briefcase, Compass, Hourglass } from "lucide-react";
 import { useApp } from "@/lib/store/app";
 import { useSession } from "@/lib/store/session";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,18 +11,24 @@ import { Avatar } from "@/components/ui/avatar";
 import { PlatformIcon } from "@/components/shared/platform-icon";
 import { companyById } from "@/lib/seed";
 import { ACTIVE_STATUSES, AUTO_APPROVE_DAYS, ESCROW_HELD_STATUSES } from "@/lib/gig-machine";
+import type { GigStatus } from "@/lib/types";
 import { daysUntil, formatMoney } from "@/lib/format";
+
+const PAST_STATUSES: GigStatus[] = ["COMPLETED", "EXPIRED", "PAID_OUT", "CANCELLED"];
 
 export function CompanyDashboard() {
   const userId = useSession((s) => s.userId)!;
   const sessionName = useSession((s) => s.name);
   const isDemo = useSession((s) => s.isDemo);
-  const { gigs, creators, transactions, scripts } = useApp();
+  const { gigs, creators, transactions } = useApp();
   const company = isDemo ? companyById(userId) : undefined;
   const brandName = sessionName || company?.name || "Your brand";
 
   const myGigs = gigs.filter((g) => g.companyId === userId);
   const active = myGigs.filter((g) => ACTIVE_STATUSES.includes(g.status));
+  const past = myGigs
+    .filter((g) => PAST_STATUSES.includes(g.status))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const inEscrow = myGigs
     .filter((g) => ESCROW_HELD_STATUSES.includes(g.status))
     .reduce((s, g) => s + g.priceCents, 0);
@@ -30,7 +36,6 @@ export function CompanyDashboard() {
     .filter((t) => t.type === "fund" && myGigs.some((g) => g.id === t.gigId))
     .reduce((s, t) => s + t.amountCents, 0);
   const awaitingReview = myGigs.filter((g) => g.status === "DELIVERED");
-  const myScripts = scripts.filter((s) => s.companyId === userId);
 
   return (
     <div className="space-y-5">
@@ -47,12 +52,6 @@ export function CompanyDashboard() {
           </p>
         </div>
         <div className="flex gap-2.5">
-          <Link
-            href="/dashboard/scripts?new=1"
-            className="flex items-center gap-2 rounded-full border-2 border-ink px-5 py-2.5 font-serif text-sm font-bold text-[#d6409f] transition-all hover:scale-105 hover:bg-ai-soft"
-          >
-            <Sparkles className="h-4 w-4" /> New AI script
-          </Link>
           <Link
             href="/dashboard/discover"
             className="flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 font-serif text-sm font-bold text-[#a8d98a] transition-all hover:scale-105"
@@ -82,10 +81,10 @@ export function CompanyDashboard() {
         </Card>
         <Card className="bg-[#a8d98a]">
           <CardContent className="text-ink">
-            <span className="sticker bg-ink text-[11px] text-[#a8d98a]">scripts</span>
-            <p className="num mt-2 font-serif text-4xl font-extrabold">{myScripts.length}</p>
+            <span className="sticker bg-ink text-[11px] text-[#a8d98a]">completed</span>
+            <p className="num mt-2 font-serif text-4xl font-extrabold">{past.length}</p>
             <p className="mt-1 text-xs font-bold opacity-60">
-              <Link href="/dashboard/scripts" className="underline underline-offset-2">open the library →</Link>
+              <Link href="/dashboard/gigs" className="underline underline-offset-2">view all gigs →</Link>
             </p>
           </CardContent>
         </Card>
@@ -164,35 +163,45 @@ export function CompanyDashboard() {
         </CardContent>
       </Card>
 
-      {/* Recent scripts */}
-      {myScripts.length > 0 && (
+      {/* Past gigs */}
+      {past.length > 0 && (
         <Card>
           <CardContent>
             <div className="mb-4 flex items-center justify-between">
-              <p className="font-serif text-lg font-extrabold">Recent scripts</p>
-              <Link href="/dashboard/scripts" className="rounded-full border-2 border-ink px-3.5 py-1 text-xs font-bold transition-all hover:scale-105 hover:bg-ink hover:text-[#f2a3df]">
-                view all →
-              </Link>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {myScripts.slice(0, 3).map((s, i) => (
-                <Link
-                  key={s.id}
-                  href="/dashboard/scripts"
-                  className="rounded-[14px] border-2 border-ink p-4 transition-all hover:-translate-y-1 hover:shadow-[4px_4px_0_0_#101805]"
-                  style={{ background: ["#fae5f3", "#e4f2da", "#faf6ef"][i % 3] }}
-                >
-                  <FileText className="h-5 w-5 text-[#d6409f]" />
-                  <p className="mt-2 line-clamp-1 font-serif text-sm font-extrabold">{s.output.title}</p>
-                  <p className="mt-0.5 text-xs font-bold capitalize text-text-tertiary">
-                    {s.inputs.tone} · {s.output.kind === "script" ? "full script" : "brief"}
-                  </p>
+              <p className="font-serif text-lg font-extrabold">Past gigs</p>
+              {past.length > 5 && (
+                <Link href="/dashboard/gigs" className="rounded-full border-2 border-ink px-3.5 py-1 text-xs font-bold transition-all hover:scale-105 hover:bg-ink hover:text-[#f2a3df]">
+                  view all →
                 </Link>
-              ))}
+              )}
+            </div>
+            <div className="space-y-2">
+              {past.slice(0, 5).map((g) => {
+                const creator = creators.find((c) => c.id === g.creatorId);
+                return (
+                  <Link
+                    key={g.id}
+                    href={`/gig/${g.id}`}
+                    className="flex items-center gap-3 rounded-[14px] border border-ink/10 p-3.5 opacity-70 transition-all hover:opacity-100 hover:border-ink/30 hover:bg-surface-2/30"
+                  >
+                    <Avatar name={creator?.name ?? "?"} hue={creator?.avatarHue ?? 0} src={creator?.avatarUrl} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold">{g.title}</p>
+                      <p className="flex items-center gap-1.5 text-xs font-medium text-text-tertiary">
+                        <PlatformIcon platform={g.platform} className="h-3 w-3" />
+                        {creator?.name ?? "Creator"}
+                      </p>
+                    </div>
+                    <span className="num hidden font-serif text-sm font-extrabold text-text-secondary sm:block">{formatMoney(g.priceCents)}</span>
+                    <StatusPill status={g.status} />
+                  </Link>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
       )}
+
     </div>
   );
 }

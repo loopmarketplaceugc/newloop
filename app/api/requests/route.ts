@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 
 function sb() {
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://vqbykppxpplctrrrpomg.supabase.co",
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
   );
 }
@@ -55,6 +55,22 @@ export async function GET(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   const requests = await withBrandNames(client, (data ?? []) as AnyRow[]);
   return NextResponse.json({ requests });
+}
+
+export async function DELETE(req: Request) {
+  const url = new URL(req.url);
+  const id = url.searchParams.get("id");
+  const companyId = url.searchParams.get("companyId");
+  if (!id || !companyId) return NextResponse.json({ error: "Missing id or companyId" }, { status: 400 });
+  const client = sb();
+  // Verify ownership before deleting
+  const { data: existing } = await client.from("requests").select("company_id").eq("id", id).single();
+  if (!existing || existing.company_id !== companyId) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  const { error } = await client.from("requests").delete().eq("id", id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  return NextResponse.json({ ok: true });
 }
 
 export async function POST(req: Request) {

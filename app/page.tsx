@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import Link from "next/link";
+import { useSession } from "@/lib/store/session";
 import { motion, useScroll, useTransform, useMotionTemplate, AnimatePresence } from "framer-motion";
 import { ArrowRight, ArrowDown, Heart, MessageCircle, Share2, Music2, Bookmark } from "lucide-react";
 import { TypeCycle, TypeOnce } from "@/components/shared/typewriter";
@@ -164,6 +165,7 @@ function IPhoneMockup() {
 }
 
 export default function LandingPage() {
+  const userId = useSession((s) => s.userId);
   const heroRef = useRef<HTMLDivElement>(null);
   const darkRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress: heroProg } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
@@ -213,22 +215,35 @@ export default function LandingPage() {
           </motion.span>
 
           <div className="flex items-center gap-2 shrink-0">
-            <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
-              <Link
-                href="/login"
-                className="rounded-full px-5 py-2.5 text-[14px] font-bold text-ink/80 hover:text-ink hover:bg-ink/8 transition-colors"
-              >
-                Log in
-              </Link>
-            </motion.div>
-            <motion.div whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}>
-              <Link
-                href="/signup"
-                className="rounded-full bg-ink px-6 py-2.5 text-[14px] font-bold text-[#f2a3df] shadow-[2px_2px_0_0_rgba(16,24,5,0.4)] transition-shadow hover:shadow-[3px_3px_0_0_rgba(16,24,5,0.5)]"
-              >
-                Sign up free →
-              </Link>
-            </motion.div>
+            {userId ? (
+              <motion.div whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}>
+                <Link
+                  href="/dashboard"
+                  className="rounded-full bg-ink px-6 py-2.5 text-[14px] font-bold text-[#f2a3df] shadow-[2px_2px_0_0_rgba(16,24,5,0.4)] transition-shadow hover:shadow-[3px_3px_0_0_rgba(16,24,5,0.5)]"
+                >
+                  Dashboard →
+                </Link>
+              </motion.div>
+            ) : (
+              <>
+                <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
+                  <Link
+                    href="/login"
+                    className="rounded-full px-5 py-2.5 text-[14px] font-bold text-ink/80 hover:text-ink hover:bg-ink/8 transition-colors"
+                  >
+                    Log in
+                  </Link>
+                </motion.div>
+                <motion.div whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}>
+                  <Link
+                    href="/signup"
+                    className="rounded-full bg-ink px-6 py-2.5 text-[14px] font-bold text-[#f2a3df] shadow-[2px_2px_0_0_rgba(16,24,5,0.4)] transition-shadow hover:shadow-[3px_3px_0_0_rgba(16,24,5,0.5)]"
+                  >
+                    Sign up free →
+                  </Link>
+                </motion.div>
+              </>
+            )}
           </div>
         </motion.div>
       </div>
@@ -519,6 +534,10 @@ export default function LandingPage() {
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 text-sm font-bold text-[#faf6ef]/60 sm:flex-row">
           <span className="font-serif text-xl text-[#f2a3df]">loop</span>
           <span>© 2026 — secure creator payouts</span>
+          <div className="flex gap-4 text-[11px] font-medium text-[#faf6ef]/30">
+            <Link href="/legal#privacy" className="hover:text-[#faf6ef]/60 transition-colors">Privacy</Link>
+            <Link href="/legal#terms" className="hover:text-[#faf6ef]/60 transition-colors">Terms</Link>
+          </div>
         </div>
       </footer>
     </div>
