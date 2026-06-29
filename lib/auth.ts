@@ -38,7 +38,8 @@ export async function signUpWithEmail(email: string, password: string, role: Rol
     if (/already registered|user already exists/i.test(error.message)) {
       throw new Error("There is already an account with this email. Log in instead, or reset your password.");
     }
-    throw new Error(error.message);
+    const msg = error.message && error.message !== "{}" ? error.message : "Signup failed — check that your email is valid and try again.";
+    throw new Error(msg);
   }
 
   // Email confirmations disabled — session returned immediately
