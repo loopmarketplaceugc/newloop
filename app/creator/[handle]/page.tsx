@@ -33,18 +33,14 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
   const { creators, reviews, gigs } = useApp();
   const [starting, setStarting] = useState(false);
   const [fetched, setFetched] = useState<Creator | null | "loading">("loading");
-  const [origin, setOrigin] = useState("");
+  const [origin] = useState(() => (typeof window !== "undefined" ? window.location.origin : ""));
 
   const key = decodeURIComponent(handle);
   const fromStore = creators.find((x) => x.handle === key || x.loopTag === key);
 
+  // Fetch from Supabase when not in the local store — makes QR scan work for any visitor.
   useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
-
-  // Fetch from Supabase when not in the local store — makes QR scan work for any visitor
-  useEffect(() => {
-    if (fromStore) { setFetched(null); return; }
+    if (fromStore) return;
     let cancelled = false;
     void fetchCreatorByHandle(key).then((c) => {
       if (!cancelled) setFetched(c ?? null);
@@ -52,9 +48,10 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
     return () => { cancelled = true; };
   }, [key, fromStore]);
 
-  const c = fromStore ?? (fetched !== "loading" ? fetched : null);
+  const c = fromStore ?? (fetched === "loading" ? null : fetched);
+  const loading = !fromStore && fetched === "loading";
 
-  if (!hydrated || fetched === "loading") {
+  if (!hydrated || loading) {
     return <div className="mx-auto max-w-3xl p-6"><CardSkeleton /></div>;
   }
 

@@ -121,7 +121,7 @@ export async function createPayoutTransfer(
  */
 export async function createBalancePayout(
   stripe: Stripe,
-  params: { amountCents: number; destination: string; creatorId: string },
+  params: { amountCents: number; destination: string; creatorId: string; idempotencyKey: string },
 ) {
   return stripe.transfers.create(
     {
@@ -130,7 +130,9 @@ export async function createBalancePayout(
       destination: params.destination,
       metadata: { creatorId: params.creatorId, kind: "balance_payout" },
     },
-    { idempotencyKey: `balance_${params.creatorId}_${params.amountCents}` },
+    // Unique per payout event (not per amount) so two distinct same-amount
+    // payouts can't collide and silently dedupe to a single transfer.
+    { idempotencyKey: params.idempotencyKey },
   );
 }
 

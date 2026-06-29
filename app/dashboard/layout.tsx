@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3,
-  Bell,
   Briefcase,
   Compass,
   CreditCard,
@@ -13,7 +12,6 @@ import {
   LayoutDashboard,
   LogOut,
   MessageSquare,
-  Search,
   User,
   Wallet,
   type LucideIcon,
@@ -23,10 +21,10 @@ import { useApp, useHydrated } from "@/lib/store/app";
 import { Avatar } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader } from "@/components/shared/loader";
+import { NotificationBell } from "@/components/shared/notification-bell";
 import { ToastViewport } from "@/components/ui/toast";
 import { companyById } from "@/lib/seed";
 import { fetchCreators, fetchMyWorld } from "@/lib/sync";
-import { daysAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { CommandPalette } from "@/components/company/command-palette";
 
@@ -66,9 +64,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const enterLiveMode = useApp((s) => s.enterLiveMode);
   const setCreatorsFromDb = useApp((s) => s.setCreatorsFromDb);
   const setLiveWorld = useApp((s) => s.setLiveWorld);
-  const markRead = useApp((s) => s.markNotificationsRead);
   const ensureCreator = useApp((s) => s.ensureCreator);
-  const [bellOpen, setBellOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
@@ -185,13 +181,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Sidebar — ink */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col bg-ink text-[#faf6ef] md:flex">
-        <div className="px-5 py-6">
-          <Link href="/dashboard" className="font-serif text-2xl font-extrabold text-[#f2a3df]">
-            loop
-          </Link>
-          {isDemo && (
-            <span className="sticker mt-2 inline-block bg-[#a8d98a] text-[11px] text-ink">demo mode</span>
-          )}
+        <div className="flex items-start justify-between px-5 py-6">
+          <div>
+            <Link href="/dashboard" className="font-serif text-2xl font-extrabold text-[#f2a3df]">
+              loop
+            </Link>
+            {isDemo && (
+              <span className="sticker mt-2 inline-block bg-[#a8d98a] text-[11px] text-ink">demo mode</span>
+            )}
+          </div>
+          <NotificationBell align="left" tone="onDark" />
         </div>
         <nav className="flex-1 space-y-1.5 px-3">
           {nav.map((item) => {
@@ -242,6 +241,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Main */}
       <div className="flex min-h-screen flex-1 flex-col md:pl-60">
+        {/* Mobile top bar — gives notifications a home on small screens */}
+        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-bg/90 px-4 py-3 backdrop-blur md:hidden">
+          <Link href="/dashboard" className="font-serif text-xl font-extrabold text-[#f2a3df]">
+            loop
+          </Link>
+          <NotificationBell align="right" tone="onLight" />
+        </header>
         <main className="flex-1 px-4 py-4 pb-28 md:px-6 md:pb-10">{children}</main>
       </div>
 

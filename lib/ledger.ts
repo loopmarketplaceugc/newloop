@@ -157,7 +157,9 @@ export async function payoutOwedBalance(params: {
   if (amount <= 0) return { ok: true, paid: 0 };
 
   try {
-    const transfer = await createBalancePayout(stripe, { amountCents: amount, destination: acct, creatorId });
+    // Unique key per payout event so distinct same-amount payouts don't collide.
+    const idempotencyKey = `balance_${creatorId}_${crypto.randomUUID()}`;
+    const transfer = await createBalancePayout(stripe, { amountCents: amount, destination: acct, creatorId, idempotencyKey });
     log.info("ledger.payoutOwedBalance", "paid owed balance", { creatorId, amount, transferId: transfer.id });
     return { ok: true, paid: amount };
   } catch (e) {

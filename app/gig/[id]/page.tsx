@@ -224,12 +224,16 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
   };
 
   const sendOffer = () => {
+    if (!Number.isFinite(offerPrice) || offerPrice <= 0) {
+      toast("Set a price first", { body: "Enter an amount greater than $0 before sending the offer.", tone: "warning" });
+      return;
+    }
     app.sendMessage({
       gigId: gig.id,
       senderId: userId,
       kind: "offer",
       offer: {
-        priceCents: offerPrice * 100,
+        priceCents: Math.round(offerPrice) * 100,
         deliverables: offerDeliverables,
         usageRightsDays: offerUsage,
         rawFootageIncluded: offerRaw,

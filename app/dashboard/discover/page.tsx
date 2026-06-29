@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { SearchX, SlidersHorizontal } from "lucide-react";
+import { Search, SearchX, SlidersHorizontal } from "lucide-react";
 import { useApp, useHydrated } from "@/lib/store/app";
+import { fetchCreators } from "@/lib/sync";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ import { cn } from "@/lib/utils";
 export default function DiscoverPage() {
   const hydrated = useHydrated();
   const creators = useApp((s) => s.creators);
+  const setCreatorsFromDb = useApp((s) => s.setCreatorsFromDb);
   const [platform, setPlatform] = useState<Platform | null>(null);
   const [niche, setNiche] = useState<Niche | null>(null);
   const [tiers, setTiers] = useState<Tier[]>([]);
@@ -38,10 +40,39 @@ export default function DiscoverPage() {
   const [productOk, setProductOk] = useState(false);
   const [minRating, setMinRating] = useState(0);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+
+  const PAGE = 60;
+
+  // Server-side search: pull matching creators into the store (merged) so a name
+  // that isn't in the first page is still findable.
+  useEffect(() => {
+    const term = search.trim();
+    if (term.length < 2) return;
+    const t = setTimeout(() => {
+      void fetchCreators({ search: term, limit: PAGE }).then(setCreatorsFromDb);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [search, setCreatorsFromDb]);
+
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const next = await fetchCreators({ offset: creators.length, limit: PAGE });
+      setCreatorsFromDb(next);
+      if (next.length < PAGE) setHasMore(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const filtered = useMemo(
-    () =>
-      creators.filter((c) => {
+    () => {
+      const q = search.trim().toLowerCase();
+      return creators.filter((c) => {
+        if (q && !c.name.toLowerCase().includes(q) && !c.handle.toLowerCase().includes(q)) return false;
         if (platform && !c.platforms.some((p) => p.platform === platform)) return false;
         if (niche && !c.niches.includes(niche)) return false;
         if (tiers.length && !tiers.includes(c.tier)) return false;
@@ -51,8 +82,9 @@ export default function DiscoverPage() {
         if (productOk && c.compensationPref === "paid_only") return false;
         if (c.rating < minRating) return false;
         return true;
-      }),
-    [creators, platform, niche, tiers, rate, minCapacity, productOk, minRating],
+      });
+    },
+    [creators, search, platform, niche, tiers, rate, minCapacity, productOk, minRating],
   );
 
   if (!hydrated) {
@@ -185,6 +217,18 @@ export default function DiscoverPage() {
         </Button>
       </div>
 
+      {/* Search by name / handle (pulls matches from the server into the list) */}
+      <div className="relative max-w-md">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search creators by name or @handle…"
+          className="w-full rounded-full border border-border bg-surface py-2.5 pl-9 pr-4 text-sm focus:border-border-bright focus:outline-none"
+        />
+      </div>
+
       <div className="flex gap-6">
         {/* Filter rail */}
         <aside className={cn("w-56 shrink-0", filtersOpen ? "block" : "hidden lg:block")}>
@@ -245,6 +289,15 @@ export default function DiscoverPage() {
                   </Card>
                 </Link>
               ))}
+            </div>
+          )}
+
+          {/* Load more — only when browsing (not searching) and a full page came back */}
+          {!search.trim() && hasMore && filtered.length > 0 && (
+            <div className="mt-6 flex justify-center">
+              <Button variant="outline" size="sm" onClick={() => void loadMore()} disabled={loadingMore}>
+                {loadingMore ? "Loading…" : "Load more creators"}
+              </Button>
             </div>
           )}
         </div>
