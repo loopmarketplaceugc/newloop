@@ -14,6 +14,7 @@ import {
 } from "@stripe/react-stripe-js";
 import { useSession } from "@/lib/store/session";
 import { saveCompanyProfile } from "@/lib/auth";
+import { authHeaders } from "@/lib/sync";
 import { DEV_PAYMENTS } from "@/lib/payments";
 import { TypeOnce } from "@/components/shared/typewriter";
 import { NICHES } from "@/lib/types";
@@ -146,18 +147,26 @@ function StripeBalanceSection({
     setClientSecret(null);
     setLoading(true);
     setErr(null);
-    fetch("/api/stripe/payment-intent", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ balance, brandId, email }),
-    })
-      .then((r) => r.json() as Promise<{ clientSecret?: string; error?: string }>)
-      .then((d) => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        // brandId is derived server-side from the auth token; the header carries it.
+        const res = await fetch("/api/stripe/payment-intent", {
+          method: "POST",
+          headers: await authHeaders(),
+          body: JSON.stringify({ balance, email }),
+        });
+        const d = (await res.json()) as { clientSecret?: string; error?: string };
+        if (cancelled) return;
         if (d.clientSecret) setClientSecret(d.clientSecret);
         else setErr(d.error ?? "Couldn't initialize payment.");
-      })
-      .catch(() => setErr("Network error — check your connection."))
-      .finally(() => setLoading(false));
+      } catch {
+        if (!cancelled) setErr("Network error — check your connection.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [balance, brandId, email]);
 
   if (loading) {

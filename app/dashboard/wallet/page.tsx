@@ -25,6 +25,7 @@ import {
   USAGE_REMINDER_DAYS,
 } from "@/lib/gig-machine";
 import { daysUntil, formatDate, formatMoney } from "@/lib/format";
+import { authHeaders } from "@/lib/sync";
 import { toast } from "@/components/ui/toast";
 import { DEV_PAYMENTS, refreshPayoutStatus, getExpressDashboardUrl } from "@/lib/payments";
 import { haptics } from "@/lib/haptics";
@@ -54,11 +55,12 @@ export default function WalletPage() {
   const expiring = myGigs.filter((g) => g.usageExpiresAt && daysUntil(g.usageExpiresAt) > 0);
   const payoutsReady = Boolean(me?.stripePayoutsEnabled);
 
-  const fetchAccountSession = async (accountId?: string) => {
+  const fetchAccountSession = async () => {
+    // Caller identity + Stripe account are resolved server-side from the auth token.
     const res = await fetch("/api/stripe/account-session", {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ creatorId: userId, email: email || undefined, accountId }),
+      headers: await authHeaders(),
+      body: JSON.stringify({ email: email || undefined }),
     });
     const data = (await res.json()) as { clientSecret?: string; accountId?: string; error?: string };
     if (!data.clientSecret) throw new Error(data.error ?? "Could not start payout setup.");
@@ -89,14 +91,13 @@ export default function WalletPage() {
     haptics.step();
     try {
       // Pre-flight: surface real Stripe errors before the embedded component mounts.
-      const initial = await fetchAccountSession(me?.stripeAccountId);
+      const initial = await fetchAccountSession();
       if (initial.accountId && !me?.stripeAccountId) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         useApp.getState().updateCreator(userId, { stripeAccountId: initial.accountId } as any);
       }
 
       let firstSecret: string | null = initial.clientSecret!;
-      const resolvedAccountId = initial.accountId ?? me?.stripeAccountId;
 
       const instance = loadConnectAndInitialize({
         publishableKey: pk,
@@ -107,7 +108,7 @@ export default function WalletPage() {
             return s;
           }
           // Session expired — fetch a fresh one.
-          const d = await fetchAccountSession(resolvedAccountId);
+          const d = await fetchAccountSession();
           return d.clientSecret!;
         },
         appearance: {

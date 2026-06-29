@@ -240,9 +240,10 @@ export default function LegalPage() {
                 by Stripe, Inc. under Stripe's terms.
               </p>
               <p className="mt-3">
-                Loop charges a service fee on each transaction, the amount of which is displayed to
-                you in the deal summary before you confirm a gig. All fees are non-refundable unless
-                Loop is at fault.
+                Every gig shows its full Deal Value and the amount the Creator receives in the deal
+                summary before you confirm. These amounts are presented in full and are binding once
+                a gig is funded. Refunds on cancellation follow the stage-based policy shown to you
+                at the time of cancellation.
               </p>
               <p className="mt-3">
                 Creators must complete Stripe Connect onboarding to receive payouts. Loop is not
