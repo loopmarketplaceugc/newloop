@@ -35,10 +35,14 @@ export async function signUpWithEmail(email: string, password: string, role: Rol
   });
 
   if (error) {
+    console.error("[signup] Supabase error:", { message: error.message, status: (error as { status?: number }).status, code: (error as { code?: string }).code });
     if (/already registered|user already exists/i.test(error.message)) {
       throw new Error("There is already an account with this email. Log in instead, or reset your password.");
     }
-    const msg = error.message && error.message !== "{}" ? error.message : "Signup failed — check that your email is valid and try again.";
+    if (/redirect/i.test(error.message)) {
+      throw new Error("Signup is not yet configured for this domain. Please contact support.");
+    }
+    const msg = error.message?.trim() && error.message !== "{}" ? error.message : "Signup failed — please try again.";
     throw new Error(msg);
   }
 
