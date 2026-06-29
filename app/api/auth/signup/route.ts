@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { createClient } from "@supabase/supabase-js";
 import { admin } from "@/lib/supabase-admin";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 
 const schema = z.object({
   email: z.string().email(),
+  password: z.string().min(8),
   role: z.enum(["creator", "company"]),
+  origin: z.string().url().optional(),
 });
 
 export async function POST(req: Request) {
@@ -22,35 +25,73 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
-  const { email, role } = parsed.data;
+  const { email, password, role, origin } = parsed.data;
 
-  // Use auth_email_exists — an O(1) DB lookup — instead of listing all users.
+  // Check for existing account
   const { data: rows, error: lookupErr } = await admin()
     .rpc("auth_email_exists", { p_email: email });
 
-  if (lookupErr) {
-    // RPC unavailable (e.g. migration not yet run) — allow signup and let
-    // Supabase handle the duplicate check itself.
-    return NextResponse.json({ ok: true });
+  if (!lookupErr) {
+    const existing = (rows as Array<{ user_id: string; user_meta: Record<string, unknown> }> | null)?.[0] ?? null;
+    if (existing) {
+      return NextResponse.json(
+        { error: "There is already an account with this email. Log in instead, or reset your password." },
+        { status: 409 },
+      );
+    }
   }
 
-  const existing = (rows as Array<{ user_id: string; user_meta: Record<string, unknown> }> | null)?.[0] ?? null;
-  if (!existing) {
-    return NextResponse.json({ ok: true });
+  // Call auth.signUp server-side so errors are visible in logs
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) {
+    console.error("[signup] Supabase env vars not configured");
+    return NextResponse.json({ error: "Service not configured." }, { status: 503 });
   }
 
-  const existingRole = (existing.user_meta?.role as string | undefined) ?? null;
+  const sb = createClient(url, anonKey, { auth: { persistSession: false } });
+  const redirectTo = origin ? `${origin}/auth/callback` : undefined;
 
-  // Use an identical message regardless of role to prevent account enumeration.
-  if (existingRole && existingRole !== role) {
+  const { data, error: signupError } = await sb.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { role },
+      ...(redirectTo ? { emailRedirectTo: redirectTo } : {}),
+    },
+  });
+
+  if (signupError) {
+    console.error("[signup] Supabase error:", {
+      message: signupError.message,
+      status: (signupError as { status?: number }).status,
+      code: (signupError as { code?: string }).code,
+    });
+    if (/already registered|user already exists/i.test(signupError.message)) {
+      return NextResponse.json(
+        { error: "There is already an account with this email. Log in instead, or reset your password." },
+        { status: 409 },
+      );
+    }
     return NextResponse.json(
-      { error: "There is already an account with this email. Log in instead, or reset your password." },
-      { status: 409 },
+      { error: signupError.message || "Signup failed — please try again." },
+      { status: 400 },
     );
   }
 
-  return NextResponse.json(
-    { error: "There is already an account with this email. Log in instead, or reset your password." },
-    { status: 409 },
-  );
+  const needsVerification = !(data.session && data.user);
+
+  if (!needsVerification && data.session && data.user) {
+    return NextResponse.json({
+      ok: true,
+      needsVerification: false,
+      session: {
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+        user_id: data.user.id,
+      },
+    });
+  }
+
+  return NextResponse.json({ ok: true, needsVerification: true });
 }

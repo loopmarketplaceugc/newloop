@@ -13,42 +13,32 @@ import type { Role } from "@/lib/types";
  * immediately and needsVerification is false.
  */
 export async function signUpWithEmail(email: string, password: string, role: Role) {
-  const check = await fetch("/api/auth/signup", {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const res = await fetch("/api/auth/signup", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email, role }),
+    body: JSON.stringify({ email, password, role, origin }),
   });
-  if (!check.ok) {
-    const body = (await check.json().catch(() => null)) as { error?: string } | null;
+
+  const body = (await res.json().catch(() => null)) as {
+    ok?: boolean;
+    needsVerification?: boolean;
+    session?: { access_token: string; refresh_token: string; user_id: string };
+    error?: string;
+  } | null;
+
+  if (!res.ok) {
     throw new Error(body?.error ?? "Signup failed — try again.");
   }
 
-  const sb = supabase();
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const { data, error } = await sb.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { role },
-      emailRedirectTo: `${origin}/auth/callback`,
-    },
-  });
-
-  if (error) {
-    console.error("[signup] Supabase error:", { message: error.message, status: (error as { status?: number }).status, code: (error as { code?: string }).code });
-    if (/already registered|user already exists/i.test(error.message)) {
-      throw new Error("There is already an account with this email. Log in instead, or reset your password.");
-    }
-    if (/redirect/i.test(error.message)) {
-      throw new Error("Signup is not yet configured for this domain. Please contact support.");
-    }
-    const msg = error.message?.trim() && error.message !== "{}" ? error.message : "Signup failed — please try again.";
-    throw new Error(msg);
-  }
-
   // Email confirmations disabled — session returned immediately
-  if (data.session && data.user) {
-    useSession.getState().setAuthed({ userId: data.user.id, role, email, onboarded: false });
+  if (!body?.needsVerification && body?.session) {
+    const sb = supabase();
+    await sb.auth.setSession({
+      access_token: body.session.access_token,
+      refresh_token: body.session.refresh_token,
+    });
+    useSession.getState().setAuthed({ userId: body.session.user_id, role, email, onboarded: false });
     return { needsVerification: false as const };
   }
 
