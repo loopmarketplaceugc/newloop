@@ -7,7 +7,6 @@ import { motion } from "framer-motion";
 import { ArrowRight, Building2, Check, Clapperboard, Loader2, Mail } from "lucide-react";
 import { z } from "zod";
 import { signUpWithEmail } from "@/lib/auth";
-import { supabase } from "@/lib/supabase";
 import { haptics } from "@/lib/haptics";
 import { toast } from "@/components/ui/toast";
 import { TypeOnce } from "@/components/shared/typewriter";
@@ -66,8 +65,13 @@ function SignupInner() {
     setResendBusy(true);
     setResendMsg(null);
     try {
-      await supabase().auth.resend({ type: "signup", email });
-      setResendMsg("Sent! Check your inbox again.");
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const res = await fetch("/api/auth/resend-confirmation", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, origin }),
+      });
+      setResendMsg(res.ok ? "Sent! Check your inbox again." : "Couldn't resend — try again in a moment.");
     } catch {
       setResendMsg("Couldn't resend — try again in a moment.");
     } finally {

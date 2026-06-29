@@ -132,9 +132,27 @@ export async function POST(req: Request) {
     email_confirm: false,
   });
 
+  const redirectTo = origin ? `${origin}/auth/callback` : undefined;
+
   if (createErr) {
     console.error("[signup] createUser error:", createErr.message);
-    if (/already registered|user already exists/i.test(createErr.message)) {
+    const isDuplicate =
+      /already registered|user already exists/i.test(createErr.message) ||
+      !createErr.message ||
+      createErr.message === "{}";
+
+    if (isDuplicate) {
+      // Unconfirmed orphan from a previous failed attempt — resend the link
+      const { data: ld } = await sb.auth.admin.generateLink({
+        type: "signup",
+        email,
+        password,
+        options: { ...(redirectTo ? { redirectTo } : {}) },
+      });
+      if (ld?.properties?.action_link) {
+        try { await sendConfirmEmail(email, ld.properties.action_link); } catch {}
+        return NextResponse.json({ ok: true, needsVerification: true });
+      }
       return NextResponse.json(
         { error: "There is already an account with this email. Log in instead, or reset your password." },
         { status: 409 },
@@ -142,8 +160,6 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ error: createErr.message || "Signup failed — please try again." }, { status: 400 });
   }
-
-  const redirectTo = origin ? `${origin}/auth/callback` : undefined;
 
   // Generate the confirmation link and send it via Resend directly
   const { data: linkData, error: linkErr } = await sb.auth.admin.generateLink({
