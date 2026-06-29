@@ -73,8 +73,9 @@ export async function POST(req: Request) {
         { status: 409 },
       );
     }
+    const isEmailError = (signupError as { status?: number }).status === 500 || !signupError.message || signupError.message === "{}";
     return NextResponse.json(
-      { error: signupError.message || "Signup failed — please try again." },
+      { error: isEmailError ? "Email service error — signup is temporarily unavailable. Please try again later or contact support." : signupError.message },
       { status: 400 },
     );
   }
