@@ -91,9 +91,9 @@ export default function ProfilePage() {
               <p className="mt-1 text-[11px] text-text-tertiary">No Loop tag yet — complete onboarding to get one.</p>
             )}
           </div>
-          <div className="flex flex-col items-end gap-1.5">
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
             <StatusDot status={me.status} />
-            <div className="flex gap-1">
+            <div className="flex flex-wrap justify-end gap-1">
               {(["open", "busy", "away"] as CreatorStatus[]).map((s) => (
                 <button
                   key={s}

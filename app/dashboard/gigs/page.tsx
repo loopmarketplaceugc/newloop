@@ -127,7 +127,7 @@ export default function GigsPage() {
                     <span className="num">{daysAgo(g.createdAt)}</span>
                   </p>
                 </div>
-                <span className={cn("num hidden font-serif text-sm font-extrabold sm:block", role === "creator" && "text-money")}>
+                <span className={cn("num shrink-0 font-serif text-sm font-extrabold", role === "creator" && "text-money")}>
                   {formatMoney(amount)}
                 </span>
                 <StatusPill status={g.status} />

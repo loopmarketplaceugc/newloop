@@ -40,7 +40,7 @@ export function CompanyDashboard() {
   return (
     <div className="space-y-5">
       {/* Hero greeting */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div>
           <h1 className="font-serif text-4xl font-extrabold leading-[0.95] sm:text-6xl">
             {brandName}
@@ -51,14 +51,12 @@ export function CompanyDashboard() {
             <span className="num">{formatMoney(inEscrow)}</span> secured
           </p>
         </div>
-        <div className="flex gap-2.5">
-          <Link
-            href="/dashboard/discover"
-            className="flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 font-serif text-sm font-bold text-[#a8d98a] transition-all hover:scale-105"
-          >
-            <Compass className="h-4 w-4" /> Find creators
-          </Link>
-        </div>
+        <Link
+          href="/dashboard/discover"
+          className="flex items-center justify-center gap-2 rounded-full bg-ink px-5 py-3 font-serif text-sm font-bold text-[#a8d98a] transition-all hover:scale-105"
+        >
+          <Compass className="h-4 w-4" /> Find creators
+        </Link>
       </div>
 
       {/* Stat cards — pink / ink / lime */}
@@ -153,7 +151,7 @@ export function CompanyDashboard() {
                         )}
                       </p>
                     </div>
-                    <span className="num hidden font-serif text-base font-extrabold sm:block">{formatMoney(g.priceCents)}</span>
+                    <span className="num shrink-0 font-serif text-sm font-extrabold">{formatMoney(g.priceCents)}</span>
                     <StatusPill status={g.status} />
                   </Link>
                 );
@@ -192,7 +190,7 @@ export function CompanyDashboard() {
                         {creator?.name ?? "Creator"}
                       </p>
                     </div>
-                    <span className="num hidden font-serif text-sm font-extrabold text-text-secondary sm:block">{formatMoney(g.priceCents)}</span>
+                    <span className="num shrink-0 font-serif text-sm font-extrabold text-text-secondary">{formatMoney(g.priceCents)}</span>
                     <StatusPill status={g.status} />
                   </Link>
                 );

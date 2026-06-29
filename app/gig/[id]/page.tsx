@@ -403,9 +403,28 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
         </div>
       </header>
 
+      {/* Mobile: primary action bar — surfaces key action without scrolling */}
+      {(action || waitingNote) && (
+        <div className="lg:hidden border-b border-border bg-bg/95 px-4 py-3 space-y-2 backdrop-blur-sm">
+          {action && (
+            <Button
+              className="w-full"
+              variant={"money" in action && action.money ? "money" : "default"}
+              onClick={action.fn}
+            >
+              {"icon" in action && action.icon ? <action.icon className="h-4 w-4" /> : null}
+              {action.label}
+            </Button>
+          )}
+          {waitingNote && (
+            <p className="text-center text-[12px] leading-relaxed text-text-secondary">{waitingNote}</p>
+          )}
+        </div>
+      )}
+
       <div className="mx-auto grid w-full max-w-6xl flex-1 gap-5 px-4 py-5 lg:grid-cols-[340px_1fr]">
-        {/* LEFT: gig context */}
-        <div className="space-y-4">
+        {/* LEFT: gig context — shows below chat on mobile, left column on desktop */}
+        <div className="order-2 space-y-4 lg:order-1">
           {/* Gig panel — persistent list of all gigs with this counterparty */}
           <Card>
             <CardContent className="p-4">
@@ -715,8 +734,8 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
           </Card>
         </div>
 
-        {/* RIGHT: workspace tabs */}
-        <Card className="relative flex min-h-[60vh] flex-col lg:max-h-[calc(100vh-7.5rem)]">
+        {/* RIGHT: workspace tabs — first on mobile, right column on desktop */}
+        <Card className="relative order-1 flex min-h-[60vh] flex-col lg:order-2 lg:max-h-[calc(100vh-7.5rem)]">
           {/* Tab bar */}
           <div className="flex shrink-0 gap-0.5 border-b border-border px-3 pt-2">
             {(["chat", "details", "contract"] as const).map((tab) => (

@@ -263,7 +263,7 @@ export default function LandingPage() {
               <motion.p {...fadeUp(0)} className="font-serif text-sm font-bold uppercase tracking-[0.2em] text-ink/70">
                 The marketplace for content creation
               </motion.p>
-              <h1 className="display-xl mt-4 text-ink text-[17vw] leading-[0.86] sm:text-[11rem]">
+              <h1 className="display-xl mt-4 text-ink text-[17vw] leading-[0.86] sm:text-[9rem] lg:text-[11rem]">
                 <span className="reveal-line">
                   <span>UGC,</span>
                 </span>
@@ -276,16 +276,16 @@ export default function LandingPage() {
                   </span>
                 </span>
               </h1>
-              <motion.div {...fadeUp(0.3)} className="mt-10 flex flex-col items-start gap-6 sm:flex-row sm:items-center">
-                <p className="max-w-md text-lg font-medium leading-snug text-ink/80">
+              <motion.div {...fadeUp(0.3)} className="mt-10 flex flex-col items-start gap-6">
+                <p className="max-w-md text-base font-medium leading-snug text-ink/80 sm:text-lg">
                   Creators meet brands. AI writes the script, Stripe handles the money,
                   contracts sign themselves. You just create.
                 </p>
-                <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
                   <motion.div whileHover={{ scale: 1.06, rotate: -1 }} whileTap={{ scale: 0.96 }}>
                     <Link
                       href="/signup?role=creator"
-                      className="flex items-center gap-2 rounded-full bg-ink px-7 py-4 font-serif text-lg font-bold text-[#f2a3df]"
+                      className="flex w-full items-center justify-center gap-2 rounded-full bg-ink px-7 py-4 font-serif text-base font-bold text-[#f2a3df] sm:w-auto sm:text-lg"
                     >
                       Sign up as Creator <ArrowRight className="h-5 w-5" />
                     </Link>
@@ -293,7 +293,7 @@ export default function LandingPage() {
                   <motion.div whileHover={{ scale: 1.06, rotate: 1 }} whileTap={{ scale: 0.96 }}>
                     <Link
                       href="/signup?role=company"
-                      className="flex items-center gap-2 rounded-full border-[3px] border-ink px-7 py-4 font-serif text-lg font-bold text-ink"
+                      className="flex w-full items-center justify-center gap-2 rounded-full border-[3px] border-ink px-7 py-4 font-serif text-base font-bold text-ink sm:w-auto sm:text-lg"
                     >
                       Sign up as Brand <ArrowRight className="h-5 w-5" />
                     </Link>
@@ -510,20 +510,20 @@ export default function LandingPage() {
       </section>
 
       {/* FINAL CTA */}
-      <section className="bg-[#a8d98a] px-5 py-28 text-center">
+      <section className="bg-[#a8d98a] px-5 py-20 text-center sm:py-28">
         <motion.h2 {...pop} className="display-xl mx-auto max-w-4xl text-[15vw] text-ink sm:text-9xl">
           Make it.
           <br />
           <span className="text-[#faf6ef]" style={{ WebkitTextStroke: "4px #101805" }}>Bank it.</span>
         </motion.h2>
-        <motion.div {...pop} className="mt-12 flex flex-col items-center justify-center gap-4 sm:flex-row">
+        <motion.div {...pop} className="mt-10 flex flex-col items-stretch justify-center gap-4 px-2 sm:flex-row sm:items-center sm:px-0">
           <motion.div whileHover={{ scale: 1.07, rotate: -2 }} whileTap={{ scale: 0.95 }}>
-            <Link href="/signup?role=creator" className="block rounded-full bg-ink px-9 py-5 font-serif text-xl font-bold text-[#a8d98a]">
+            <Link href="/signup?role=creator" className="block rounded-full bg-ink px-9 py-4 font-serif text-lg font-bold text-[#a8d98a] sm:py-5 sm:text-xl">
               Start creating →
             </Link>
           </motion.div>
           <motion.div whileHover={{ scale: 1.07, rotate: 2 }} whileTap={{ scale: 0.95 }}>
-            <Link href="/signup?role=company" className="block rounded-full border-[3px] border-ink px-9 py-5 font-serif text-xl font-bold text-ink">
+            <Link href="/signup?role=company" className="block rounded-full border-[3px] border-ink px-9 py-4 font-serif text-lg font-bold text-ink sm:py-5 sm:text-xl">
               Find creators →
             </Link>
           </motion.div>

@@ -208,17 +208,17 @@ export default function DiscoverPage() {
         <div>
           <h1 className="font-serif text-4xl sm:text-5xl font-extrabold leading-[0.95]">Discover creators</h1>
           <p className="mt-2 text-sm font-bold text-text-secondary">
-            <span className="num">{filtered.length}</span> of <span className="num">{creators.length}</span> creators ·
-            press <kbd className="num rounded border border-border bg-surface-2 px-1 text-[11px]">⌘K</kbd> to search
+            <span className="num">{filtered.length}</span> of <span className="num">{creators.length}</span> creators
+            <span className="hidden md:inline"> · press <kbd className="num rounded border border-border bg-surface-2 px-1 text-[11px]">⌘K</kbd> to search</span>
           </p>
         </div>
         <Button variant="outline" size="sm" className="lg:hidden" onClick={() => setFiltersOpen(!filtersOpen)}>
-          <SlidersHorizontal className="h-4 w-4" /> Filters
+          <SlidersHorizontal className="h-4 w-4" /> {filtersOpen ? "Hide filters" : "Filters"}
         </Button>
       </div>
 
       {/* Search by name / handle (pulls matches from the server into the list) */}
-      <div className="relative max-w-md">
+      <div className="relative w-full max-w-md">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
         <input
           type="search"
@@ -229,9 +229,9 @@ export default function DiscoverPage() {
         />
       </div>
 
-      <div className="flex gap-6">
-        {/* Filter rail */}
-        <aside className={cn("w-56 shrink-0", filtersOpen ? "block" : "hidden lg:block")}>
+      <div className="flex flex-col gap-6 lg:flex-row">
+        {/* Filter rail — full-width on mobile when open, fixed sidebar on desktop */}
+        <aside className={cn("lg:w-56 lg:shrink-0", filtersOpen ? "block" : "hidden lg:block")}>
           {filterRail}
         </aside>
 

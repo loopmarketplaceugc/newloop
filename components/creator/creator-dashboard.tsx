@@ -109,7 +109,7 @@ export function CreatorDashboard() {
       <CreatorTour />
 
       {/* Hero greeting */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div>
           <h1 className="font-serif text-4xl font-extrabold leading-[0.95] sm:text-6xl">
             Hey, <span className="text-gradient-ink">{firstName}</span>
@@ -131,7 +131,7 @@ export function CreatorDashboard() {
         <Link
           href="/dashboard/opportunities"
           onClick={() => haptics.select()}
-          className="flex items-center gap-2 rounded-full bg-ink px-6 py-3.5 font-serif text-base font-bold text-[#faf6ef] transition-transform hover:scale-105"
+          className="flex items-center justify-center gap-2 rounded-full bg-ink px-6 py-3.5 font-serif text-base font-bold text-[#faf6ef] transition-transform hover:scale-105 sm:w-auto"
         >
           <Compass className="h-5 w-5 text-[#a8d98a]" /> Find opportunities
           <ArrowRight className="h-4 w-4" />
@@ -269,12 +269,12 @@ export function CreatorDashboard() {
                 body="When a brand sends you an offer, it lands here. Keep your profile fresh to get matched."
               />
             ) : (
-              <div className="-mx-1 flex gap-2.5 overflow-x-auto pb-1">
+              <div className="-mx-1 flex gap-2.5 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory">
                 {KANBAN_LANES.map((lane, li) => {
                   const laneGigs = myGigs.filter((g) => lane.statuses.includes(g.status) && !["COMPLETED", "EXPIRED", "PAID_OUT"].includes(g.status));
                   const laneTints = ["#f2a3df", "#a8d98a", "#101805", "#f2a3df", "#a8d98a"];
                   return (
-                    <div key={lane.label} className="w-40 shrink-0">
+                    <div key={lane.label} className="w-36 shrink-0 snap-start sm:w-40">
                       <p
                         className="mb-2 flex items-center justify-between rounded-full border-2 border-ink px-3 py-1 text-[11px] font-bold"
                         style={{

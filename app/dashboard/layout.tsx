@@ -31,20 +31,21 @@ import { CommandPalette } from "@/components/company/command-palette";
 interface NavItem {
   href: string;
   label: string;
+  shortLabel?: string;
   icon: LucideIcon;
 }
 
 const creatorNav: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
+  { href: "/dashboard", label: "Dashboard", shortLabel: "Home", icon: BarChart3 },
   { href: "/dashboard/gigs", label: "Gigs", icon: Briefcase },
-  { href: "/dashboard/opportunities", label: "Opportunities", icon: Compass },
+  { href: "/dashboard/opportunities", label: "Opportunities", shortLabel: "Opps", icon: Compass },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
   { href: "/dashboard/profile", label: "Profile", icon: User },
   { href: "/dashboard/wallet", label: "Wallet", icon: Wallet },
 ];
 
 const companyNav: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Dashboard", shortLabel: "Home", icon: LayoutDashboard },
   { href: "/dashboard/gigs", label: "Gigs", icon: Briefcase },
   { href: "/dashboard/discover", label: "Discover", icon: Compass },
   { href: "/dashboard/requests", label: "Requests", icon: FileText },
@@ -252,7 +253,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       {/* Bottom nav — mobile */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex bg-ink md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 flex bg-ink pb-[env(safe-area-inset-bottom)] md:hidden">
         {nav.map((item) => {
           const active =
             item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
@@ -261,19 +262,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-1 flex-col items-center gap-1 py-3 text-[10px] font-bold",
+                "flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[9px] font-bold",
                 active ? "text-[#f2a3df]" : "text-[#faf6ef]/40",
               )}
             >
               <div className="relative">
-                <item.icon className="h-5 w-5" />
+                <item.icon className="h-[22px] w-[22px]" />
                 {item.label === "Messages" && unread > 0 && (
                   <span className="absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#d6409f] text-[9px] font-bold text-white">
                     {unread > 9 ? "9+" : unread}
                   </span>
                 )}
               </div>
-              {item.label}
+              <span className="w-full truncate text-center leading-tight">
+                {item.shortLabel ?? item.label}
+              </span>
             </Link>
           );
         })}

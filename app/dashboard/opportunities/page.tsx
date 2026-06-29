@@ -83,13 +83,13 @@ export default function OpportunitiesPage() {
             <Link
               key={r.id}
               href={`/dashboard/opportunities/${r.id}`}
-              className="group flex items-center gap-4 rounded-[24px] border border-ink/10 bg-surface px-5 py-4 shadow-[0_1px_3px_rgba(16,24,5,0.05)] transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/20 hover:shadow-[0_12px_32px_-10px_rgba(16,24,5,0.20)]"
+              className="group flex items-center gap-3 rounded-[24px] border border-ink/10 bg-surface px-4 py-4 shadow-[0_1px_3px_rgba(16,24,5,0.05)] transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/20 hover:shadow-[0_12px_32px_-10px_rgba(16,24,5,0.20)] sm:px-5"
             >
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-bold uppercase tracking-widest text-text-tertiary">
                   {r.brand_name ?? "Brand"}
                 </p>
-                <p className="mt-0.5 truncate font-serif text-[15px] font-extrabold leading-tight">
+                <p className="mt-0.5 truncate font-serif text-[14px] font-extrabold leading-tight sm:text-[15px]">
                   {r.title}
                 </p>
                 <p className="num mt-0.5 text-sm font-bold text-money">
@@ -99,11 +99,11 @@ export default function OpportunitiesPage() {
               </div>
 
               {alreadyApplied ? (
-                <span className="shrink-0 flex items-center gap-1.5 rounded-full bg-[#a8d98a] px-5 py-3 font-serif text-[14px] font-bold text-ink">
-                  <Check className="h-4 w-4" /> Applied
+                <span className="shrink-0 flex items-center gap-1 rounded-full bg-[#a8d98a] px-3 py-2 font-serif text-[13px] font-bold text-ink sm:gap-1.5 sm:px-5 sm:py-3 sm:text-[14px]">
+                  <Check className="h-3.5 w-3.5" /> Applied
                 </span>
               ) : (
-                <span className="shrink-0 rounded-full bg-[#f2a3df] px-7 py-3.5 font-serif text-[15px] font-bold text-ink shadow-[0_4px_14px_-4px_rgba(242,163,223,0.7)] transition-transform group-hover:scale-[1.04]">
+                <span className="shrink-0 rounded-full bg-[#f2a3df] px-4 py-2.5 font-serif text-[14px] font-bold text-ink shadow-[0_4px_14px_-4px_rgba(242,163,223,0.7)] transition-transform group-hover:scale-[1.04] sm:px-7 sm:py-3.5 sm:text-[15px]">
                   Apply →
                 </span>
               )}

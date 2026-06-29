@@ -129,7 +129,7 @@ function CompanyRequestsView({ userId }: { userId: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div>
           <h1 className="font-serif text-4xl font-extrabold leading-[0.95] sm:text-5xl">Requests</h1>
           <p className="mt-2 text-sm font-bold text-text-secondary">
@@ -139,7 +139,7 @@ function CompanyRequestsView({ userId }: { userId: string }) {
         <button
           type="button"
           onClick={() => setFormOpen((v) => !v)}
-          className="flex items-center gap-2 rounded-full bg-ink px-5 py-3 font-serif text-sm font-bold text-[#f2a3df] shadow-[0_4px_14px_-4px_rgba(16,24,5,0.4)] transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+          className="flex items-center justify-center gap-2 rounded-full bg-ink px-5 py-3 font-serif text-sm font-bold text-[#f2a3df] shadow-[0_4px_14px_-4px_rgba(16,24,5,0.4)] transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
         >
           <Plus className="h-4 w-4" />
           New request
@@ -244,7 +244,7 @@ function CompanyRequestsView({ userId }: { userId: string }) {
                 type="date"
                 value={deadline}
                 onChange={(e) => setDeadline(e.target.value)}
-                className="rounded-xl border-2 border-ink/20 bg-white px-4 py-3 font-bold focus:border-ink focus:outline-none"
+                className="w-full rounded-xl border-2 border-ink/20 bg-white px-4 py-3 font-bold focus:border-ink focus:outline-none sm:w-auto"
               />
             </div>
 
@@ -286,7 +286,7 @@ function CompanyRequestsView({ userId }: { userId: string }) {
             <button
               type="submit"
               disabled={submitting}
-              className="rounded-full bg-ink px-8 py-4 font-serif text-lg font-bold text-[#f2a3df] shadow-[0_6px_20px_-6px_rgba(16,24,5,0.5)] transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+              className="w-full rounded-full bg-ink px-8 py-4 font-serif text-lg font-bold text-[#f2a3df] shadow-[0_6px_20px_-6px_rgba(16,24,5,0.5)] transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 cursor-pointer sm:w-auto"
             >
               {submitting ? "Posting…" : "Post request →"}
             </button>
@@ -423,18 +423,18 @@ function CreatorRequestsView({ userId: _userId }: { userId: string }) {
           <Link
             key={r.id}
             href={`/dashboard/requests/${r.id}`}
-            className="group flex items-center justify-between gap-4 rounded-[24px] border border-ink/10 bg-surface px-5 py-4 shadow-[0_1px_3px_rgba(16,24,5,0.05)] transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/20 hover:shadow-[0_12px_32px_-10px_rgba(16,24,5,0.20)]"
+            className="group flex items-center gap-3 rounded-[24px] border border-ink/10 bg-surface px-4 py-4 shadow-[0_1px_3px_rgba(16,24,5,0.05)] transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/20 hover:shadow-[0_12px_32px_-10px_rgba(16,24,5,0.20)] sm:px-5"
           >
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[11px] font-bold uppercase tracking-widest text-text-tertiary">
                 {r.brand_name ?? "Brand"}
               </p>
-              <p className="mt-1 truncate font-serif text-lg font-extrabold leading-tight">{r.title}</p>
+              <p className="mt-1 truncate font-serif text-[15px] font-extrabold leading-tight">{r.title}</p>
               <p className="num mt-0.5 text-sm font-bold text-money">
                 ${(r.pay_per_creator_cents / 100).toFixed(0)} <span className="text-text-tertiary">/ creator</span>
               </p>
             </div>
-            <span className="shrink-0 rounded-full bg-[#f2a3df] px-7 py-3.5 font-serif text-[15px] font-bold text-ink shadow-[0_4px_14px_-4px_rgba(242,163,223,0.7)] transition-transform group-hover:scale-[1.04]">
+            <span className="shrink-0 rounded-full bg-[#f2a3df] px-4 py-2.5 font-serif text-[14px] font-bold text-ink shadow-[0_4px_14px_-4px_rgba(242,163,223,0.7)] transition-transform group-hover:scale-[1.04] sm:px-7 sm:py-3.5 sm:text-[15px]">
               Apply →
             </span>
           </Link>
