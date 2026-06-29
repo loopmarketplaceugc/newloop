@@ -5,7 +5,9 @@ import {
   stripeClient,
   createPayoutTransfer,
   createGigRefund,
+  createBalancePayout,
 } from "@/lib/stripe";
+import { log } from "@/lib/log";
 import type { GigStatus } from "@/lib/types";
 
 /**
@@ -107,9 +109,63 @@ export async function recordFunding(params: {
       .from("gigs")
       .update({ status: "FUNDED_IN_ESCROW", usage_expires_at: usageExpiresAt })
       .eq("id", gigId);
+    // Brand counter-signs the contract by funding it (creator signed on accept).
+    await sb
+      .from("contracts")
+      .update({ company_signed_at: new Date().toISOString() })
+      .eq("gig_id", gigId)
+      .is("company_signed_at", null);
   }
 
   return { ok: true };
+}
+
+/**
+ * Pay out a creator's accrued owed balance — money released to them before they
+ * had connected payouts. Called when payouts become enabled (Connect status
+ * refresh and the account.updated webhook). The claim is atomic (claim_balance
+ * locks + zeroes the row) so concurrent callers can't double-pay; a failed
+ * transfer re-credits the balance so the creator never loses money.
+ */
+export async function payoutOwedBalance(params: {
+  creatorId: string;
+}): Promise<{ ok: boolean; paid: number; error?: string }> {
+  const { creatorId } = params;
+  const sb = admin();
+
+  const { data: profile } = await sb
+    .from("profiles")
+    .select("stripe_account_id, stripe_payouts_enabled, balance_cents")
+    .eq("id", creatorId)
+    .maybeSingle();
+
+  const acct = profile?.stripe_account_id as string | undefined;
+  const enabled = Boolean(profile?.stripe_payouts_enabled);
+  const balance = (profile?.balance_cents as number | undefined) ?? 0;
+  if (!acct || !enabled || balance <= 0) return { ok: true, paid: 0 };
+
+  const stripe = stripeClient();
+  if (!stripe) return { ok: true, paid: 0 };
+
+  // Atomically claim the owed amount (sets balance to 0, returns prior value).
+  const { data: claimed, error: claimErr } = await sb.rpc("claim_balance", { p_uid: creatorId });
+  if (claimErr) {
+    log.error("ledger.payoutOwedBalance", "claim_balance failed", { creatorId, error: claimErr });
+    return { ok: false, paid: 0, error: claimErr.message };
+  }
+  const amount = (claimed as number | null) ?? 0;
+  if (amount <= 0) return { ok: true, paid: 0 };
+
+  try {
+    const transfer = await createBalancePayout(stripe, { amountCents: amount, destination: acct, creatorId });
+    log.info("ledger.payoutOwedBalance", "paid owed balance", { creatorId, amount, transferId: transfer.id });
+    return { ok: true, paid: amount };
+  } catch (e) {
+    // Re-credit so the creator doesn't lose money; they can retry.
+    await sb.rpc("credit_balance", { p_uid: creatorId, p_amount: amount });
+    log.error("ledger.payoutOwedBalance", "transfer failed; re-credited balance", { creatorId, amount, error: e });
+    return { ok: false, paid: 0, error: e instanceof Error ? e.message : "Transfer failed" };
+  }
 }
 
 /**
@@ -175,6 +231,9 @@ export async function releaseFunds(params: {
         // Roll back the claim so the brand can retry once payouts are fixed.
         await sb.from("transactions").delete().eq("gig_id", gigId).in("type", ["fee", "release"]);
         const msg = e instanceof Error ? e.message : "Stripe transfer failed";
+        log.error("ledger.releaseFunds", "payout transfer failed; rolled back ledger claim", {
+          gigId, creatorId: gig.creator_id, payout, error: e,
+        });
         return { ok: false, status: 502, error: msg };
       }
     }
@@ -261,6 +320,9 @@ export async function recordRefund(params: {
       } catch (e) {
         await sb.from("transactions").delete().eq("gig_id", gigId).eq("type", "refund");
         const msg = e instanceof Error ? e.message : "Stripe refund failed";
+        log.error("ledger.recordRefund", "refund failed; rolled back ledger claim", {
+          gigId, refundCents, error: e,
+        });
         return { ok: false, status: 502, error: msg };
       }
     }

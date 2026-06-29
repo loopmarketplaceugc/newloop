@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { stripeClient } from "@/lib/stripe";
 import { admin } from "@/lib/supabase-admin";
-import { recordFunding } from "@/lib/ledger";
+import { recordFunding, payoutOwedBalance } from "@/lib/ledger";
+import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,6 +48,14 @@ export async function POST(req: Request) {
               amountCents: session.amount_total ?? 0,
               stripeRef: ref,
             });
+            // Capture the brand's Stripe customer so the billing portal works later.
+            const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
+            if (customerId) {
+              const { data: gigRow } = await admin().from("gigs").select("company_id").eq("id", gigId).maybeSingle();
+              if (gigRow?.company_id) {
+                await admin().from("profiles").update({ stripe_customer_id: customerId }).eq("id", gigRow.company_id);
+              }
+            }
           }
         }
         break;
@@ -78,23 +87,40 @@ export async function POST(req: Request) {
 
       case "account.updated": {
         const acct = event.data.object as Stripe.Account;
+        const enabled = Boolean(acct.payouts_enabled);
         await admin()
           .from("profiles")
-          .update({ stripe_payouts_enabled: Boolean(acct.payouts_enabled) })
+          .update({ stripe_payouts_enabled: enabled })
           .eq("stripe_account_id", acct.id);
+        // Once payouts turn on, flush any balance the creator accrued beforehand.
+        if (enabled) {
+          const { data: profile } = await admin()
+            .from("profiles")
+            .select("id")
+            .eq("stripe_account_id", acct.id)
+            .maybeSingle();
+          if (profile?.id) {
+            const paid = await payoutOwedBalance({ creatorId: profile.id as string });
+            if (!paid.ok) log.warn("webhook.account.updated", "owed-balance payout failed", { error: paid.error });
+          }
+        }
         break;
       }
 
       case "charge.dispute.created": {
         const dispute = event.data.object as Stripe.Dispute;
-        console.error("[webhook] Dispute created:", dispute.id, "charge:", dispute.charge, "reason:", dispute.reason);
+        log.error("webhook.dispute", "Dispute created", {
+          disputeId: dispute.id, charge: dispute.charge, reason: dispute.reason,
+        });
         // TODO: move the gig to DISPUTED status and notify both parties.
         break;
       }
 
       case "payout.failed":
       case "payment_intent.payment_failed": {
-        console.error(`[webhook] Money failure event: ${event.type}`, event.data.object);
+        log.error("webhook.moneyFailure", `Money failure event: ${event.type}`, {
+          object: event.data.object,
+        });
         // TODO: surface failure to the creator/brand and allow retry.
         break;
       }
@@ -105,7 +131,7 @@ export async function POST(req: Request) {
   } catch (e) {
     // Log and 500 so Stripe retries — never silently drop a money event.
     const msg = e instanceof Error ? e.message : "handler error";
-    console.error(`[webhook] Handler error for ${event.type}:`, msg);
+    log.error("webhook.handler", `Handler error for ${event.type}`, { error: e });
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 

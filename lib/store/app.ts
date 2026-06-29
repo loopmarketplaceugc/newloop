@@ -16,6 +16,7 @@ import {
   dbInsertDeliverable,
   dbInsertGig,
   dbInsertReview,
+  dbMarkNotificationsRead,
   dbReleaseFunds,
   dbSendMessage,
   dbUpdateGig,
@@ -63,6 +64,7 @@ interface LiveWorld {
   deliverables: Deliverable[];
   transactions: Transaction[];
   reviews: Review[];
+  notifications?: Notification[];
 }
 
 const emptyLiveState = () => ({
@@ -160,6 +162,12 @@ export const useApp = create<AppState>()(
             transactions: world.transactions,
             reviews,
             creators,
+            // Live notifications are authored by DB triggers; merge them in.
+            notifications: world.notifications
+              ? mergeById(s.notifications, world.notifications).sort((a, b) =>
+                  b.createdAt.localeCompare(a.createdAt),
+                )
+              : s.notifications,
           };
         }),
 
@@ -267,7 +275,7 @@ export const useApp = create<AppState>()(
                 revisionRounds: offer.revisionRounds,
                 videoLengthSeconds: offer.videoLengthSeconds,
               },
-              companySignedAt: now(),
+              // Creator signs by accepting; the brand counter-signs when they fund.
               creatorSignedAt: now(),
             };
             set((s) => ({
@@ -525,20 +533,27 @@ export const useApp = create<AppState>()(
         void dbInsertReview(review);
       },
 
-      notify: (n) =>
+      // In live mode, notifications are authored cross-user by DB triggers and
+      // arrive via the poll; the local optimistic path is demo-only (a local
+      // push would only ever be visible in the actor's own browser).
+      notify: (n) => {
+        if (!useSession.getState().isDemo) return;
         set((s) => ({
           notifications: [
             { ...n, id: uid("n"), read: false, createdAt: now() },
             ...s.notifications,
           ],
-        })),
+        }));
+      },
 
-      markNotificationsRead: (userId) =>
+      markNotificationsRead: (userId) => {
         set((s) => ({
           notifications: s.notifications.map((n) =>
             n.userId === userId ? { ...n, read: true } : n,
           ),
-        })),
+        }));
+        if (!useSession.getState().isDemo) void dbMarkNotificationsRead();
+      },
 
       resetDemo: () => set(seedState()),
     }),

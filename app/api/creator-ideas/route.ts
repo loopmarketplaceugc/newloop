@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { authedUserId } from "@/lib/supabase-admin";
+import { rateLimit } from "@/lib/rate-limit";
 
 /**
  * Creator-facing ideas & scripts assistant. Brainstorms hooks, content angles,
@@ -71,6 +73,17 @@ async function llmReply(
 }
 
 export async function POST(req: Request) {
+  // Authenticated creators only — this calls a paid LLM, so it can't be open.
+  const callerId = await authedUserId(req);
+  if (!callerId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const rl = rateLimit(`ideas:${callerId}`, 20, 5 * 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: "You're sending ideas too fast — take a breath and try again." },
+      { status: 429, headers: { "retry-after": String(rl.retryAfterSec) } },
+    );
+  }
+
   const parsed = requestSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });

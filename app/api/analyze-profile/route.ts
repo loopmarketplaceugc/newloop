@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { authedUserId } from "@/lib/supabase-admin";
+import { rateLimit } from "@/lib/rate-limit";
 
 const requestSchema = z.object({
   platform: z.enum(["tiktok", "reels"]),
@@ -130,6 +132,17 @@ function analyzeInstagram(html: string): ProfileMetrics {
 }
 
 export async function POST(req: Request) {
+  // Authenticated only — this is a server-side fetcher; keep it from being an open proxy.
+  const callerId = await authedUserId(req);
+  if (!callerId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const rl = rateLimit(`analyze:${callerId}`, 15, 5 * 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: "Too many lookups — try again shortly." },
+      { status: 429, headers: { "retry-after": String(rl.retryAfterSec) } },
+    );
+  }
+
   const parsed = requestSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Send a valid TikTok or Instagram profile URL." }, { status: 400 });

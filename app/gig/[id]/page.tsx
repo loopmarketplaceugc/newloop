@@ -567,6 +567,46 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
               Request revision ({gig.revisionCount}/{maxRounds} used)
             </Button>
           )}
+          {gig.status === "DISPUTED" && (
+            <div className="space-y-2 rounded-[12px] border border-red-400/40 bg-red-500/5 p-4">
+              <p className="text-[13px] font-semibold text-red-500">This gig is in dispute</p>
+              <p className="text-[12px] leading-relaxed text-text-secondary">
+                {isCreator
+                  ? "The brand is reviewing this gig. They can clear you to publish, or cancel it for a refund."
+                  : "Revisions are exhausted. Resolve it: clear the creator to publish, or cancel and refund the escrow."}
+              </p>
+              {!isCreator && (
+                <div className="flex flex-col gap-2 pt-1">
+                  <Button
+                    className="w-full"
+                    onClick={() => {
+                      app.approveDraft(gig.id);
+                      haptics.success();
+                      toast("Dispute resolved", { body: `${creator?.name ?? "Creator"} can now publish.`, tone: "success" });
+                    }}
+                  >
+                    <CheckCircle2 className="h-4 w-4" /> Clear creator to publish
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={async () => {
+                      try {
+                        await app.cancelGig(gig.id);
+                        haptics.success();
+                        toast("Gig cancelled", { body: "The escrow has been refunded per policy.", tone: "info" });
+                      } catch (e) {
+                        haptics.error();
+                        toast("Couldn’t cancel", { body: e instanceof Error ? e.message : "Try again shortly.", tone: "warning" });
+                      }
+                    }}
+                  >
+                    <X className="h-4 w-4" /> Cancel &amp; refund
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
           {waitingNote && (
             <p className="rounded-[10px] border border-border bg-surface-2/60 px-3.5 py-2.5 text-[12px] leading-relaxed text-text-secondary">
               {waitingNote}

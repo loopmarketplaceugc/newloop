@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { rateLimit, clientIp } from "@/lib/rate-limit";
+import { log } from "@/lib/log";
 
 const schema = z.object({
   email: z.string().email().max(320),
 });
 
-const SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://nylivxiyzxjdjsbdmrnw.supabase.co";
-const SUPABASE_ANON_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55bGl2eGl5enhqZGpzYmRtcm53Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0Mzc3ODUsImV4cCI6MjA5ODAxMzc4NX0.gr4KBqv9Wdjk_JG3cUb4MkJtjILvwjQarlOe6k5LDkQ";
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 function siteUrl(req: Request) {
   return (
@@ -107,9 +107,22 @@ async function sendResendEmail(params: { to: string; resetUrl: string }) {
 }
 
 export async function POST(req: Request) {
+  // Throttle by IP — password-reset is a spam/enumeration vector.
+  const rl = rateLimit(`reset:${clientIp(req)}`, 5, 10 * 60_000);
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: "Too many requests. Try again shortly." },
+      { status: 429, headers: { "retry-after": String(rl.retryAfterSec) } },
+    );
+  }
+
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Enter a valid email." }, { status: 400 });
+  }
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    log.error("auth.reset-password", "Supabase env not configured");
+    return NextResponse.json({ error: "Service unavailable." }, { status: 503 });
   }
 
   const email = parsed.data.email.toLowerCase();
@@ -145,6 +158,7 @@ export async function POST(req: Request) {
     if (error) throw new Error(error.message);
     return NextResponse.json({ ok: true, mode: "supabase-fallback" });
   } catch (error) {
+    log.error("auth.reset-password", "reset email failed", { error });
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Could not send reset email." },
       { status: 500 },

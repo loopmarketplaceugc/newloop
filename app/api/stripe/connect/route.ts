@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { stripeClient, createConnectAccount, createAccountLink } from "@/lib/stripe";
 import { admin, authedUserId } from "@/lib/supabase-admin";
+import { payoutOwedBalance } from "@/lib/ledger";
+import { log } from "@/lib/log";
 
 /**
  * Creator payout onboarding via Stripe Connect (Express).
@@ -46,8 +48,15 @@ export async function POST(req: Request) {
     if (action === "status") {
       if (!storedAccountId) return NextResponse.json({ payoutsEnabled: false });
       const acct = await stripe.accounts.retrieve(storedAccountId);
+      const payoutsEnabled = Boolean(acct.payouts_enabled);
+      // Persist the flag, then flush any balance the creator accrued before connecting.
+      if (payoutsEnabled) {
+        await admin().from("profiles").update({ stripe_payouts_enabled: true }).eq("id", callerId);
+        const paid = await payoutOwedBalance({ creatorId: callerId });
+        if (!paid.ok) log.warn("stripe.connect", "owed-balance payout failed", { callerId, error: paid.error });
+      }
       return NextResponse.json({
-        payoutsEnabled: Boolean(acct.payouts_enabled),
+        payoutsEnabled,
         chargesEnabled: Boolean(acct.charges_enabled),
         accountId: storedAccountId,
       });

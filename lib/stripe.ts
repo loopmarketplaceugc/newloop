@@ -71,6 +71,8 @@ export async function createGigCheckout(
 
   const sessionParams: Stripe.Checkout.SessionCreateParams = {
     mode: "payment",
+    // Always mint a Customer so the brand's billing portal works on return.
+    customer_creation: "always",
     line_items: [
       {
         quantity: 1,
@@ -108,6 +110,27 @@ export async function createPayoutTransfer(
       metadata: { gigId: params.gigId, kind: "gig_payout" },
     },
     { idempotencyKey: `release_${params.gigId}` },
+  );
+}
+
+/**
+ * Pay out a creator's accrued owed balance (earned before they connected
+ * payouts). Not tied to a single gig. Idempotency key is keyed to the creator +
+ * amount so a retried claim of the same amount can't transfer twice within
+ * Stripe's idempotency window.
+ */
+export async function createBalancePayout(
+  stripe: Stripe,
+  params: { amountCents: number; destination: string; creatorId: string },
+) {
+  return stripe.transfers.create(
+    {
+      amount: params.amountCents,
+      currency: "usd",
+      destination: params.destination,
+      metadata: { creatorId: params.creatorId, kind: "balance_payout" },
+    },
+    { idempotencyKey: `balance_${params.creatorId}_${params.amountCents}` },
   );
 }
 

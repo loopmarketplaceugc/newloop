@@ -9,6 +9,7 @@ import type {
   GigStatus,
   Message,
   MessageKind,
+  Notification,
   OfferBody,
   Platform,
   Review,
@@ -94,7 +95,12 @@ interface MessageRow {
 
 /* ---------- mappers ---------- */
 
-export function mapCreator(p: ProfileRow, d?: DetailsRow | null, platforms: PlatformRow[] = []): Creator {
+export function mapCreator(
+  p: ProfileRow,
+  d?: DetailsRow | null,
+  platforms: PlatformRow[] = [],
+  completedGigs = 0,
+): Creator {
   const followers = platforms.reduce((s, x) => s + x.follower_count, 0);
   return {
     id: p.id,
@@ -122,7 +128,7 @@ export function mapCreator(p: ProfileRow, d?: DetailsRow | null, platforms: Plat
     compensationPref: d?.compensation_pref ?? "product_plus",
     rating: 0,
     reviewCount: 0,
-    completedGigs: 0,
+    completedGigs,
     portfolio: [],
     mediaKitUrl: d?.media_kit_url ?? undefined,
     joinedAt: p.created_at,
@@ -177,22 +183,54 @@ export function mapMessage(m: MessageRow): Message {
 
 /* ---------- fetchers ---------- */
 
-/** All creators with a published profile — powers Discover. */
-export async function fetchCreators(): Promise<Creator[]> {
+/** Count COMPLETED gigs per creator for a set of ids. Best-effort; returns {}. */
+async function completedGigCounts(sb: ReturnType<typeof supabase>, creatorIds: string[]): Promise<Record<string, number>> {
+  if (!creatorIds.length) return {};
+  const { data } = await sb
+    .from("gigs")
+    .select("creator_id")
+    .eq("status", "COMPLETED")
+    .in("creator_id", creatorIds);
+  const counts: Record<string, number> = {};
+  for (const row of (data ?? []) as { creator_id: string }[]) {
+    counts[row.creator_id] = (counts[row.creator_id] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/**
+ * Creators with a published profile — powers Discover. Paginated + searchable so
+ * it never loads the entire table.
+ */
+export async function fetchCreators(opts?: { limit?: number; offset?: number; search?: string }): Promise<Creator[]> {
   try {
     const sb = supabase();
-    const { data: profiles } = await sb.from("profiles").select("*").eq("role", "creator");
+    const limit = Math.min(Math.max(opts?.limit ?? 60, 1), 200);
+    const offset = Math.max(opts?.offset ?? 0, 0);
+    let query = sb
+      .from("profiles")
+      .select("*")
+      .eq("role", "creator")
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+    if (opts?.search?.trim()) {
+      const term = `%${opts.search.trim()}%`;
+      query = query.or(`name.ilike.${term},handle.ilike.${term}`);
+    }
+    const { data: profiles } = await query;
     if (!profiles?.length) return [];
     const ids = profiles.map((p) => p.id);
-    const [{ data: details }, { data: platforms }] = await Promise.all([
+    const [{ data: details }, { data: platforms }, completed] = await Promise.all([
       sb.from("creator_details").select("*").in("profile_id", ids),
       sb.from("creator_platforms").select("*").in("creator_id", ids),
+      completedGigCounts(sb, ids),
     ]);
     return (profiles as ProfileRow[]).map((p) =>
       mapCreator(
         p,
         (details as DetailsRow[] | null)?.find((d) => d.profile_id === p.id),
         ((platforms as PlatformRow[] | null) ?? []).filter((x) => x.creator_id === p.id),
+        completed[p.id] ?? 0,
       ),
     );
   } catch {
@@ -267,6 +305,22 @@ export async function fetchMyWorld() {
     createdAt: r.created_at as string,
   }));
 
+  // Notifications addressed to the current user (RLS scopes to own rows).
+  const { data: notifRows } = await sb
+    .from("notifications")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(100);
+  const notifications: Notification[] = (notifRows ?? []).map((n) => ({
+    id: n.id as string,
+    userId: n.user_id as string,
+    title: n.title as string,
+    body: (n.body as string) ?? "",
+    href: (n.href as string) ?? undefined,
+    read: Boolean(n.read),
+    createdAt: n.created_at as string,
+  }));
+
   // counterparty profiles (creators on my gigs, plus me if creator)
   const counterpartIds = Array.from(new Set(gigs.flatMap((g) => [g.creatorId, g.companyId])));
   let creators: Creator[] = [];
@@ -276,19 +330,30 @@ export async function fetchMyWorld() {
       sb.from("creator_details").select("*").in("profile_id", counterpartIds),
       sb.from("creator_platforms").select("*").in("creator_id", counterpartIds),
     ]);
+    // completedGigs from the gigs we already loaded (a party sees their own gigs).
+    const completed: Record<string, number> = {};
+    for (const g of gigs) if (g.status === "COMPLETED") completed[g.creatorId] = (completed[g.creatorId] ?? 0) + 1;
     creators = ((profiles as ProfileRow[] | null) ?? []).map((p) =>
       mapCreator(
         p,
         (details as DetailsRow[] | null)?.find((d) => d.profile_id === p.id),
         ((platforms as PlatformRow[] | null) ?? []).filter((x) => x.creator_id === p.id),
+        completed[p.id] ?? 0,
       ),
     );
   }
 
-  return { gigs, messages, contracts, deliverables, transactions, reviews, creators };
+  return { gigs, messages, contracts, deliverables, transactions, reviews, creators, notifications };
   } catch {
     return null;
   }
+}
+
+/** Mark all the signed-in user's notifications as read (live mode). */
+export async function dbMarkNotificationsRead() {
+  const uid = await authedId();
+  if (!uid) return;
+  await supabase().from("notifications").update({ read: true }).eq("user_id", uid).eq("read", false);
 }
 
 /** Fetch a single creator by Loop tag or handle — used by the public profile page. */
@@ -476,10 +541,11 @@ export async function dbInsertGig(g: Gig): Promise<Gig | null> {
 export async function dbInsertContract(gigId: string, terms: object) {
   const uid = await authedId();
   if (!uid) return;
-  const now = new Date().toISOString();
+  // Creator signs by accepting the offer; the brand counter-signs at funding
+  // (server sets company_signed_at in recordFunding).
   await supabase()
     .from("contracts")
-    .upsert({ gig_id: gigId, terms, company_signed_at: now, creator_signed_at: now });
+    .upsert({ gig_id: gigId, terms, creator_signed_at: new Date().toISOString() });
 }
 
 export async function dbInsertReview(r: Omit<Review, "createdAt">) {

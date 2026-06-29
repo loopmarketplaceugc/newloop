@@ -2,14 +2,23 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-/** Live Supabase project (publishable key — safe in the client; RLS guards every table). */
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://nylivxiyzxjdjsbdmrnw.supabase.co";
-const KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55bGl2eGl5enhqZGpzYmRtcm53Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0Mzc3ODUsImV4cCI6MjA5ODAxMzc4NX0.gr4KBqv9Wdjk_JG3cUb4MkJtjILvwjQarlOe6k5LDkQ";
+/**
+ * Live Supabase project (publishable anon key — safe in the client; RLS guards
+ * every table). Both values MUST come from the environment: no hardcoded
+ * fallback, so a misconfigured deploy fails fast instead of silently pointing at
+ * the wrong project.
+ */
+const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 let client: SupabaseClient | null = null;
 
 export function supabase(): SupabaseClient {
+  if (!URL || !KEY) {
+    throw new Error(
+      "Supabase is not configured: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+    );
+  }
   if (!client) client = createClient(URL, KEY);
   return client;
 }

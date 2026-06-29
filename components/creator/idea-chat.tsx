@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Loader2, Send, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { authHeaders } from "@/lib/sync";
 import { haptics } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
@@ -39,7 +40,7 @@ export function IdeaChat({ niches, platforms }: { niches?: string[]; platforms?:
     try {
       const res = await fetch("/api/creator-ideas", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: await authHeaders(),
         body: JSON.stringify({ messages: next, niches, platforms }),
       });
       const body = (await res.json()) as { reply?: string; error?: string };
