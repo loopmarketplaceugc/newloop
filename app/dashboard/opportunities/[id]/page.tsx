@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Check } from "lucide-react";
 import { useSession } from "@/lib/store/session";
 import { useHydrated } from "@/lib/store/app";
+import { authHeaders } from "@/lib/sync";
 import { haptics } from "@/lib/haptics";
 import { toast } from "@/components/ui/toast";
 
@@ -49,19 +50,24 @@ export default function OpportunityDetailPage({
 
   useEffect(() => {
     if (!id || !userId) return;
-    void Promise.all([
-      fetch(`/api/requests?id=${id}`).then((r) => r.json() as Promise<{ request?: Request }>),
-      fetch(`/api/requests/apply?creatorId=${userId}`).then(
-        (r) => r.json() as Promise<{ applications?: { request_id: string }[] }>,
-      ),
-    ])
-      .then(([reqData, appData]) => {
+    void (async () => {
+      try {
+        const hdrs = await authHeaders();
+        const [reqData, appData] = await Promise.all([
+          fetch(`/api/requests?id=${id}`).then((r) => r.json() as Promise<{ request?: Request }>),
+          fetch(`/api/requests/apply?creatorId=${userId}`, { headers: hdrs }).then(
+            (r) => r.json() as Promise<{ applications?: { request_id: string }[] }>,
+          ),
+        ]);
         if (reqData.request) setRequest(reqData.request);
         const ids = new Set((appData.applications ?? []).map((a) => a.request_id));
         if (ids.has(id)) setApplied(true);
-      })
-      .catch(() => null)
-      .finally(() => setLoading(false));
+      } catch {
+        // non-fatal
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [id, userId]);
 
   const handleApply = async () => {
@@ -71,14 +77,21 @@ export default function OpportunityDetailPage({
     try {
       const res = await fetch("/api/requests/apply", {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ requestId: request.id, creatorId: userId, note: note || null }),
+        headers: await authHeaders(),
+        body: JSON.stringify({ requestId: request.id, note: note || null }),
       });
       if (res.ok) {
         setApplied(true);
         toast("Application sent!", {
           body: `${request.brand_name ?? "The brand"} will review your profile and reach out soon.`,
           tone: "success",
+        });
+      } else {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        haptics.error();
+        toast("Couldn't apply", {
+          body: body?.error ?? "Please try again.",
+          tone: "warning",
         });
       }
     } finally {

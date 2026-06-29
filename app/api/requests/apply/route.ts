@@ -8,6 +8,11 @@ export async function GET(req: Request) {
   const companyId = url.searchParams.get("companyId");
 
   if (creatorId) {
+    // A creator may only read their own applications.
+    const callerId = await authedUserId(req);
+    if (!callerId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (callerId !== creatorId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
     const { data, error } = await admin()
       .from("request_applications")
       .select("request_id, status, applied_at")
@@ -17,6 +22,19 @@ export async function GET(req: Request) {
   }
 
   if (requestId) {
+    // Only the company that owns this request may see its applicants.
+    const callerId = await authedUserId(req);
+    if (!callerId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { data: ownerRow } = await admin()
+      .from("requests")
+      .select("company_id")
+      .eq("id", requestId)
+      .single();
+    if (!ownerRow || (ownerRow.company_id as string) !== callerId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const { data: apps, error } = await admin()
       .from("request_applications")
       .select("id, creator_id, note, status, applied_at")
@@ -48,6 +66,11 @@ export async function GET(req: Request) {
   }
 
   if (companyId) {
+    // Only the owning company may see pending counts for their own requests.
+    const callerId = await authedUserId(req);
+    if (!callerId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (callerId !== companyId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
     const { data: reqs } = await admin()
       .from("requests")
       .select("id")

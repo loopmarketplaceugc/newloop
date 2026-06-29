@@ -179,11 +179,18 @@ function CompanyDetailView({ request }: { request: Request }) {
   const [loadingApps, setLoadingApps] = useState(true);
 
   useEffect(() => {
-    void fetch(`/api/requests/apply?requestId=${request.id}`)
-      .then((r) => r.json() as Promise<{ applications?: Applicant[] }>)
-      .then((d) => setApplicants(d.applications ?? []))
-      .catch(() => null)
-      .finally(() => setLoadingApps(false));
+    void (async () => {
+      try {
+        const hdrs = await authHeaders();
+        const data = await fetch(`/api/requests/apply?requestId=${request.id}`, { headers: hdrs })
+          .then((r) => r.json() as Promise<{ applications?: Applicant[] }>);
+        setApplicants(data.applications ?? []);
+      } catch {
+        // non-fatal
+      } finally {
+        setLoadingApps(false);
+      }
+    })();
   }, [request.id]);
 
   const handleAction = async (applicationId: string, action: "approve" | "reject") => {
@@ -302,14 +309,19 @@ function CreatorDetailView({ request, userId }: { request: Request; userId: stri
   const [checkingApplied, setCheckingApplied] = useState(true);
 
   useEffect(() => {
-    void fetch(`/api/requests/apply?creatorId=${userId}`)
-      .then((r) => r.json() as Promise<{ applications?: { request_id: string }[] }>)
-      .then((d) => {
-        const ids = new Set((d.applications ?? []).map((a) => a.request_id));
+    void (async () => {
+      try {
+        const hdrs = await authHeaders();
+        const data = await fetch(`/api/requests/apply?creatorId=${userId}`, { headers: hdrs })
+          .then((r) => r.json() as Promise<{ applications?: { request_id: string }[] }>);
+        const ids = new Set((data.applications ?? []).map((a) => a.request_id));
         if (ids.has(request.id)) setApplied(true);
-      })
-      .catch(() => null)
-      .finally(() => setCheckingApplied(false));
+      } catch {
+        // non-fatal
+      } finally {
+        setCheckingApplied(false);
+      }
+    })();
   }, [request.id, userId]);
 
   const handleApply = async () => {

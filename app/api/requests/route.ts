@@ -31,10 +31,18 @@ export async function GET(req: Request) {
   const id = url.searchParams.get("id");
 
   if (id) {
+    // Public — any authenticated or unauthenticated viewer can fetch a specific request.
     const { data, error } = await admin().from("requests").select("*").eq("id", id).single();
     if (error) return NextResponse.json({ error: error.message }, { status: 404 });
     const [withName] = await withBrandNames([data as AnyRow]);
     return NextResponse.json({ request: withName });
+  }
+
+  if (companyId) {
+    // Only the company that owns the requests may list them.
+    const callerId = await authedUserId(req);
+    if (!callerId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (callerId !== companyId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   let query = admin().from("requests").select("*").order("created_at", { ascending: false });

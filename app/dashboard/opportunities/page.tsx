@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { useHydrated } from "@/lib/store/app";
 import { useSession } from "@/lib/store/session";
+import { authHeaders } from "@/lib/sync";
 import { CardSkeleton } from "@/components/ui/skeleton";
 
 interface Request {
@@ -26,18 +27,23 @@ export default function OpportunitiesPage() {
 
   useEffect(() => {
     if (!userId) return;
-    void Promise.all([
-      fetch("/api/requests").then((r) => r.json() as Promise<{ requests?: Request[] }>),
-      fetch(`/api/requests/apply?creatorId=${userId}`).then(
-        (r) => r.json() as Promise<{ applications?: { request_id: string }[] }>,
-      ),
-    ])
-      .then(([reqData, appData]) => {
+    void (async () => {
+      try {
+        const hdrs = await authHeaders();
+        const [reqData, appData] = await Promise.all([
+          fetch("/api/requests").then((r) => r.json() as Promise<{ requests?: Request[] }>),
+          fetch(`/api/requests/apply?creatorId=${userId}`, { headers: hdrs }).then(
+            (r) => r.json() as Promise<{ applications?: { request_id: string }[] }>,
+          ),
+        ]);
         setRequests(reqData.requests ?? []);
         setAppliedIds(new Set((appData.applications ?? []).map((a) => a.request_id)));
-      })
-      .catch(() => null)
-      .finally(() => setLoading(false));
+      } catch {
+        // non-fatal
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [userId]);
 
   if (!hydrated || !userId) return <CardSkeleton />;

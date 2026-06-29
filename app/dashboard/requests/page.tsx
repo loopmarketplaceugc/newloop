@@ -52,9 +52,10 @@ function CompanyRequestsView({ userId }: { userId: string }) {
 
   const loadRequests = async () => {
     try {
+      const hdrs = await authHeaders();
       const [reqRes, countRes] = await Promise.all([
-        fetch(`/api/requests?companyId=${userId}`),
-        fetch(`/api/requests/apply?companyId=${userId}`),
+        fetch(`/api/requests?companyId=${userId}`, { headers: hdrs }),
+        fetch(`/api/requests/apply?companyId=${userId}`, { headers: hdrs }),
       ]);
       const reqData = (await reqRes.json()) as { requests?: Request[] };
       const countData = (await countRes.json()) as { counts?: Record<string, number> };
