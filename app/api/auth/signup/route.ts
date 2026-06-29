@@ -123,8 +123,11 @@ export async function POST(req: Request) {
   }
 
   const sb = admin();
+  const redirectTo = origin ? `${origin}/auth/callback` : undefined;
 
-  // Create the user via admin (skips Supabase's broken SMTP)
+  // Create the user via admin (skips Supabase's broken SMTP). We already ruled
+  // out a duplicate via auth_email_exists above, so any failure here is a real
+  // createUser error (commonly a failing on-signup DB trigger).
   const { data: created, error: createErr } = await sb.auth.admin.createUser({
     email,
     password,
@@ -132,34 +135,22 @@ export async function POST(req: Request) {
     email_confirm: false,
   });
 
-  const redirectTo = origin ? `${origin}/auth/callback` : undefined;
-
-  if (createErr) {
-    console.error("[signup] createUser error:", createErr.message);
-    const isDuplicate =
-      /already registered|user already exists/i.test(createErr.message) ||
-      !createErr.message ||
-      createErr.message === "{}";
-
-    if (isDuplicate) {
-      // Unconfirmed orphan from a previous failed attempt — resend the link
-      const { data: ld } = await sb.auth.admin.generateLink({
-        type: "signup",
-        email,
-        password,
-        options: { ...(redirectTo ? { redirectTo } : {}) },
-      });
-      if (ld?.properties?.action_link) {
-        try { await sendConfirmEmail(email, ld.properties.action_link); } catch {}
-        return NextResponse.json({ ok: true, needsVerification: true });
-      }
+  if (createErr || !created?.user) {
+    const detail = createErr ? JSON.stringify(createErr, Object.getOwnPropertyNames(createErr)) : "no user returned";
+    console.error("[signup] createUser FAILED:", detail);
+    if (createErr && /already registered|user already exists|email.*exists/i.test(createErr.message)) {
       return NextResponse.json(
         { error: "There is already an account with this email. Log in instead, or reset your password." },
         { status: 409 },
       );
     }
-    return NextResponse.json({ error: createErr.message || "Signup failed — please try again." }, { status: 400 });
+    return NextResponse.json(
+      { error: createErr?.message?.trim() && createErr.message !== "{}" ? createErr.message : "Could not create your account. Please try again or contact support." },
+      { status: 400 },
+    );
   }
+
+  console.log("[signup] user created:", created.user.id);
 
   // Generate the confirmation link and send it via Resend directly
   const { data: linkData, error: linkErr } = await sb.auth.admin.generateLink({
@@ -170,16 +161,15 @@ export async function POST(req: Request) {
   });
 
   if (linkErr || !linkData?.properties?.action_link) {
-    console.error("[signup] generateLink error:", linkErr?.message);
-    // User was created — they can request a resend from the check-inbox screen
+    console.error("[signup] generateLink error:", linkErr ? JSON.stringify(linkErr, Object.getOwnPropertyNames(linkErr)) : "no link");
     return NextResponse.json({ ok: true, needsVerification: true });
   }
 
   try {
     await sendConfirmEmail(email, linkData.properties.action_link);
+    console.log("[signup] confirmation email sent to", email);
   } catch (emailErr) {
-    console.error("[signup] Resend error:", emailErr instanceof Error ? emailErr.message : emailErr);
-    // Still return success — user exists; they can resend from the check-inbox screen
+    console.error("[signup] Resend error:", emailErr instanceof Error ? emailErr.message : String(emailErr));
   }
 
   return NextResponse.json({ ok: true, needsVerification: true });
