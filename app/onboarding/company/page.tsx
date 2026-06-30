@@ -49,12 +49,11 @@ type Step =
   | { kind: "tos"; q: string; sub: string }
   | { kind: "done"; q: string };
 
-const BUDGETS = ["under $1k / mo", "$1k–5k / mo", "$5k–20k / mo", "$20k+ / mo"];
-const BALANCE_OPTIONS = ["$0", "$50", "$100", "$250+"];
-type PaidBalance = "$50" | "$100" | "$250+";
+type PaidBalance = "$50" | "$250" | "custom";
+const CUSTOM_MIN_CENTS = 25000; // $250 — enforced here and on the server
 
 // ── Dev-mode mock — simulates a successful payment without Stripe ─────────────
-function DevBalanceSection({ balanceLabel, onPaid }: { balanceLabel: string; onPaid: () => void }) {
+function DevBalanceSection({ balanceLabel, onPaid }: { balanceLabel: string; onPaid: () => void; }) {
   const [simulating, setSimulating] = useState(false);
   const simulate = async () => {
     setSimulating(true);
@@ -132,11 +131,13 @@ function StripeBalanceInner({ balanceLabel, onPaid }: { balanceLabel: string; on
 // ── Fetches a PaymentIntent then renders Elements ─────────────────────────────
 function StripeBalanceSection({
   balance,
+  amountCents,
   brandId,
   email,
   onPaid,
 }: {
   balance: PaidBalance;
+  amountCents: number;
   brandId: string;
   email?: string;
   onPaid: () => void;
@@ -152,11 +153,15 @@ function StripeBalanceSection({
     let cancelled = false;
     void (async () => {
       try {
-        // brandId is derived server-side from the auth token; the header carries it.
+        // brandId is derived server-side from the auth token — never in the URL.
+        const body =
+          balance === "custom"
+            ? { balance, amountCents, email }
+            : { balance, email };
         const res = await fetch("/api/stripe/payment-intent", {
           method: "POST",
           headers: await authHeaders(),
-          body: JSON.stringify({ balance, email }),
+          body: JSON.stringify(body),
         });
         const d = (await res.json()) as { clientSecret?: string; error?: string };
         if (cancelled) return;
@@ -169,7 +174,7 @@ function StripeBalanceSection({
       }
     })();
     return () => { cancelled = true; };
-  }, [balance, brandId, email]);
+  }, [balance, amountCents, brandId, email]);
 
   if (loading) {
     return (
@@ -205,7 +210,10 @@ function StripeBalanceSection({
         },
       }}
     >
-      <StripeBalanceInner balanceLabel={balance} onPaid={onPaid} />
+      <StripeBalanceInner
+        balanceLabel={balance === "custom" ? `$${(amountCents / 100).toFixed(0)}` : balance}
+        onPaid={onPaid}
+      />
     </Elements>
   );
 }
@@ -235,8 +243,17 @@ export default function CompanyOnboarding() {
   const [niches, setNiches] = useState<string[]>([]);
   const [budget, setBudget] = useState<string | null>(null);
   const [balance, setBalance] = useState<string | null>(null);
+  const [customAmount, setCustomAmount] = useState("");
   const [tosAgreed, setTosAgreed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const customAmountCents = Math.round((parseFloat(customAmount) || 0) * 100);
+  const customAmountValid = customAmountCents >= CUSTOM_MIN_CENTS;
+  // Stripe form is active when a paid option is selected and (if custom) amount is valid
+  const stripeFormActive =
+    balance !== null &&
+    balance !== "$0" &&
+    (balance !== "custom" || customAmountValid);
 
   const handleBalancePaid = () => {
     setDir(1);
@@ -292,13 +309,19 @@ export default function CompanyOnboarding() {
       setError("pick at least one");
       return;
     }
-    if (step.kind === "budget" && !budget) {
-      setError("pick a range — you can change it anytime");
-      return;
+    if (step.kind === "budget") {
+      const n = parseInt(budget ?? "", 10);
+      if (!budget || isNaN(n) || n <= 0) {
+        setError("enter your monthly budget — even a rough estimate works");
+        return;
+      }
     }
-    if (step.kind === "balance" && !balance) {
-      setError("pick an option to continue");
-      return;
+    if (step.kind === "balance") {
+      if (!balance) { setError("pick an option to continue"); return; }
+      if (balance === "custom" && !customAmountValid) {
+        setError(`minimum custom top-up is $${CUSTOM_MIN_CENTS / 100}`);
+        return;
+      }
     }
     if (step.kind === "tos" && !tosAgreed) {
       setError("you need to agree to the terms before continuing");
@@ -310,7 +333,7 @@ export default function CompanyOnboarding() {
         companyName: values.companyName,
         website: values.website,
         niches,
-        budgetRange: budget ?? "",
+        budgetRange: budget ? `$${parseInt(budget).toLocaleString()}/mo` : "",
         balance: balance ?? "$0",
       });
       completeOnboarding();
@@ -409,35 +432,27 @@ export default function CompanyOnboarding() {
               )}
 
               {step.kind === "budget" && (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {BUDGETS.map((b, i) => {
-                    const on = budget === b;
-                    return (
-                      <motion.button
-                        key={b}
-                        initial={{ opacity: 0, y: 16 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.05 * i }}
-                        whileHover={{ scale: 1.04, rotate: i % 2 ? 1 : -1 }}
-                        whileTap={{ scale: 0.96 }}
-                        onClick={() => setBudget(b)}
-                        className={cn(
-                          "rounded-[20px] border-[3px] px-6 py-5 text-left font-serif text-xl font-bold transition-colors cursor-pointer",
-                          on ? "border-transparent bg-[#f2a3df] text-ink" : "border-[#faf6ef]/20 text-[#faf6ef] hover:border-[#faf6ef]/50",
-                        )}
-                      >
-                        {on && <Check className="mr-2 inline h-5 w-5" />}
-                        <span className="num">{b}</span>
-                      </motion.button>
-                    );
-                  })}
+                <div className="flex items-center gap-3">
+                  <span className="font-serif text-4xl font-extrabold text-[#faf6ef]/40 sm:text-6xl">$</span>
+                  <input
+                    ref={inputRef}
+                    inputMode="numeric"
+                    value={budget ?? ""}
+                    placeholder="5000"
+                    onChange={(e) => setBudget(e.target.value.replace(/[^\d]/g, ""))}
+                    onKeyDown={(e) => e.key === "Enter" && next()}
+                    className="num w-full border-b-4 border-[#faf6ef]/20 bg-transparent pb-3 font-serif text-4xl font-bold text-[#f2a3df] placeholder:text-[#faf6ef]/15 focus:border-[#a8d98a] focus:outline-none sm:text-6xl"
+                    style={{ boxShadow: "none", borderRadius: 0 }}
+                  />
+                  <span className="shrink-0 font-serif text-lg font-bold text-[#faf6ef]/30">/ mo</span>
                 </div>
               )}
 
               {step.kind === "balance" && (
-                <div>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    {BALANCE_OPTIONS.map((b, i) => {
+                <div className="space-y-4">
+                  {/* Fixed options + skip */}
+                  <div className="grid grid-cols-3 gap-3">
+                    {(["$0", "$50", "$250"] as const).map((b, i) => {
                       const on = balance === b;
                       return (
                         <motion.button
@@ -447,7 +462,7 @@ export default function CompanyOnboarding() {
                           transition={{ delay: 0.05 * i }}
                           whileHover={{ scale: 1.04 }}
                           whileTap={{ scale: 0.96 }}
-                          onClick={() => setBalance(b)}
+                          onClick={() => { setBalance(b); setCustomAmount(""); }}
                           className={cn(
                             "rounded-[20px] border-[3px] px-6 py-5 text-center font-serif text-xl font-bold transition-colors cursor-pointer",
                             on ? "border-transparent bg-[#f2a3df] text-ink" : "border-[#faf6ef]/20 text-[#faf6ef] hover:border-[#faf6ef]/50",
@@ -460,9 +475,58 @@ export default function CompanyOnboarding() {
                     })}
                   </div>
 
-                  {/* Payment form — only for paid amounts */}
+                  {/* Custom option */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.15 }}
+                    onClick={() => setBalance("custom")}
+                    className={cn(
+                      "rounded-[20px] border-[3px] px-6 py-5 cursor-pointer transition-colors",
+                      balance === "custom"
+                        ? "border-transparent bg-[#f2a3df]/20 border-[#f2a3df]"
+                        : "border-[#faf6ef]/20 hover:border-[#faf6ef]/50",
+                    )}
+                  >
+                    <p className="font-serif text-lg font-bold text-[#faf6ef]">
+                      {balance === "custom" && <Check className="mr-2 inline h-4 w-4" />}
+                      Custom amount
+                    </p>
+                    <p className="mt-0.5 text-xs font-medium text-[#faf6ef]/50">Minimum $250</p>
+                    <AnimatePresence>
+                      {balance === "custom" && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="mt-4 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            <span className="font-serif text-2xl font-extrabold text-[#faf6ef]/40">$</span>
+                            <input
+                              inputMode="numeric"
+                              value={customAmount}
+                              placeholder="250"
+                              onChange={(e) => setCustomAmount(e.target.value.replace(/[^\d]/g, ""))}
+                              className="num w-full border-b-2 border-[#faf6ef]/30 bg-transparent pb-1 font-serif text-2xl font-bold text-[#f2a3df] placeholder:text-[#faf6ef]/20 focus:border-[#f2a3df] focus:outline-none"
+                              style={{ boxShadow: "none", borderRadius: 0 }}
+                              autoFocus
+                            />
+                          </div>
+                          {customAmount && !customAmountValid && (
+                            <p className="mt-2 text-xs font-bold text-[#f2a3df]">
+                              ↳ minimum is $250
+                            </p>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+
+                  {/* Payment form — only shown when a paid option is selected and (for custom) amount is valid */}
                   <AnimatePresence>
-                    {balance && balance !== "$0" && userId && (
+                    {stripeFormActive && userId && (
                       <motion.div
                         initial={{ opacity: 0, y: 16 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -471,12 +535,17 @@ export default function CompanyOnboarding() {
                       >
                         {DEV_PAYMENTS ? (
                           <DevBalanceSection
-                            balanceLabel={balance}
+                            balanceLabel={
+                              balance === "custom"
+                                ? `$${(customAmountCents / 100).toFixed(0)}`
+                                : (balance ?? "")
+                            }
                             onPaid={handleBalancePaid}
                           />
                         ) : (
                           <StripeBalanceSection
                             balance={balance as PaidBalance}
+                            amountCents={balance === "custom" ? customAmountCents : (balance === "$50" ? 5000 : 25000)}
                             brandId={userId}
                             email={email ?? undefined}
                             onPaid={handleBalancePaid}
@@ -516,10 +585,12 @@ export default function CompanyOnboarding() {
                   {niches.map((n) => (
                     <span key={n} className="sticker bg-[#f2a3df] text-ink">{n}</span>
                   ))}
-                  <span className="sticker bg-[#a8d98a] text-ink">{budget}</span>
+                  {budget && <span className="sticker bg-[#a8d98a] text-ink num">${parseInt(budget).toLocaleString()}/mo</span>}
                   <span className="rounded-full bg-[#faf6ef]/10 px-4 py-2 text-sm font-bold">{values.website}</span>
-                  {balance && balance !== "$0" && (
-                    <span className="rounded-full bg-[#faf6ef]/10 px-4 py-2 text-sm font-bold">{balance} balance</span>
+                  {stripeFormActive && (
+                    <span className="rounded-full bg-[#faf6ef]/10 px-4 py-2 text-sm font-bold num">
+                      ${balance === "custom" ? (customAmountCents / 100).toFixed(0) : balance?.replace("$", "")} balance
+                    </span>
                   )}
                 </motion.div>
               )}
@@ -531,8 +602,8 @@ export default function CompanyOnboarding() {
               )}
 
               <div className="mt-10 flex items-center gap-3">
-                {/* Hide OK + hint when Stripe form is active — it has its own Pay button */}
-                {!(step.kind === "balance" && balance && balance !== "$0") && (
+                {/* Hide OK + hint when Stripe/payment form is active — it has its own Pay button */}
+                {!(step.kind === "balance" && stripeFormActive) && (
                   <>
                     <motion.button
                       whileHover={{ scale: 1.05 }}

@@ -3,16 +3,30 @@ import { z } from "zod";
 import { stripeClient } from "@/lib/stripe";
 import { authedUserId } from "@/lib/supabase-admin";
 
-const AMOUNT_MAP: Record<string, number> = {
+const FIXED_AMOUNTS: Record<string, number> = {
   "$50": 5000,
-  "$100": 10000,
-  "$250+": 25000,
+  "$250": 25000,
 };
 
-const schema = z.object({
-  balance: z.enum(["$50", "$100", "$250+"]),
-  email: z.string().email().optional(),
-});
+// Custom amounts must be at least $250 — enforced here regardless of what the
+// client sends. Never derived from a URL parameter; always from the request body
+// of an authenticated POST.
+const CUSTOM_MIN_CENTS = 25000;
+
+const schema = z.discriminatedUnion("balance", [
+  z.object({
+    balance: z.enum(["$50", "$250"]),
+    email: z.string().email().optional(),
+  }),
+  z.object({
+    balance: z.literal("custom"),
+    amountCents: z
+      .number()
+      .int("Amount must be a whole number of cents")
+      .min(CUSTOM_MIN_CENTS, `Minimum custom top-up is $${CUSTOM_MIN_CENTS / 100}`),
+    email: z.string().email().optional(),
+  }),
+]);
 
 export async function POST(req: Request) {
   const callerId = await authedUserId(req);
@@ -25,21 +39,24 @@ export async function POST(req: Request) {
 
   const parsed = schema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Invalid request" },
+      { status: 400 },
+    );
   }
 
   const { balance, email } = parsed.data;
-  const amountCents = AMOUNT_MAP[balance];
+  const amountCents =
+    balance === "custom" ? parsed.data.amountCents : FIXED_AMOUNTS[balance];
 
   try {
     const intent = await stripe.paymentIntents.create({
       amount: amountCents,
       currency: "usd",
       automatic_payment_methods: { enabled: true },
-      // brandId from verified token; kind identifies this as a balance top-up in the webhook.
       metadata: { brandId: callerId, balance, kind: "balance_topup" },
       receipt_email: email,
-      description: `Loop balance top-up (${balance})`,
+      description: `Loop balance top-up ($${(amountCents / 100).toFixed(2)})`,
     });
 
     return NextResponse.json({ clientSecret: intent.client_secret });
