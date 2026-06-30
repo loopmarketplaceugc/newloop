@@ -127,7 +127,7 @@ export default function BillingPage() {
                       <p className="num text-xs text-text-tertiary">{formatDate(t.createdAt)}{t.stripeRef ? ` · ${t.stripeRef}` : ""}</p>
                     </div>
                     <span className={`num text-sm font-bold ${isRefund ? "text-money" : ""}`}>
-                      {isRefund ? "+" : "−"}{formatMoney(t.amountCents)}
+                      {isRefund ? "+" : ""}{formatMoney(t.amountCents)}
                     </span>
                   </div>
                 );

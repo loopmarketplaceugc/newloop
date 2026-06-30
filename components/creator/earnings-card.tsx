@@ -14,6 +14,18 @@ const RANGES = [
   { label: "All", days: 365 },
 ] as const;
 
+/**
+ * Round the chart's top edge up to a clean number with ~20% headroom, scaled to
+ * the data's magnitude — so a $40 total and a $40k total both fill the chart
+ * nicely instead of hugging the bottom or clipping the top.
+ */
+function niceCeil(max: number): number {
+  if (max <= 0) return 10;
+  const padded = max * 1.2;
+  const mag = Math.pow(10, Math.floor(Math.log10(padded)));
+  return Math.ceil(padded / mag) * mag;
+}
+
 /** Earnings are derived from real release transactions — never invented. */
 export function EarningsCard({ releases }: { releases: Transaction[] }) {
   const [range, setRange] = useState<(typeof RANGES)[number]>(RANGES[1]);
@@ -88,7 +100,7 @@ export function EarningsCard({ releases }: { releases: Transaction[] }) {
                 tick={{ fontSize: 11, fill: "#faf6ef99" }}
                 minTickGap={48}
               />
-              <YAxis hide domain={[0, "dataMax + 100"]} />
+              <YAxis hide domain={[0, (dataMax: number) => niceCeil(dataMax)]} />
               <Tooltip
                 cursor={{ stroke: "#f2a3df", strokeDasharray: "3 3" }}
                 content={({ active, payload, label }) =>

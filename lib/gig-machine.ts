@@ -54,7 +54,7 @@ export const STATUS_LABELS: Record<GigStatus, string> = {
   DRAFT: "Draft",
   OFFER_SENT: "Offer sent",
   OFFER_ACCEPTED: "Offer accepted",
-  FUNDED_IN_ESCROW: "Payment secured",
+  FUNDED_IN_ESCROW: "Payment locked",
   PRODUCT_SHIPPED: "Product shipped",
   PRODUCT_DELIVERED: "Product delivered",
   IN_PRODUCTION: "In production",

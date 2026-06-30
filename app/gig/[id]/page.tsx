@@ -11,7 +11,6 @@ import {
   ExternalLink,
   FileSignature,
   FileVideo,
-  Lock,
   Package,
   Paperclip,
   Plus,
@@ -122,8 +121,8 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
             await useApp.getState().fundHold(gig.id, { sessionId });
           }
           haptics.success();
-          toast("Payment secured", {
-            body: "Funds are held securely — the creator is cleared to start.",
+          toast("Payment locked", {
+            body: "Funds are locked and held securely — the creator is cleared to start.",
             tone: "success",
           });
         } catch (e) {
@@ -286,7 +285,7 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
         case "IN_PRODUCTION":
         case "REVISION_REQUESTED":
           return {
-            label: gig.status === "REVISION_REQUESTED" ? "Submit revision link" : "Submit draft link",
+            label: gig.status === "REVISION_REQUESTED" ? "Resubmit" : "Submit draft link",
             icon: Upload,
             fn: () => {
               setDeliverableUrl("");
@@ -697,30 +696,33 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
               <CardContent className="p-4">
                 <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Deliverables</p>
                 <div className="space-y-2">
-                  {deliverables.map((d) => (
-                    <div key={d.id} className="flex items-center gap-2.5 rounded-[8px] border border-border p-2.5">
-                      <FileVideo className="h-4 w-4 shrink-0 text-text-tertiary" />
-                      <div className="min-w-0 flex-1">
-                        {d.url ? (
-                          <a href={d.url} target="_blank" rel="noopener noreferrer" className="truncate text-[12px] font-medium text-money hover:underline block">
-                            {d.fileName}
-                          </a>
-                        ) : (
+                  {deliverables.map((d) =>
+                    d.url ? (
+                      <a
+                        key={d.id}
+                        href={d.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2.5 rounded-[8px] border border-border p-2.5 transition-colors hover:border-border-bright"
+                      >
+                        <FileVideo className="h-4 w-4 shrink-0 text-text-tertiary" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[12px] font-medium text-money">{d.fileName}</p>
+                          <p className="num text-[11px] text-text-tertiary">v{d.version}</p>
+                        </div>
+                        <ExternalLink className="h-4 w-4 shrink-0 text-text-tertiary" />
+                      </a>
+                    ) : (
+                      <div key={d.id} className="flex items-center gap-2.5 rounded-[8px] border border-border p-2.5">
+                        <FileVideo className="h-4 w-4 shrink-0 text-text-tertiary" />
+                        <div className="min-w-0 flex-1">
                           <p className="truncate text-[12px] font-medium">{d.fileName}</p>
-                        )}
-                        <p className="num text-[11px] text-text-tertiary">v{d.version}</p>
+                          <p className="num text-[11px] text-text-tertiary">v{d.version}</p>
+                        </div>
                       </div>
-                      {d.watermarked ? (
-                        <Badge variant="amber"><Lock className="h-3 w-3" /> Watermarked</Badge>
-                      ) : (
-                        <Badge variant="money">Original</Badge>
-                      )}
-                    </div>
-                  ))}
+                    ),
+                  )}
                 </div>
-                <p className="mt-2 text-[11px] leading-relaxed text-text-tertiary">
-                  Link stays locked until brand approves — originals unlock after payout.
-                </p>
               </CardContent>
             </Card>
           )}
@@ -1002,26 +1004,32 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
                 <div>
                   <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Deliverables</p>
                   <div className="space-y-2">
-                    {deliverables.map((d) => (
-                      <div key={d.id} className="flex items-center gap-2.5 rounded-[8px] border border-border p-2.5">
-                        <FileVideo className="h-4 w-4 shrink-0 text-text-tertiary" />
-                        <div className="min-w-0 flex-1">
-                          {d.url ? (
-                            <a href={d.url} target="_blank" rel="noopener noreferrer" className="truncate text-[12px] font-medium text-money hover:underline block">
-                              {d.fileName}
-                            </a>
-                          ) : (
+                    {deliverables.map((d) =>
+                      d.url ? (
+                        <a
+                          key={d.id}
+                          href={d.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2.5 rounded-[8px] border border-border p-2.5 transition-colors hover:border-border-bright"
+                        >
+                          <FileVideo className="h-4 w-4 shrink-0 text-text-tertiary" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[12px] font-medium text-money">{d.fileName}</p>
+                            <p className="num text-[11px] text-text-tertiary">v{d.version}</p>
+                          </div>
+                          <ExternalLink className="h-4 w-4 shrink-0 text-text-tertiary" />
+                        </a>
+                      ) : (
+                        <div key={d.id} className="flex items-center gap-2.5 rounded-[8px] border border-border p-2.5">
+                          <FileVideo className="h-4 w-4 shrink-0 text-text-tertiary" />
+                          <div className="min-w-0 flex-1">
                             <p className="truncate text-[12px] font-medium">{d.fileName}</p>
-                          )}
-                          <p className="num text-[11px] text-text-tertiary">v{d.version}</p>
+                            <p className="num text-[11px] text-text-tertiary">v{d.version}</p>
+                          </div>
                         </div>
-                        {d.watermarked ? (
-                          <Badge variant="amber"><Lock className="h-3 w-3" /> Watermarked</Badge>
-                        ) : (
-                          <Badge variant="money">Original</Badge>
-                        )}
-                      </div>
-                    ))}
+                      ),
+                    )}
                   </div>
                 </div>
               )}
@@ -1151,10 +1159,10 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
       {/* Deliverable URL dialog — creator submits a link to the draft video */}
       <Dialog open={deliverableOpen} onOpenChange={setDeliverableOpen}>
         <DialogContent>
-          <DialogTitle>Submit draft link</DialogTitle>
+          <DialogTitle>{gig.status === "REVISION_REQUESTED" ? "Resubmit deliverable" : "Submit draft link"}</DialogTitle>
           <DialogDescription>
             Paste a link to your draft video (Google Drive, Dropbox, Frame.io, etc.). The brand
-            can review it here — the link stays locked to them until payout.
+            can open and review it right here.
           </DialogDescription>
           <div className="mt-4 space-y-4">
             <div>
@@ -1170,14 +1178,15 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
               className="w-full"
               disabled={!/^https?:\/\/.+/.test(deliverableUrl.trim())}
               onClick={() => {
+                const wasRevision = gig.status === "REVISION_REQUESTED";
                 app.submitDeliverable(gig.id, deliverableUrl.trim());
                 setDeliverableOpen(false);
                 setDeliverableUrl("");
                 haptics.success();
-                toast("Draft submitted", { body: "Link sent for review. Auto-approves in 14 days.", tone: "success" });
+                toast(wasRevision ? "Resubmitted" : "Draft submitted", { body: "Link sent for review. Auto-approves in 14 days.", tone: "success" });
               }}
             >
-              <Upload className="h-4 w-4" /> Submit draft link
+              <Upload className="h-4 w-4" /> {gig.status === "REVISION_REQUESTED" ? "Resubmit" : "Submit draft link"}
             </Button>
           </div>
         </DialogContent>
