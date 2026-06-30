@@ -82,19 +82,28 @@ export async function completeAuthFromSession() {
   if (!user) return null;
   await flushPendingProfile();
   const metaRole = (user.user_metadata?.role as Role | undefined) ?? "creator";
+  // The DB trigger creates a stub profile row immediately on signup, so
+  // Boolean(profile) is always true and can't be used as the onboarded signal.
+  // Instead, check for the role-specific detail row (creator_details / companies)
+  // which is only written during onboarding, never by the trigger.
   const { data: profile } = await sb
     .from("profiles")
-    .select("role, name")
+    .select("role, name, creator_details(profile_id), companies(profile_id)")
     .eq("id", user.id)
     .maybeSingle();
+  const role = (profile?.role as Role | undefined) ?? metaRole;
+  const detailRows = role === "company"
+    ? (profile as { companies?: unknown[] } | null)?.companies
+    : (profile as { creator_details?: unknown[] } | null)?.creator_details;
+  const onboarded = Array.isArray(detailRows) ? detailRows.length > 0 : Boolean(detailRows);
   useSession.getState().setAuthed({
     userId: user.id,
-    role: (profile?.role as Role | undefined) ?? metaRole,
+    role,
     name: profile?.name ?? "",
     email: user.email ?? "",
-    onboarded: Boolean(profile),
+    onboarded,
   });
-  return { onboarded: Boolean(profile), role: (profile?.role as Role | undefined) ?? metaRole };
+  return { onboarded, role };
 }
 
 /** Log in, load the profile, and hydrate the session store. */
@@ -108,21 +117,27 @@ export async function logInWithEmail(email: string, password: string) {
   // Flush onboarding data captured before the email was confirmed
   await flushPendingProfile();
 
+  // Same logic as completeAuthFromSession — the DB trigger always creates a stub
+  // profile row, so we check the detail table to determine onboarded state.
   const { data: profile } = await sb
     .from("profiles")
-    .select("role, name")
+    .select("role, name, creator_details(profile_id), companies(profile_id)")
     .eq("id", userId)
     .maybeSingle();
 
   const resolvedRole = (profile?.role as Role | undefined) ?? metaRole;
+  const detailRows = resolvedRole === "company"
+    ? (profile as { companies?: unknown[] } | null)?.companies
+    : (profile as { creator_details?: unknown[] } | null)?.creator_details;
+  const onboarded = Array.isArray(detailRows) ? detailRows.length > 0 : Boolean(detailRows);
   useSession.getState().setAuthed({
     userId,
     role: resolvedRole,
     name: profile?.name ?? "",
     email,
-    onboarded: Boolean(profile),
+    onboarded,
   });
-  return { onboarded: Boolean(profile), role: resolvedRole };
+  return { onboarded, role: resolvedRole };
 }
 
 /** Send Supabase's password recovery email. */
