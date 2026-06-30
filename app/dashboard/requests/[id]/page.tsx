@@ -26,6 +26,8 @@ interface Request {
   reels_per_creator: number;
   pay_per_creator_cents: number;
   deadline_at: string | null;
+  campaign_start_at?: string | null;
+  campaign_end_at?: string | null;
   merch_included: boolean;
   merch_description: string | null;
   status: string;
@@ -237,16 +239,22 @@ function CompanyDetailView({ request }: { request: Request }) {
           )}
         </div>
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-          {[
-            { value: `$${(request.pay_per_creator_cents / 100).toFixed(0)}`, label: "per creator" },
-            { value: String(request.num_creators), label: "creators needed" },
-            {
-              value: request.deadline_at
-                ? new Date(request.deadline_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })
-                : "Open",
-              label: "deadline",
-            },
-          ].map(({ value, label }) => (
+          {(() => {
+            const reels = Math.max(1, request.reels_per_creator);
+            const perReel = request.pay_per_creator_cents / reels / 100;
+            const fmt = (d: string) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+            const start = request.campaign_start_at;
+            const end = request.campaign_end_at ?? request.deadline_at;
+            const range = start && end ? `${fmt(start)} – ${fmt(end)}` : end ? `by ${fmt(end)}` : "Open";
+            return [
+              {
+                value: request.pay_per_creator_cents === 0 ? "Merch" : `$${perReel.toFixed(0)}`,
+                label: request.pay_per_creator_cents === 0 ? "compensation" : "per reel",
+              },
+              { value: String(request.num_creators), label: "creators needed" },
+              { value: range, label: "campaign" },
+            ];
+          })().map(({ value, label }) => (
             <div key={label} className="rounded-[12px] bg-ink/5 px-2 py-2.5">
               <p className="num font-serif text-lg font-extrabold">{value}</p>
               <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-text-tertiary">{label}</p>

@@ -25,11 +25,37 @@ interface Request {
   reels_per_creator: number;
   pay_per_creator_cents: number;
   deadline_at: string | null;
+  campaign_start_at?: string | null;
+  campaign_end_at?: string | null;
   merch_included: boolean;
   merch_description: string | null;
   status: string;
   created_at: string;
   brand_name?: string;
+}
+
+type CompType = "cash" | "cash_merch" | "merch";
+
+const COMP_OPTIONS: { id: CompType; label: string }[] = [
+  { id: "cash", label: "Cash" },
+  { id: "cash_merch", label: "Cash + merch" },
+  { id: "merch", label: "Merch only" },
+];
+
+/** Per-reel dollars for a request, derived from the stored per-creator total. */
+function payPerReelDollars(r: Request): number {
+  const reels = Math.max(1, r.reels_per_creator);
+  return r.pay_per_creator_cents / reels / 100;
+}
+
+/** Short human label for a request's campaign range (falls back to the deadline). */
+function campaignRangeLabel(r: Request): string {
+  const fmt = (d: string) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const start = r.campaign_start_at;
+  const end = r.campaign_end_at ?? r.deadline_at;
+  if (start && end) return `${fmt(start)} – ${fmt(end)}`;
+  if (end) return `by ${fmt(end)}`;
+  return "Open";
 }
 
 function CompanyRequestsView({ userId }: { userId: string }) {
@@ -38,12 +64,20 @@ function CompanyRequestsView({ userId }: { userId: string }) {
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [numCreators, setNumCreators] = useState(1);
   const [reelsPerCreator, setReelsPerCreator] = useState(1);
-  const [payPerCreator, setPayPerCreator] = useState(0);
-  const [deadline, setDeadline] = useState("");
-  const [merchIncluded, setMerchIncluded] = useState(false);
+  const [payPerReel, setPayPerReel] = useState(0);
+  const [campaignStart, setCampaignStart] = useState("");
+  const [campaignEnd, setCampaignEnd] = useState("");
+  const [compType, setCompType] = useState<CompType>("cash");
   const [merchDescription, setMerchDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const wantsCash = compType !== "merch";
+  const wantsMerch = compType !== "cash";
+  const effectivePayPerReel = wantsCash ? payPerReel : 0;
+  const perCreator = effectivePayPerReel * reelsPerCreator;
+  const totalBudget = perCreator * numCreators;
   const [requests, setRequests] = useState<Request[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
@@ -93,6 +127,22 @@ function CompanyRequestsView({ userId }: { userId: string }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
+
+    // Validation
+    if (wantsCash && payPerReel <= 0) {
+      setFormError("Set a pay-per-reel amount greater than $0.");
+      return;
+    }
+    if (wantsMerch && !merchDescription.trim()) {
+      setFormError("Describe the merch you'll send creators.");
+      return;
+    }
+    if (campaignStart && campaignEnd && campaignEnd < campaignStart) {
+      setFormError("Campaign end date can't be before the start date.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       await fetch("/api/requests", {
@@ -104,10 +154,13 @@ function CompanyRequestsView({ userId }: { userId: string }) {
           platforms: selectedPlatforms,
           numCreators,
           reelsPerCreator,
-          payPerCreator,
-          deadlineAt: deadline || null,
-          merchIncluded,
-          merchDescription: merchIncluded ? merchDescription : null,
+          // Stored as the per-creator total = pay-per-reel × reels per creator.
+          payPerCreator: perCreator,
+          campaignStartAt: campaignStart || null,
+          campaignEndAt: campaignEnd || null,
+          deadlineAt: campaignEnd || null,
+          merchIncluded: wantsMerch,
+          merchDescription: wantsMerch ? merchDescription : null,
         }),
       });
       setSuccess(true);
@@ -116,9 +169,10 @@ function CompanyRequestsView({ userId }: { userId: string }) {
       setSelectedPlatforms([]);
       setNumCreators(1);
       setReelsPerCreator(1);
-      setPayPerCreator(0);
-      setDeadline("");
-      setMerchIncluded(false);
+      setPayPerReel(0);
+      setCampaignStart("");
+      setCampaignEnd("");
+      setCompType("cash");
       setMerchDescription("");
       void loadRequests();
       setTimeout(() => { setSuccess(false); setFormOpen(false); }, 2000);
@@ -203,7 +257,7 @@ function CompanyRequestsView({ userId }: { userId: string }) {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-[13px] font-bold uppercase tracking-widest text-text-tertiary mb-1.5">Creators</label>
                 <input
@@ -226,56 +280,91 @@ function CompanyRequestsView({ userId }: { userId: string }) {
                   className="w-full rounded-xl border-2 border-ink/20 bg-white px-4 py-3 font-bold focus:border-ink focus:outline-none"
                 />
               </div>
-              <div>
-                <label className="block text-[13px] font-bold uppercase tracking-widest text-text-tertiary mb-1.5">Pay / creator ($)</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={payPerCreator}
-                  onChange={(e) => setPayPerCreator(Number(e.target.value))}
-                  className="w-full rounded-xl border-2 border-ink/20 bg-white px-4 py-3 font-bold focus:border-ink focus:outline-none"
-                />
-              </div>
             </div>
 
+            {/* Compensation — cash per reel, merch, or both */}
             <div>
-              <label className="block text-[13px] font-bold uppercase tracking-widest text-text-tertiary mb-1.5">Deadline</label>
-              <input
-                type="date"
-                value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
-                className="w-full rounded-xl border-2 border-ink/20 bg-white px-4 py-3 font-bold focus:border-ink focus:outline-none sm:w-auto"
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center gap-3">
-                <label className="text-[13px] font-bold uppercase tracking-widest text-text-tertiary">Merch included?</label>
-                <button
-                  type="button"
-                  onClick={() => setMerchIncluded((v) => !v)}
-                  className={cn(
-                    "relative inline-flex h-6 w-11 items-center rounded-full border-2 border-ink/20 transition-colors cursor-pointer",
-                    merchIncluded ? "bg-[#a8d98a]" : "bg-ink/10",
-                  )}
-                >
-                  <span
+              <label className="block text-[13px] font-bold uppercase tracking-widest text-text-tertiary mb-2">Compensation</label>
+              <div className="flex flex-wrap gap-2">
+                {COMP_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setCompType(opt.id)}
                     className={cn(
-                      "inline-block h-4 w-4 transform rounded-full bg-ink transition-transform",
-                      merchIncluded ? "translate-x-5" : "translate-x-1",
+                      "rounded-full border-[2.5px] px-4 py-2 text-sm font-bold transition-colors cursor-pointer",
+                      compType === opt.id
+                        ? "border-transparent bg-[#a8d98a] text-ink"
+                        : "border-ink/20 text-ink hover:border-ink",
                     )}
-                  />
-                </button>
+                  >
+                    {opt.label}
+                  </button>
+                ))}
               </div>
-              {merchIncluded && (
-                <input
-                  value={merchDescription}
-                  onChange={(e) => setMerchDescription(e.target.value)}
-                  placeholder="What's being shipped?"
-                  className="mt-3 w-full rounded-xl border-2 border-ink/20 bg-white px-4 py-3 font-bold focus:border-ink focus:outline-none"
-                />
+
+              {wantsCash && (
+                <div className="mt-3">
+                  <label className="block text-[13px] font-bold uppercase tracking-widest text-text-tertiary mb-1.5">Pay / reel ($)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={payPerReel}
+                    onChange={(e) => setPayPerReel(Number(e.target.value))}
+                    className="w-full rounded-xl border-2 border-ink/20 bg-white px-4 py-3 font-bold focus:border-ink focus:outline-none sm:w-48"
+                  />
+                  {perCreator > 0 && (
+                    <p className="num mt-2 text-[13px] font-bold text-text-secondary">
+                      ${payPerReel.toLocaleString()}/reel × {reelsPerCreator} {reelsPerCreator === 1 ? "reel" : "reels"} = ${perCreator.toLocaleString()} per creator
+                      {numCreators > 1 && <> · ${totalBudget.toLocaleString()} total for {numCreators} creators</>}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {wantsMerch && (
+                <div className="mt-3">
+                  <label className="block text-[13px] font-bold uppercase tracking-widest text-text-tertiary mb-1.5">
+                    {compType === "merch" ? "Merch sent instead of payment" : "Merch included"}
+                  </label>
+                  <input
+                    value={merchDescription}
+                    onChange={(e) => setMerchDescription(e.target.value)}
+                    placeholder="What's being shipped? (e.g. full skincare set, ~$120 value)"
+                    className="w-full rounded-xl border-2 border-ink/20 bg-white px-4 py-3 font-bold focus:border-ink focus:outline-none"
+                  />
+                </div>
               )}
             </div>
+
+            {/* Campaign range — start + end dates */}
+            <div>
+              <label className="block text-[13px] font-bold uppercase tracking-widest text-text-tertiary mb-1.5">Campaign range</label>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <input
+                  type="date"
+                  value={campaignStart}
+                  onChange={(e) => setCampaignStart(e.target.value)}
+                  aria-label="Campaign start date"
+                  className="w-full rounded-xl border-2 border-ink/20 bg-white px-4 py-3 font-bold focus:border-ink focus:outline-none sm:w-auto"
+                />
+                <span className="hidden text-sm font-bold text-text-tertiary sm:block">→</span>
+                <input
+                  type="date"
+                  value={campaignEnd}
+                  min={campaignStart || undefined}
+                  onChange={(e) => setCampaignEnd(e.target.value)}
+                  aria-label="Campaign end date"
+                  className="w-full rounded-xl border-2 border-ink/20 bg-white px-4 py-3 font-bold focus:border-ink focus:outline-none sm:w-auto"
+                />
+              </div>
+            </div>
+
+            {formError && (
+              <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-bold text-red-600">
+                {formError}
+              </p>
+            )}
 
             {success && (
               <p className="rounded-xl bg-[#a8d98a] px-4 py-3 text-sm font-bold text-ink">
@@ -348,12 +437,15 @@ function CompanyRequestsView({ userId }: { userId: string }) {
                     ))}
                     {r.merch_included && (
                       <span className="rounded-full bg-[#f2a3df] px-2.5 py-1 text-[11px] font-bold text-ink">
-                        merch
+                        {r.pay_per_creator_cents === 0 ? "merch only" : "merch"}
                       </span>
                     )}
                   </div>
                   <p className="num mt-2 text-sm font-bold text-text-tertiary">
-                    ${(r.pay_per_creator_cents / 100).toFixed(0)} / creator · {r.num_creators} creators needed
+                    {r.pay_per_creator_cents === 0
+                      ? "Merch only"
+                      : `$${payPerReelDollars(r).toFixed(0)} / reel`}
+                    {" · "}{r.num_creators} creators needed · {campaignRangeLabel(r)}
                   </p>
                 </Link>
                 <div className="flex shrink-0 items-center gap-2">
@@ -431,7 +523,11 @@ function CreatorRequestsView({ userId: _userId }: { userId: string }) {
               </p>
               <p className="mt-1 truncate font-serif text-[15px] font-extrabold leading-tight">{r.title}</p>
               <p className="num mt-0.5 text-sm font-bold text-money">
-                ${(r.pay_per_creator_cents / 100).toFixed(0)} <span className="text-text-tertiary">/ creator</span>
+                {r.pay_per_creator_cents === 0 ? (
+                  <span className="text-text-secondary">Merch only</span>
+                ) : (
+                  <>${payPerReelDollars(r).toFixed(0)} <span className="text-text-tertiary">/ reel</span></>
+                )}
               </p>
             </div>
             <span className="shrink-0 rounded-full bg-[#f2a3df] px-4 py-2.5 font-serif text-[14px] font-bold text-ink shadow-[0_4px_14px_-4px_rgba(242,163,223,0.7)] transition-transform group-hover:scale-[1.04] sm:px-7 sm:py-3.5 sm:text-[15px]">

@@ -81,7 +81,12 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null) as Record<string, unknown> | null;
   if (!body) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
 
-  const { data, error } = await admin().from("requests").insert([{
+  const campaignEnd = (body.campaignEndAt as string | null) ?? (body.deadlineAt as string | null) ?? null;
+  const campaignStart = (body.campaignStartAt as string | null) ?? null;
+
+  // Base row uses only columns guaranteed to exist. deadline_at carries the
+  // campaign end date so older rows / the gig-creation path keep working.
+  const baseRow = {
     company_id: callerId, // always from verified token, never from body
     title: body.title,
     description: body.description,
@@ -89,11 +94,19 @@ export async function POST(req: Request) {
     num_creators: Math.max(1, Number(body.numCreators) || 1),
     reels_per_creator: Math.max(1, Number(body.reelsPerCreator) || 1),
     pay_per_creator_cents: Math.round(Math.max(0, Number(body.payPerCreator) || 0) * 100),
-    deadline_at: body.deadlineAt ?? null,
+    deadline_at: campaignEnd,
     merch_included: body.merchIncluded ?? false,
     merch_description: body.merchDescription ?? null,
     status: "open",
-  }]).select().single();
+  };
+  const withCampaign = { ...baseRow, campaign_start_at: campaignStart, campaign_end_at: campaignEnd };
+
+  // Try with the campaign-range columns; fall back if the migration (00020)
+  // hasn't been applied to this database yet.
+  let { data, error } = await admin().from("requests").insert([withCampaign]).select().single();
+  if (error && /campaign_start_at|campaign_end_at|schema cache|column/i.test(error.message)) {
+    ({ data, error } = await admin().from("requests").insert([baseRow]).select().single());
+  }
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ request: data });
 }

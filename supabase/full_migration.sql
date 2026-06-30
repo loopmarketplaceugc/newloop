@@ -302,6 +302,8 @@ create table if not exists requests (
   reels_per_creator integer not null default 1,
   pay_per_creator_cents integer not null default 0,
   deadline_at timestamptz,
+  campaign_start_at timestamptz,
+  campaign_end_at timestamptz,
   merch_included boolean not null default false,
   merch_description text,
   status text not null default 'open' check (status in ('open', 'closed', 'draft')),
