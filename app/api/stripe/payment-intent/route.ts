@@ -8,11 +8,8 @@ const FIXED_AMOUNTS: Record<string, number> = {
   "$250": 25000,
 };
 
-// Custom amounts must be at least $250 — enforced here regardless of what the
-// client sends. Never derived from a URL parameter; always from the request body
-// of an authenticated POST.
-const CUSTOM_MIN_CENTS = 25000;
-
+// Custom amounts have no fixed minimum — any positive amount is accepted.
+// Derived from the request body of an authenticated POST, never from a URL.
 const schema = z.discriminatedUnion("balance", [
   z.object({
     balance: z.enum(["$50", "$250"]),
@@ -23,7 +20,7 @@ const schema = z.discriminatedUnion("balance", [
     amountCents: z
       .number()
       .int("Amount must be a whole number of cents")
-      .min(CUSTOM_MIN_CENTS, `Minimum custom top-up is $${CUSTOM_MIN_CENTS / 100}`),
+      .positive("Enter an amount greater than $0"),
     email: z.string().email().optional(),
   }),
 ]);

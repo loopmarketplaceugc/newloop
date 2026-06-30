@@ -50,7 +50,6 @@ type Step =
   | { kind: "done"; q: string };
 
 type PaidBalance = "$50" | "$250" | "custom";
-const CUSTOM_MIN_CENTS = 25000; // $250 — enforced here and on the server
 
 // ── Dev-mode mock — simulates a successful payment without Stripe ─────────────
 function DevBalanceSection({ balanceLabel, onPaid }: { balanceLabel: string; onPaid: () => void; }) {
@@ -248,7 +247,7 @@ export default function CompanyOnboarding() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const customAmountCents = Math.round((parseFloat(customAmount) || 0) * 100);
-  const customAmountValid = customAmountCents >= CUSTOM_MIN_CENTS;
+  const customAmountValid = customAmountCents > 0;
   // Stripe form is active when a paid option is selected and (if custom) amount is valid
   const stripeFormActive =
     balance !== null &&
@@ -319,7 +318,7 @@ export default function CompanyOnboarding() {
     if (step.kind === "balance") {
       if (!balance) { setError("pick an option to continue"); return; }
       if (balance === "custom" && !customAmountValid) {
-        setError(`minimum custom top-up is $${CUSTOM_MIN_CENTS / 100}`);
+        setError("enter an amount greater than $0");
         return;
       }
     }
@@ -492,7 +491,7 @@ export default function CompanyOnboarding() {
                       {balance === "custom" && <Check className="mr-2 inline h-4 w-4" />}
                       Custom amount
                     </p>
-                    <p className="mt-0.5 text-xs font-medium text-[#faf6ef]/50">Minimum $250</p>
+                    <p className="mt-0.5 text-xs font-medium text-[#faf6ef]/50">Enter any amount</p>
                     <AnimatePresence>
                       {balance === "custom" && (
                         <motion.div
@@ -516,7 +515,7 @@ export default function CompanyOnboarding() {
                           </div>
                           {customAmount && !customAmountValid && (
                             <p className="mt-2 text-xs font-bold text-[#f2a3df]">
-                              ↳ minimum is $250
+                              ↳ enter an amount greater than $0
                             </p>
                           )}
                         </motion.div>
