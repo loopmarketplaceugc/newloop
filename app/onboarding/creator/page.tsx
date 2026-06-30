@@ -331,50 +331,28 @@ export default function CreatorOnboarding() {
 
               {/* TERMS OF SERVICE */}
               {step.kind === "tos" && (
-                <div className="space-y-5">
-                  <div className="rounded-[20px] border-[3px] border-[#faf6ef]/15 bg-[#faf6ef]/[0.04] p-6 space-y-4">
-                    <p className="text-xs font-bold uppercase tracking-widest text-[#faf6ef]/40">Key terms</p>
-                    <ul className="space-y-3 text-sm font-medium text-[#faf6ef]/70">
-                      <li className="flex gap-3">
-                        <span className="text-[#f2a3df] shrink-0 font-bold">→</span>
-                        All connections made through Loop must transact on Loop — taking deals off-platform is a breach of these Terms.
-                      </li>
-                      <li className="flex gap-3">
-                        <span className="text-[#f2a3df] shrink-0 font-bold">→</span>
-                        Every deal signed through Loop is legally binding — both parties must follow the contract terms.
-                      </li>
-                      <li className="flex gap-3">
-                        <span className="text-[#f2a3df] shrink-0 font-bold">→</span>
-                        You must disclose sponsored content per FTC guidelines and own all rights to content you submit.
-                      </li>
-                      <li className="flex gap-3">
-                        <span className="text-[#f2a3df] shrink-0 font-bold">→</span>
-                        Loop holds funds in escrow until deliverables are approved — protecting both sides.
-                      </li>
-                    </ul>
-                    <a href="/legal#terms" target="_blank" className="text-xs font-bold text-[#a8d98a] underline underline-offset-2 hover:text-[#a8d98a]/70 transition-colors">
-                      Read full Terms of Service →
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={tosAgreed}
+                    onChange={(e) => {
+                      haptics.tap();
+                      setTosAgreed(e.target.checked);
+                    }}
+                    className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded accent-[#f2a3df]"
+                  />
+                  <span className="text-sm font-medium text-[#faf6ef]/70">
+                    I agree to Loop&apos;s{" "}
+                    <a href="/legal#terms" target="_blank" className="text-[#f2a3df] underline underline-offset-2">
+                      Terms &amp; Conditions
+                    </a>{" "}
+                    and{" "}
+                    <a href="/legal#privacy" target="_blank" className="text-[#f2a3df] underline underline-offset-2">
+                      Privacy Policy
                     </a>
-                  </div>
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={tosAgreed}
-                      onChange={(e) => {
-                        haptics.tap();
-                        setTosAgreed(e.target.checked);
-                      }}
-                      className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded accent-[#f2a3df]"
-                    />
-                    <span className="text-sm font-medium text-[#faf6ef]/70">
-                      I agree to Loop&apos;s{" "}
-                      <a href="/legal#terms" target="_blank" className="text-[#f2a3df] underline underline-offset-2">
-                        Terms of Service
-                      </a>{" "}
-                      and confirm I&apos;m at least 18 years old.
-                    </span>
-                  </label>
-                </div>
+                    , and confirm I&apos;m at least 18 years old.
+                  </span>
+                </label>
               )}
 
               {/* PLATFORM PICK */}
