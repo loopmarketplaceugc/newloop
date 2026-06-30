@@ -13,17 +13,15 @@ import { Switch } from "@/components/ui/switch";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Avatar } from "@/components/ui/avatar";
 import { CardSkeleton } from "@/components/ui/skeleton";
-import { TierBadge } from "@/components/shared/tier-badge";
+import { ReachBadge } from "@/components/shared/reach-badge";
 import { StatusDot } from "@/components/shared/status-dot";
 import { PlatformIcon } from "@/components/shared/platform-icon";
 import { StarRating } from "@/components/shared/star-rating";
 import {
   NICHES,
   PLATFORM_LABELS,
-  TIER_LABELS,
   type Niche,
   type Platform,
-  type Tier,
 } from "@/lib/types";
 import { formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -34,7 +32,6 @@ export default function DiscoverPage() {
   const setCreatorsFromDb = useApp((s) => s.setCreatorsFromDb);
   const [platform, setPlatform] = useState<Platform | null>(null);
   const [niche, setNiche] = useState<Niche | null>(null);
-  const [tiers, setTiers] = useState<Tier[]>([]);
   const [rate, setRate] = useState<[number, number]>([0, 1500]);
   const [minCapacity, setMinCapacity] = useState(0);
   const [productOk, setProductOk] = useState(false);
@@ -75,7 +72,6 @@ export default function DiscoverPage() {
         if (q && !c.name.toLowerCase().includes(q) && !c.handle.toLowerCase().includes(q)) return false;
         if (platform && !c.platforms.some((p) => p.platform === platform)) return false;
         if (niche && !c.niches.includes(niche)) return false;
-        if (tiers.length && !tiers.includes(c.tier)) return false;
         const rateDollars = c.baseRateCents / 100;
         if (rateDollars < rate[0] || rateDollars > rate[1]) return false;
         if (c.capacityPerWeek < minCapacity) return false;
@@ -84,7 +80,7 @@ export default function DiscoverPage() {
         return true;
       });
     },
-    [creators, search, platform, niche, tiers, rate, minCapacity, productOk, minRating],
+    [creators, search, platform, niche, rate, minCapacity, productOk, minRating],
   );
 
   if (!hydrated) {
@@ -98,7 +94,6 @@ export default function DiscoverPage() {
   const clearAll = () => {
     setPlatform(null);
     setNiche(null);
-    setTiers([]);
     setRate([0, 1500]);
     setMinCapacity(0);
     setProductOk(false);
@@ -140,25 +135,6 @@ export default function DiscoverPage() {
               )}
             >
               {n}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div>
-        <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Tier</p>
-        <div className="flex flex-wrap gap-1.5">
-          {(Object.keys(TIER_LABELS) as Tier[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTiers(tiers.includes(t) ? tiers.filter((x) => x !== t) : [...tiers, t])}
-              className={cn(
-                "rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer",
-                tiers.includes(t)
-                  ? "border-text-primary bg-text-primary text-bg"
-                  : "border-border text-text-secondary hover:border-border-bright",
-              )}
-            >
-              {TIER_LABELS[t]}
             </button>
           ))}
         </div>
@@ -241,7 +217,7 @@ export default function DiscoverPage() {
             <EmptyState
               icon={SearchX}
               title="No creators match these filters"
-              body="Loosen the rate range or drop a filter — elite-tier creators in narrow niches book out fast."
+              body="Loosen the rate range or drop a filter — top creators in narrow niches book out fast."
               action={
                 <Button variant="outline" size="sm" onClick={clearAll}>
                   Clear filters
@@ -264,7 +240,7 @@ export default function DiscoverPage() {
                       <StatusDot status={c.status} withLabel={false} />
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                      <TierBadge tier={c.tier} />
+                      <ReachBadge platforms={c.platforms} showIcons={false} className="mr-1" />
                       {c.niches.slice(0, 3).map((n) => (
                         <Badge key={n}>{n}</Badge>
                       ))}

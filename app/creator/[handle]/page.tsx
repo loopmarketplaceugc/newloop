@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { CardSkeleton } from "@/components/ui/skeleton";
-import { TierBadge } from "@/components/shared/tier-badge";
+import { ReachBadge } from "@/components/shared/reach-badge";
 import { StatusDot } from "@/components/shared/status-dot";
 import { PlatformIcon } from "@/components/shared/platform-icon";
 import { StarRating } from "@/components/shared/star-rating";
@@ -114,7 +114,7 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="font-serif text-3xl font-semibold">{c.name}</h1>
-            <TierBadge tier={c.tier} />
+            <ReachBadge platforms={c.platforms} />
           </div>
           <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-secondary">
             {c.handle && <span>@{c.handle}</span>}
@@ -146,7 +146,7 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
             <p className="text-[10px] font-extrabold uppercase tracking-widest text-text-tertiary">Loop creator tag</p>
             <p className="num mt-1 font-serif text-2xl font-extrabold">{c.loopTag}</p>
             <p className="mt-1.5 text-xs font-medium text-text-secondary">
-              Scan to open this profile instantly — verified tier, platforms, and portfolio in one tap.
+              Scan to open this profile instantly — verified reach, platforms, and portfolio in one tap.
             </p>
           </div>
           <QrCode value={profileUrl} size={110} label={`QR for ${c.name}`} />

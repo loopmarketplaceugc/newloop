@@ -5,7 +5,7 @@ import { Command } from "cmdk";
 import { Compass, MessageSquare, Search, User } from "lucide-react";
 import { useApp } from "@/lib/store/app";
 import { Avatar } from "@/components/ui/avatar";
-import { TierBadge } from "@/components/shared/tier-badge";
+import { ReachBadge } from "@/components/shared/reach-badge";
 import { formatMoney } from "@/lib/format";
 
 /** Cmd+K — searches creators and jumps to company surfaces. */
@@ -77,7 +77,7 @@ export function CommandPalette({
                   <span className="font-medium">{c.name}</span>
                   <span className="text-text-tertiary">@{c.handle}</span>
                   <span className="ml-auto flex items-center gap-2">
-                    <TierBadge tier={c.tier} />
+                    <ReachBadge platforms={c.platforms} showIcons={false} />
                     <span className="num text-xs text-text-secondary">{formatMoney(c.baseRateCents)}</span>
                   </span>
                 </Command.Item>

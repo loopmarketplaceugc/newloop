@@ -6,7 +6,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PlatformIcon } from "@/components/shared/platform-icon";
 import { StarRating } from "@/components/shared/star-rating";
 import { StatusDot } from "@/components/shared/status-dot";
-import { TierBadge } from "@/components/shared/tier-badge";
 import { formatCompact, formatMoney } from "@/lib/format";
 import type { Creator } from "@/lib/types";
 
@@ -34,7 +33,6 @@ export function CreatorCard({ creator }: { creator: Creator }) {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-serif text-xl font-semibold">{creator.name}</h3>
-              <TierBadge tier={creator.tier} />
             </div>
             <p className="mt-0.5 text-sm text-text-tertiary">@{creator.handle} · {creator.location}</p>
             <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-text-secondary">{creator.bio}</p>

@@ -15,7 +15,6 @@ import type {
   Review,
   Transaction,
 } from "@/lib/types";
-import { tierForFollowers } from "@/lib/types";
 import { platformFeeCents } from "@/lib/gig-machine";
 
 /* ---------- row types ---------- */
@@ -101,7 +100,6 @@ export function mapCreator(
   platforms: PlatformRow[] = [],
   completedGigs = 0,
 ): Creator {
-  const followers = platforms.reduce((s, x) => s + x.follower_count, 0);
   return {
     id: p.id,
     handle: p.handle ?? `creator-${p.id.slice(0, 8)}`,
@@ -111,7 +109,6 @@ export function mapCreator(
     bio: p.bio ?? "",
     location: p.location ?? "",
     status: p.status,
-    tier: tierForFollowers(followers),
     platforms: platforms.map((x) => ({
       platform: x.platform,
       url: x.url,
@@ -582,15 +579,19 @@ export async function dbUpsertCreatorDetails(p: {
   baseRateCents?: number;
   capacityPerWeek?: number;
   compensationPref?: string;
+  avatarUrl?: string | null;
+  avatarHue?: number;
 }) {
   const sb = supabase();
   const uid = await authedId();
   if (!uid) return;
-  if (p.bio !== undefined || p.status !== undefined) {
-    await sb
-      .from("profiles")
-      .update({ ...(p.bio !== undefined ? { bio: p.bio } : {}), ...(p.status ? { status: p.status } : {}) })
-      .eq("id", uid);
+  const profilePatch: Record<string, unknown> = {};
+  if (p.bio !== undefined) profilePatch.bio = p.bio;
+  if (p.status) profilePatch.status = p.status;
+  if (p.avatarUrl !== undefined) profilePatch.avatar_url = p.avatarUrl;
+  if (p.avatarHue !== undefined) profilePatch.avatar_hue = p.avatarHue;
+  if (Object.keys(profilePatch).length > 0) {
+    await sb.from("profiles").update(profilePatch).eq("id", uid);
   }
   const details: Record<string, unknown> = { profile_id: uid };
   if (p.niches) details.niches = p.niches;

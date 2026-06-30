@@ -8,23 +8,6 @@ export const PLATFORM_LABELS: Record<Platform, string> = {
   shorts: "YouTube Shorts",
 };
 
-export type Tier = "nano" | "micro" | "mid" | "elite";
-
-export const TIER_LABELS: Record<Tier, string> = {
-  nano: "Nano",
-  micro: "Micro",
-  mid: "Mid",
-  elite: "Elite",
-};
-
-/** Nano <10k · Micro 10–50k · Mid 50–250k · Elite 250k+ */
-export function tierForFollowers(followers: number): Tier {
-  if (followers >= 250_000) return "elite";
-  if (followers >= 50_000) return "mid";
-  if (followers >= 10_000) return "micro";
-  return "nano";
-}
-
 export type CompensationPref = "paid_only" | "product_ok" | "product_plus";
 
 export const COMPENSATION_LABELS: Record<CompensationPref, string> = {
@@ -77,7 +60,6 @@ export interface Creator {
   bio: string;
   location: string;
   status: CreatorStatus;
-  tier: Tier;
   platforms: PlatformPresence[];
   niches: Niche[];
   baseRateCents: number;

@@ -41,7 +41,7 @@ interface Applicant {
   status: string;
   applied_at: string;
   profile: { id: string; name: string; handle: string; avatar_hue: number; bio: string | null } | null;
-  creator_details: { niches: string[] | null; tier: string | null } | null;
+  creator_details: { niches: string[] | null } | null;
 }
 
 type AppActionState = { type: "idle" } | { type: "loading" } | { type: "approved"; gigId: string } | { type: "rejected" };
@@ -60,7 +60,6 @@ function ApplicantCard({ applicant, onAction }: {
 
   const name = applicant.profile?.name ?? "Creator";
   const handle = applicant.profile?.handle;
-  const tier = applicant.creator_details?.tier;
   const niches = applicant.creator_details?.niches ?? [];
   const hue = applicant.profile?.avatar_hue ?? 285;
 
@@ -100,11 +99,6 @@ function ApplicantCard({ applicant, onAction }: {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-serif text-[15px] font-extrabold">{name}</p>
-            {tier && (
-              <span className="rounded-full bg-ink/8 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                {tier}
-              </span>
-            )}
             {state.type === "approved" && (
               <span className="flex items-center gap-1 rounded-full bg-[#a8d98a] px-2.5 py-0.5 text-[11px] font-bold text-ink">
                 <Check className="h-3 w-3" /> Approved

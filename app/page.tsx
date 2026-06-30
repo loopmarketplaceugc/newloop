@@ -349,7 +349,7 @@ export default function LandingPage() {
           <p className="mt-4 max-w-sm font-bold text-ink/70">*from first DM to money in the bank, without leaving the app.</p>
           <div className="mt-14 grid gap-5 md:grid-cols-3">
             {[
-              { n: "01", t: "Match", d: "Brands filter creators by niche, tier, rate & capacity. Slide into the gig chat — offers are cards, not vibes.", bg: "bg-ink", fg: "text-[#a8d98a]" },
+              { n: "01", t: "Match", d: "Brands filter creators by niche, platform, rate & capacity. Slide into the gig chat — offers are cards, not vibes.", bg: "bg-ink", fg: "text-[#a8d98a]" },
               { n: "02", t: "Create", d: "AI writes the script with timed hooks. The brand pays BEFORE you film. Contract generates itself.", bg: "bg-[#f2a3df]", fg: "text-ink" },
               { n: "03", t: "Get paid", d: "Brand approves → money releases instantly. They ghost? Auto-approves in 14 days. Payouts land in your wallet.", bg: "bg-[#faf6ef]", fg: "text-ink" },
             ].map((c, i) => (

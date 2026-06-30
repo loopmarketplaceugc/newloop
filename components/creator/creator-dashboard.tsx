@@ -44,7 +44,6 @@ function firstRunCreator(id: string, name: string): Creator {
     bio: "",
     location: "",
     status: "open",
-    tier: "nano",
     platforms: [],
     niches: [],
     baseRateCents: 0,

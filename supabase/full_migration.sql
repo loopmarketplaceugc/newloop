@@ -33,7 +33,6 @@ create table profiles (
 
 create table creator_details (
   profile_id uuid primary key references profiles on delete cascade,
-  tier text not null default 'nano',
   base_rate_cents integer not null default 0 check (base_rate_cents >= 0),
   usage_upcharge_pct integer not null default 30,
   raw_upcharge_pct integer not null default 40,

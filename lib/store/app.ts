@@ -200,6 +200,10 @@ export const useApp = create<AppState>()(
         if (partial.baseRateCents !== undefined) db.baseRateCents = partial.baseRateCents;
         if (partial.capacityPerWeek !== undefined) db.capacityPerWeek = partial.capacityPerWeek;
         if (partial.compensationPref !== undefined) db.compensationPref = partial.compensationPref;
+        // Profile photo: send null on removal so the DB clears it ("avatarUrl" key
+        // present but undefined → the user cleared their photo back to the gradient).
+        if ("avatarUrl" in partial) db.avatarUrl = partial.avatarUrl ?? null;
+        if (partial.avatarHue !== undefined) db.avatarHue = partial.avatarHue;
         if (Object.keys(db).length > 0) void dbUpsertCreatorDetails(db);
       },
 
@@ -218,7 +222,6 @@ export const useApp = create<AppState>()(
             bio: "",
             location: "",
             status: "open",
-            tier: "nano",
             platforms: [],
             niches: [],
             baseRateCents: 0,

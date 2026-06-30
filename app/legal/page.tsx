@@ -70,7 +70,7 @@ export default function LegalPage() {
               <ul className="ml-5 list-disc space-y-1">
                 <li>Provide, operate, maintain, and improve the platform and its features.</li>
                 <li>Create and manage your account, and verify your identity.</li>
-                <li>Match creators and brands based on niche, platform, follower tier, budget, and other preferences.</li>
+                <li>Match creators and brands based on niche, platform, follower reach, budget, and other preferences.</li>
                 <li>Facilitate gig creation, contracting, deliverable review, funding holds, and payouts.</li>
                 <li>Process payments and send payment confirmations, payout notifications, and invoices through Stripe.</li>
                 <li>Send transactional emails including account confirmation, password resets, offer alerts, contract updates, dispute notices, and payout confirmations.</li>
@@ -99,7 +99,7 @@ export default function LegalPage() {
             <div>
               <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">5. How We Share Your Information</h2>
               <ul className="ml-5 list-disc space-y-1">
-                <li><strong>Between users</strong> — creator profile data (name, handle, bio, niche, tier, platforms, portfolio) is visible to brand users on the Discover page and in gig workspaces. Brand profile data (company name, website, niche) is visible to creator users. Messages and deliverables shared within a gig workspace are visible to both parties of that gig.</li>
+                <li><strong>Between users</strong> — creator profile data (name, handle, bio, niche, platforms, portfolio) is visible to brand users on the Discover page and in gig workspaces. Brand profile data (company name, website, niche) is visible to creator users. Messages and deliverables shared within a gig workspace are visible to both parties of that gig.</li>
                 <li><strong>Supabase</strong> — we host our database and authentication system on Supabase, which stores data in the United States. Supabase is contractually prohibited from using your data for any purpose other than providing infrastructure services to Loop.</li>
                 <li><strong>Stripe, Inc.</strong> — payment processing, creator payouts, and Stripe Connect onboarding. Data shared with Stripe is governed by Stripe&rsquo;s own Privacy Policy.</li>
                 <li><strong>Resend</strong> — transactional email delivery. Email addresses and message content are transmitted to Resend solely to deliver emails on our behalf.</li>

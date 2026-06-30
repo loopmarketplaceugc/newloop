@@ -49,10 +49,10 @@ const baseCreators: Creator[] = [
     handle: "mia.creates",
     name: "Mia Tanaka",
     avatarHue: 160,
+    avatarUrl: portrait("women", 26),
     bio: "UGC for beauty & skincare brands. 200+ videos shipped. I write my own hooks and turn drafts around in 72 hours.",
     location: "Los Angeles, CA",
     status: "open",
-    tier: "micro",
     platforms: [
       { platform: "tiktok", url: "https://tiktok.com/@mia.creates", followerCount: 42_300 },
       { platform: "reels", url: "https://instagram.com/mia.creates", followerCount: 18_900 },
@@ -83,10 +83,10 @@ const baseCreators: Creator[] = [
     handle: "dev.darius",
     name: "Darius Cole",
     avatarHue: 210,
+    avatarUrl: portrait("men", 4),
     bio: "Tech & SaaS explainer videos that don't feel like ads. Ex-PM, so I actually understand your product.",
     location: "Austin, TX",
     status: "open",
-    tier: "mid",
     platforms: [
       { platform: "tiktok", url: "https://tiktok.com/@dev.darius", followerCount: 128_000 },
       { platform: "shorts", url: "https://youtube.com/@devdarius", followerCount: 86_000 },
@@ -113,10 +113,10 @@ const baseCreators: Creator[] = [
     handle: "soph.eats",
     name: "Sophia Reyes",
     avatarHue: 25,
+    avatarUrl: portrait("women", 19),
     bio: "Food content with cinematic close-ups. Restaurants, CPG snacks, meal kits — if it's edible, I'll make it look irresistible.",
     location: "Chicago, IL",
     status: "busy",
-    tier: "micro",
     platforms: [
       { platform: "reels", url: "https://instagram.com/soph.eats", followerCount: 33_500 },
       { platform: "tiktok", url: "https://tiktok.com/@soph.eats", followerCount: 21_000 },
@@ -143,10 +143,10 @@ const baseCreators: Creator[] = [
     handle: "liftwithlena",
     name: "Lena Okafor",
     avatarHue: 300,
+    avatarUrl: portrait("women", 9),
     bio: "Fitness UGC — supplements, apparel, home gym gear. Real workouts, real sweat, honest reviews your audience trusts.",
     location: "Miami, FL",
     status: "open",
-    tier: "elite",
     platforms: [
       { platform: "tiktok", url: "https://tiktok.com/@liftwithlena", followerCount: 410_000 },
       { platform: "reels", url: "https://instagram.com/liftwithlena", followerCount: 265_000 },
@@ -174,10 +174,10 @@ const baseCreators: Creator[] = [
     handle: "jakeunboxes",
     name: "Jake Moreau",
     avatarHue: 45,
+    avatarUrl: portrait("men", 11),
     bio: "Gadget unboxings and honest first impressions. Clean desk setups, crisp audio, zero fluff.",
     location: "Seattle, WA",
     status: "open",
-    tier: "nano",
     platforms: [
       { platform: "shorts", url: "https://youtube.com/@jakeunboxes", followerCount: 8_200 },
       { platform: "tiktok", url: "https://tiktok.com/@jakeunboxes", followerCount: 5_600 },
@@ -203,10 +203,10 @@ const baseCreators: Creator[] = [
     handle: "theglowarchive",
     name: "Amara Diallo",
     avatarHue: 280,
+    avatarUrl: portrait("women", 33),
     bio: "Luxury-feel beauty content on an indie budget. Soft lighting, slow pans, voiceovers that convert.",
     location: "New York, NY",
     status: "open",
-    tier: "mid",
     platforms: [
       { platform: "reels", url: "https://instagram.com/theglowarchive", followerCount: 96_000 },
     ],
@@ -232,10 +232,10 @@ const baseCreators: Creator[] = [
     handle: "casa.carlos",
     name: "Carlos Vega",
     avatarHue: 95,
+    avatarUrl: portrait("men", 19),
     bio: "Home & DIY content. Renovation b-roll, tool reviews, organization hacks. Dad energy, real results.",
     location: "Phoenix, AZ",
     status: "away",
-    tier: "micro",
     platforms: [
       { platform: "tiktok", url: "https://tiktok.com/@casa.carlos", followerCount: 27_400 },
       { platform: "shorts", url: "https://youtube.com/@casacarlos", followerCount: 12_100 },
@@ -261,10 +261,10 @@ const baseCreators: Creator[] = [
     handle: "petsofpriya",
     name: "Priya Sharma",
     avatarHue: 15,
+    avatarUrl: portrait("women", 60),
     bio: "Pet content featuring two golden retrievers and a very judgmental cat. Treats, toys, tech for pets.",
     location: "Denver, CO",
     status: "open",
-    tier: "micro",
     platforms: [
       { platform: "tiktok", url: "https://tiktok.com/@petsofpriya", followerCount: 48_700 },
       { platform: "reels", url: "https://instagram.com/petsofpriya", followerCount: 31_200 },
@@ -290,10 +290,10 @@ const baseCreators: Creator[] = [
     handle: "wanderwithwes",
     name: "Wes Kim",
     avatarHue: 195,
+    avatarUrl: portrait("men", 9),
     bio: "Travel & lifestyle UGC. Hotels, luggage, booking apps. Shot on cinema glass, delivered in vertical.",
     location: "San Diego, CA",
     status: "open",
-    tier: "mid",
     platforms: [
       { platform: "reels", url: "https://instagram.com/wanderwithwes", followerCount: 152_000 },
       { platform: "tiktok", url: "https://tiktok.com/@wanderwithwes", followerCount: 74_000 },
@@ -319,10 +319,10 @@ const baseCreators: Creator[] = [
     handle: "frugal.fern",
     name: "Fern Whitaker",
     avatarHue: 130,
+    avatarUrl: portrait("women", 50),
     bio: "Personal finance made unscary. Budgeting apps, cashback tools, banks. Plain-English scripts, high retention.",
     location: "Columbus, OH",
     status: "open",
-    tier: "nano",
     platforms: [
       { platform: "tiktok", url: "https://tiktok.com/@frugal.fern", followerCount: 9_300 },
     ],
@@ -347,10 +347,10 @@ const baseCreators: Creator[] = [
     handle: "mamabearmeg",
     name: "Meg Lawson",
     avatarHue: 340,
+    avatarUrl: portrait("women", 75),
     bio: "Parenting & family products tested by three kids under six. If it survives my house, it'll survive anything.",
     location: "Nashville, TN",
     status: "busy",
-    tier: "micro",
     platforms: [
       { platform: "reels", url: "https://instagram.com/mamabearmeg", followerCount: 39_800 },
       { platform: "tiktok", url: "https://tiktok.com/@mamabearmeg", followerCount: 26_500 },
@@ -376,10 +376,10 @@ const baseCreators: Creator[] = [
     handle: "atlas.runs",
     name: "Atlas Nguyen",
     avatarHue: 250,
+    avatarUrl: portrait("men", 50),
     bio: "Running & endurance gear. Shoe reviews at mile 40, not mile zero. Marathon PR 2:51.",
     location: "Portland, OR",
     status: "open",
-    tier: "elite",
     platforms: [
       { platform: "shorts", url: "https://youtube.com/@atlasruns", followerCount: 295_000 },
       { platform: "tiktok", url: "https://tiktok.com/@atlas.runs", followerCount: 188_000 },
@@ -413,7 +413,6 @@ const extraCreators: Creator[] = [
     bio: "Streetwear, beauty drops, and try-on edits with fast hooks and clean transitions.",
     location: "Atlanta, GA",
     status: "open",
-    tier: "micro",
     platforms: [
       { platform: "reels", url: "https://instagram.com/zara.styles", followerCount: 29_400 },
       { platform: "tiktok", url: "https://tiktok.com/@zara.styles", followerCount: 18_200 },
@@ -436,7 +435,6 @@ const extraCreators: Creator[] = [
     bio: "App walkthroughs, AI tools, and crisp product explainers for teams that sell complex software.",
     location: "San Jose, CA",
     status: "open",
-    tier: "mid",
     platforms: [
       { platform: "shorts", url: "https://youtube.com/@noahbyte", followerCount: 112_000 },
       { platform: "tiktok", url: "https://tiktok.com/@noah.byte", followerCount: 64_500 },
@@ -460,7 +458,6 @@ const extraCreators: Creator[] = [
     bio: "Restaurant reels, farmers market finds, and CPG snack content with warm natural light.",
     location: "Charlotte, NC",
     status: "busy",
-    tier: "micro",
     platforms: [
       { platform: "reels", url: "https://instagram.com/imani.bites", followerCount: 41_000 },
       { platform: "tiktok", url: "https://tiktok.com/@imani.bites", followerCount: 22_300 },
@@ -483,7 +480,6 @@ const extraCreators: Creator[] = [
     bio: "Functional fitness, recovery tools, and active travel content shot in real training blocks.",
     location: "Salt Lake City, UT",
     status: "open",
-    tier: "mid",
     platforms: [
       { platform: "tiktok", url: "https://tiktok.com/@theo.trains", followerCount: 88_000 },
       { platform: "reels", url: "https://instagram.com/theo.trains", followerCount: 57_200 },
@@ -507,7 +503,6 @@ const extraCreators: Creator[] = [
     bio: "Parenting, organization, and home routines for practical products that make family life easier.",
     location: "Raleigh, NC",
     status: "open",
-    tier: "micro",
     platforms: [
       { platform: "reels", url: "https://instagram.com/harper.home", followerCount: 36_700 },
       { platform: "tiktok", url: "https://tiktok.com/@harper.home", followerCount: 19_600 },
@@ -530,7 +525,6 @@ const extraCreators: Creator[] = [
     bio: "Skincare routines, texture shots, and beauty voiceovers with a polished editorial feel.",
     location: "Brooklyn, NY",
     status: "open",
-    tier: "elite",
     platforms: [
       { platform: "tiktok", url: "https://tiktok.com/@aaliyah.glow", followerCount: 318_000 },
       { platform: "reels", url: "https://instagram.com/aaliyah.glow", followerCount: 142_000 },
@@ -555,7 +549,6 @@ const extraCreators: Creator[] = [
     bio: "Pet tech, treats, and home-life videos with two rescue dogs and a clean testing format.",
     location: "Tampa, FL",
     status: "away",
-    tier: "nano",
     platforms: [
       { platform: "tiktok", url: "https://tiktok.com/@benji.pets", followerCount: 7_900 },
       { platform: "reels", url: "https://instagram.com/benji.pets", followerCount: 5_400 },
@@ -578,7 +571,6 @@ const extraCreators: Creator[] = [
     bio: "Boutique hotels, luggage, and travel fashion captured in bright, walkable city guides.",
     location: "New Orleans, LA",
     status: "open",
-    tier: "mid",
     platforms: [
       { platform: "reels", url: "https://instagram.com/camille.away", followerCount: 121_000 },
       { platform: "shorts", url: "https://youtube.com/@camilleaway", followerCount: 39_000 },
@@ -602,7 +594,6 @@ const extraCreators: Creator[] = [
     bio: "Plain-English finance and SaaS demos for tools that help people budget, save, and track work.",
     location: "Detroit, MI",
     status: "open",
-    tier: "micro",
     platforms: [
       { platform: "tiktok", url: "https://tiktok.com/@omar.money", followerCount: 44_800 },
       { platform: "shorts", url: "https://youtube.com/@omarmoney", followerCount: 18_400 },
@@ -625,7 +616,6 @@ const extraCreators: Creator[] = [
     bio: "Smart home, desk gear, and everyday tech reviews with practical setups and clean audio.",
     location: "Minneapolis, MN",
     status: "open",
-    tier: "micro",
     platforms: [
       { platform: "shorts", url: "https://youtube.com/@niagadgets", followerCount: 24_200 },
       { platform: "tiktok", url: "https://tiktok.com/@nia.gadgets", followerCount: 15_900 },
@@ -648,7 +638,6 @@ const extraCreators: Creator[] = [
     bio: "Family meals, kid snacks, and kitchen products tested in real weekday routines.",
     location: "Kansas City, MO",
     status: "busy",
-    tier: "nano",
     platforms: [
       { platform: "reels", url: "https://instagram.com/elise.table", followerCount: 8_700 },
       { platform: "tiktok", url: "https://tiktok.com/@elise.table", followerCount: 6_300 },
@@ -671,7 +660,6 @@ const extraCreators: Creator[] = [
     bio: "Gym apparel, supplements, and recovery products with high-energy edits and clear demos.",
     location: "Las Vegas, NV",
     status: "open",
-    tier: "elite",
     platforms: [
       { platform: "tiktok", url: "https://tiktok.com/@jayden.fit", followerCount: 402_000 },
       { platform: "reels", url: "https://instagram.com/jayden.fit", followerCount: 188_000 },
@@ -696,7 +684,6 @@ const extraCreators: Creator[] = [
     bio: "Apartment makeovers, renter-friendly DIY, and connected home gear for small spaces.",
     location: "Boston, MA",
     status: "open",
-    tier: "micro",
     platforms: [
       { platform: "reels", url: "https://instagram.com/riley.rooms", followerCount: 34_500 },
       { platform: "shorts", url: "https://youtube.com/@rileyrooms", followerCount: 13_200 },
@@ -719,7 +706,6 @@ const extraCreators: Creator[] = [
     bio: "Local beauty finds, salon visits, and quick product reviews with bright, friendly delivery.",
     location: "Orlando, FL",
     status: "open",
-    tier: "micro",
     platforms: [
       { platform: "tiktok", url: "https://tiktok.com/@sienna.shares", followerCount: 26_100 },
       { platform: "reels", url: "https://instagram.com/sienna.shares", followerCount: 17_700 },
@@ -742,7 +728,6 @@ const extraCreators: Creator[] = [
     bio: "Travel workouts, hotel gym reviews, and wellness products filmed on the road.",
     location: "Washington, DC",
     status: "open",
-    tier: "mid",
     platforms: [
       { platform: "tiktok", url: "https://tiktok.com/@malik.moves", followerCount: 154_000 },
       { platform: "reels", url: "https://instagram.com/malik.moves", followerCount: 71_000 },
@@ -766,7 +751,6 @@ const extraCreators: Creator[] = [
     bio: "Outfit checks, capsule wardrobes, and beauty pairings for brands that need polished UGC.",
     location: "Scottsdale, AZ",
     status: "open",
-    tier: "mid",
     platforms: [
       { platform: "reels", url: "https://instagram.com/ava.fitcheck", followerCount: 132_000 },
       { platform: "tiktok", url: "https://tiktok.com/@ava.fitcheck", followerCount: 49_800 },
@@ -790,7 +774,6 @@ const extraCreators: Creator[] = [
     bio: "Neighborhood restaurants, pop-ups, and founder-led food stories with fast turnaround.",
     location: "San Antonio, TX",
     status: "busy",
-    tier: "micro",
     platforms: [
       { platform: "tiktok", url: "https://tiktok.com/@mateo.local", followerCount: 31_200 },
       { platform: "reels", url: "https://instagram.com/mateo.local", followerCount: 20_500 },
@@ -813,7 +796,6 @@ const extraCreators: Creator[] = [
     bio: "Pet lifestyle and local dog-friendly guides with product tests that feel natural.",
     location: "Sacramento, CA",
     status: "open",
-    tier: "micro",
     platforms: [
       { platform: "reels", url: "https://instagram.com/chloe.paws", followerCount: 38_900 },
       { platform: "tiktok", url: "https://tiktok.com/@chloe.paws", followerCount: 16_600 },
@@ -836,7 +818,6 @@ const extraCreators: Creator[] = [
     bio: "Finance apps, creator tools, and workflow software explained without jargon.",
     location: "Philadelphia, PA",
     status: "open",
-    tier: "mid",
     platforms: [
       { platform: "shorts", url: "https://youtube.com/@quinncash", followerCount: 96_000 },
       { platform: "tiktok", url: "https://tiktok.com/@quinn.cash", followerCount: 58_000 },
@@ -860,7 +841,6 @@ const extraCreators: Creator[] = [
     bio: "Home routines, baby gear, and storage products with calm voiceover and clear before-after shots.",
     location: "Irvine, CA",
     status: "open",
-    tier: "micro",
     platforms: [
       { platform: "reels", url: "https://instagram.com/layla.nest", followerCount: 46_400 },
       { platform: "tiktok", url: "https://tiktok.com/@layla.nest", followerCount: 27_900 },
@@ -883,7 +863,6 @@ const extraCreators: Creator[] = [
     bio: "B2B SaaS demos, screen recordings, and founder-style explainers with conversion-focused scripts.",
     location: "Boulder, CO",
     status: "open",
-    tier: "mid",
     platforms: [
       { platform: "shorts", url: "https://youtube.com/@elliotdemo", followerCount: 143_000 },
       { platform: "tiktok", url: "https://tiktok.com/@elliot.demo", followerCount: 82_000 },
@@ -907,7 +886,6 @@ const extraCreators: Creator[] = [
     bio: "Wellness, skin prep, supplements, and gym bag essentials with relatable daily routines.",
     location: "Houston, TX",
     status: "open",
-    tier: "micro",
     platforms: [
       { platform: "tiktok", url: "https://tiktok.com/@bri.wellness", followerCount: 49_200 },
       { platform: "reels", url: "https://instagram.com/bri.wellness", followerCount: 31_300 },
@@ -930,7 +908,6 @@ const extraCreators: Creator[] = [
     bio: "Food tours, hotel breakfasts, and snack taste tests with punchy voiceover and clean captions.",
     location: "Honolulu, HI",
     status: "away",
-    tier: "mid",
     platforms: [
       { platform: "reels", url: "https://instagram.com/andre.eats", followerCount: 104_000 },
       { platform: "tiktok", url: "https://tiktok.com/@andre.eats", followerCount: 73_000 },
@@ -954,7 +931,6 @@ const extraCreators: Creator[] = [
     bio: "Home styling, outfit links, and decor finds edited for saves, shares, and shopping intent.",
     location: "Cincinnati, OH",
     status: "open",
-    tier: "nano",
     platforms: [
       { platform: "reels", url: "https://instagram.com/piper.styled", followerCount: 8_400 },
       { platform: "tiktok", url: "https://tiktok.com/@piper.styled", followerCount: 5_900 },
@@ -977,7 +953,6 @@ const extraCreators: Creator[] = [
     bio: "Fintech, payroll, and creator-economy tools explained through practical, numbers-first demos.",
     location: "St. Louis, MO",
     status: "open",
-    tier: "micro",
     platforms: [
       { platform: "tiktok", url: "https://tiktok.com/@isaiah.fintech", followerCount: 37_500 },
       { platform: "shorts", url: "https://youtube.com/@isaiahfintech", followerCount: 21_900 },

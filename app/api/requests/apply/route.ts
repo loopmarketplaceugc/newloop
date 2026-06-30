@@ -47,7 +47,7 @@ export async function GET(req: Request) {
     const ids = apps.map((a) => a.creator_id as string);
     const [{ data: profiles }, { data: details }] = await Promise.all([
       admin().from("profiles").select("id, name, handle, avatar_hue, bio").in("id", ids),
-      admin().from("creator_details").select("profile_id, niches, tier").in("profile_id", ids),
+      admin().from("creator_details").select("profile_id, niches").in("profile_id", ids),
     ]);
 
     const byId = new Map((profiles ?? []).map((p) => [p.id as string, p]));

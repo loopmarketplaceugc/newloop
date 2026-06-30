@@ -12,7 +12,7 @@ import { DEMO_CREATOR_ID } from "@/lib/seed";
 import { QrCode } from "@/components/shared/qr-code";
 import { TypeOnce } from "@/components/shared/typewriter";
 import { TikTokLogo, InstagramLogo, YouTubeLogo } from "@/components/shared/brand-logos";
-import { tierForFollowers, TIER_LABELS, NICHES, type Platform } from "@/lib/types";
+import { NICHES, type Platform } from "@/lib/types";
 import { formatCompact } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -116,7 +116,6 @@ export default function CreatorOnboarding() {
 
   const followerCountFor = (p: Platform) => numericInput(followers[p]);
   const totalFollowers = platforms.reduce((s, p) => s + followerCountFor(p), 0);
-  const tier = tierForFollowers(totalFollowers);
 
   useEffect(() => {
     setTyped(false);
@@ -194,7 +193,6 @@ export default function CreatorOnboarding() {
       ensureCreator(id, {
         name: nickname,
         status: "open",
-        tier,
         platforms: platformRows.map((r) => ({ platform: r.platform, url: "", followerCount: r.followerCount })),
       });
       setName(nickname);
@@ -416,13 +414,12 @@ export default function CreatorOnboarding() {
                   </div>
                   {totalFollowers > 0 && (
                     <motion.p
-                      key={tier}
+                      key="combined-followers"
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
                       className="text-sm font-bold text-[#faf6ef]/60"
                     >
-                      <span className="num">{formatCompact(totalFollowers)}</span> combined →{" "}
-                      <span className="sticker bg-[#f2a3df] text-ink">{TIER_LABELS[tier]} tier</span>
+                      <span className="num">{formatCompact(totalFollowers)}</span> combined followers
                     </motion.p>
                   )}
                 </div>
@@ -445,7 +442,6 @@ export default function CreatorOnboarding() {
                         </span>
                       );
                     })}
-                    <span className="sticker bg-[#a8d98a] text-ink">{TIER_LABELS[tier]} tier</span>
                     <span className="flex items-center gap-1.5 text-sm font-bold text-[#a8d98a]">
                       <span className="h-2.5 w-2.5 animate-pulse-dot rounded-full bg-[#a8d98a]" /> Open to Work
                     </span>
@@ -461,7 +457,7 @@ export default function CreatorOnboarding() {
                         {loopTag ?? "minting…"}
                       </p>
                       <p className="mt-3 max-w-xs text-sm font-medium leading-relaxed text-[#faf6ef]/55">
-                        Brands scan this to instantly see your verified profile — your name, tier, and portfolio in one tap.
+                        Brands scan this to instantly see your verified profile — your name, reach, and portfolio in one tap.
                       </p>
                     </div>
                     {loopTag && (

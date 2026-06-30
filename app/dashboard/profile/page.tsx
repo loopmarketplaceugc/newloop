@@ -10,8 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Label, Textarea } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Avatar } from "@/components/ui/avatar";
+import { AvatarEditor } from "@/components/creator/avatar-editor";
 import { CardSkeleton } from "@/components/ui/skeleton";
-import { TierBadge } from "@/components/shared/tier-badge";
+import { ReachBadge } from "@/components/shared/reach-badge";
 import { StatusDot } from "@/components/shared/status-dot";
 import { TikTokLogo, InstagramLogo, YouTubeLogo } from "@/components/shared/brand-logos";
 import { toast } from "@/components/ui/toast";
@@ -99,11 +100,16 @@ export default function ProfilePage() {
       {/* Identity card */}
       <Card>
         <CardContent className="flex flex-wrap items-center gap-4">
-          <Avatar name={me.name} hue={me.avatarHue} src={me.avatarUrl} size="xl" />
+          <AvatarEditor
+            name={me.name}
+            hue={me.avatarHue}
+            src={me.avatarUrl}
+            onChange={(avatarUrl) => updateCreator(me.id, { avatarUrl })}
+          />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-serif text-xl font-semibold">{me.name}</h2>
-              <TierBadge tier={me.tier} />
+              <ReachBadge platforms={me.platforms} />
             </div>
             <p className="text-sm text-text-secondary">@{me.handle} · {me.location}</p>
             {me.loopTag ? (
