@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { admin, authedUserId } from "@/lib/supabase-admin";
+import { sendNewApplicantEmail } from "./notify";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -194,6 +195,24 @@ export async function POST(req: Request) {
 
   const { data: reqData } = await admin().from("requests").select("title, company_id").eq("id", body.requestId).single();
   const { data: creatorData } = await admin().from("profiles").select("name").eq("id", callerId).single();
+
+  // Best-effort email to the brand that a creator applied. Never blocks the
+  // application — it's already recorded above.
+  if (reqData?.company_id) {
+    try {
+      const { data: companyUser } = await admin().auth.admin.getUserById(reqData.company_id as string);
+      const origin = new URL(req.url).origin;
+      await sendNewApplicantEmail({
+        to: companyUser?.user?.email ?? null,
+        creatorName: creatorData?.name ?? "A creator",
+        requestTitle: reqData.title ?? "your request",
+        reviewUrl: `${origin}/dashboard/requests/${body.requestId}`,
+      });
+    } catch {
+      // non-fatal
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     requestTitle: reqData?.title,
