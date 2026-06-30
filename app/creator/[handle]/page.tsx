@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { CardSkeleton } from "@/components/ui/skeleton";
 import { ReachBadge } from "@/components/shared/reach-badge";
+import { ChannelBento } from "@/components/creator/channel-bento";
 import { StatusDot } from "@/components/shared/status-dot";
 import { PlatformIcon } from "@/components/shared/platform-icon";
 import { StarRating } from "@/components/shared/star-rating";
@@ -101,15 +102,17 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
   };
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-5 py-8">
+    <div className="mx-auto w-full max-w-6xl px-5 py-6">
       <Link
         href={role === "company" ? "/dashboard/discover" : role === "creator" ? "/dashboard" : "/"}
-        className="mb-6 inline-flex items-center gap-1.5 text-[13px] text-text-secondary hover:text-text-primary"
+        className="mb-6 inline-flex items-center gap-2 rounded-full border-2 border-ink bg-surface px-5 py-2.5 text-sm font-bold text-ink shadow-[2px_2px_0_0_#101805] transition-all hover:-translate-y-0.5 hover:bg-ink hover:text-bg"
       >
-        <ArrowLeft className="h-3.5 w-3.5" /> Back
+        <ArrowLeft className="h-4 w-4" /> Back
       </Link>
 
-      <div className="flex flex-wrap items-start gap-5">
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-8">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start gap-5">
         <Avatar name={c.name} hue={c.avatarHue} src={c.avatarUrl} size="xl" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -274,6 +277,13 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
             </Card>
           ))
         )}
+      </div>
+        </div>
+
+        {/* Right rail — channel bento with platform switcher + profile links */}
+        <aside className="mt-8 space-y-4 lg:mt-0 lg:sticky lg:top-6">
+          <ChannelBento platforms={c.platforms} />
+        </aside>
       </div>
     </div>
   );
