@@ -26,7 +26,7 @@ import { CreatorTour } from "./creator-tour";
 import { companyById } from "@/lib/seed";
 import {
   ACTIVE_STATUSES,
-  ESCROW_HELD_STATUSES,
+  HELD_STATUSES,
   KANBAN_LANES,
   creatorPayoutCents,
 } from "@/lib/gig-machine";
@@ -73,7 +73,7 @@ export function CreatorDashboard() {
   const releaseTxs = transactions.filter((t) => t.type === "release" && myGigIds.has(t.gigId));
   const released = releaseTxs.reduce((s, t) => s + t.amountCents, 0);
   const pendingPayout = myGigs
-    .filter((g) => ESCROW_HELD_STATUSES.includes(g.status))
+    .filter((g) => HELD_STATUSES.includes(g.status))
     .reduce((s, g) => s + creatorPayoutCents(g.priceCents), 0);
   const myReviews = reviews.filter((r) => r.targetId === userId);
   const completedGigs = myGigs.filter((g) => ["PAID_OUT", "COMPLETED", "EXPIRED"].includes(g.status));

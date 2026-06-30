@@ -419,12 +419,12 @@ async function postMoney(path: string, body: Record<string, unknown>): Promise<M
   }
 }
 
-/** Brand funds a gig's escrow (server verifies payment + records it durably). */
-export function dbFundEscrow(p: { gigId: string; sessionId?: string | null }): Promise<MoneyResult> {
+/** Brand funds a gig's hold (server verifies payment + records it durably). */
+export function dbFundHold(p: { gigId: string; sessionId?: string | null }): Promise<MoneyResult> {
   return postMoney("/api/gigs/fund", { gigId: p.gigId, sessionId: p.sessionId ?? undefined });
 }
 
-/** Brand approves work → server releases escrow to the creator. */
+/** Brand approves work → server releases held funds to the creator. */
 export function dbReleaseFunds(gigId: string): Promise<MoneyResult> {
   return postMoney("/api/gigs/approve", { gigId });
 }

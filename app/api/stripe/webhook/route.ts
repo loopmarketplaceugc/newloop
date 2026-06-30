@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 /**
  * Authoritative Stripe webhook. This is the source of truth for funding state:
  * even if the brand closes the tab before returning from Checkout, the gig is
- * still moved into escrow here. The signature is verified against
+ * still moved into the held state here. The signature is verified against
  * STRIPE_WEBHOOK_SECRET so the endpoint can't be spoofed. All handlers are
  * idempotent, so Stripe's at-least-once retries are safe.
  */

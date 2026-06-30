@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 
 /**
- * Stripe money movement for Loop — SEPARATE CHARGES & TRANSFERS (true escrow).
+ * Stripe money movement for Loop — SEPARATE CHARGES & TRANSFERS (funds held by Loop).
  *
  * 1. Funding: the brand checks out for the full gig amount, collected entirely
  *    into Loop's platform balance. The money is genuinely held — nothing
@@ -48,7 +48,7 @@ export async function createAccountLink(
 }
 
 /**
- * Brand funds a gig's escrow. The full amount is collected into Loop's platform
+ * Brand funds a gig's hold. The full amount is collected into Loop's platform
  * balance (no transfer_data) and held until the brand approves the work. The
  * gig id is stamped on the PaymentIntent so the webhook can reconcile funding
  * server-side even if the brand never returns to the success URL.
@@ -95,7 +95,7 @@ export async function createGigCheckout(
 }
 
 /**
- * Release a creator's net payout from escrow on brand approval. Idempotency key
+ * Release a creator's net payout from the hold on brand approval. Idempotency key
  * is keyed to the gig so a retried/duplicated release can never transfer twice.
  */
 export async function createPayoutTransfer(
@@ -136,7 +136,7 @@ export async function createBalancePayout(
   );
 }
 
-/** Refund a brand from escrow on cancellation. Idempotency key keyed to the gig. */
+/** Refund a brand from the hold on cancellation. Idempotency key keyed to the gig. */
 export async function createGigRefund(
   stripe: Stripe,
   params: { paymentIntentId: string; amountCents: number; gigId: string },

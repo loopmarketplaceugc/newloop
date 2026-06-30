@@ -3,7 +3,7 @@ import { mainPath, STATUS_LABELS } from "@/lib/gig-machine";
 import { cn } from "@/lib/utils";
 import type { Gig } from "@/lib/types";
 
-export function EscrowTimeline({ gig }: { gig: Gig }) {
+export function HoldTimeline({ gig }: { gig: Gig }) {
   const steps = mainPath(gig.physicalProduct);
   const currentIndex = Math.max(0, steps.indexOf(gig.status));
 

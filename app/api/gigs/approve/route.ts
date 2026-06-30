@@ -3,7 +3,7 @@ import { authedUserId } from "@/lib/supabase-admin";
 import { releaseFunds } from "@/lib/ledger";
 
 /**
- * Brand approves delivered work → release escrow to the creator.
+ * Brand approves delivered work → release held funds to the creator.
  * Caller identity comes from their verified JWT, never the body, so a creator
  * cannot approve (and pay out) their own gig.
  */

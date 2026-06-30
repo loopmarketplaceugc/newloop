@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CardSkeleton } from "@/components/ui/skeleton";
 import { CountUpMoney } from "@/components/shared/count-up";
-import { ESCROW_HELD_STATUSES } from "@/lib/gig-machine";
+import { HELD_STATUSES } from "@/lib/gig-machine";
 import { formatDate, formatMoney } from "@/lib/format";
 import { toast } from "@/components/ui/toast";
 import { DEV_PAYMENTS, openBillingPortal } from "@/lib/payments";
@@ -30,8 +30,8 @@ export default function BillingPage() {
   const myTx = transactions
     .filter((t) => myGigIds.has(t.gigId) && (t.type === "fund" || t.type === "refund"))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const inEscrow = myGigs
-    .filter((g) => ESCROW_HELD_STATUSES.includes(g.status))
+  const onHold = myGigs
+    .filter((g) => HELD_STATUSES.includes(g.status))
     .reduce((s, g) => s + g.priceCents, 0);
   const funded = myTx.filter((t) => t.type === "fund").reduce((s, t) => s + t.amountCents, 0);
 
@@ -69,7 +69,7 @@ export default function BillingPage() {
         <div>
           <h1 className="font-serif text-4xl sm:text-5xl font-extrabold leading-[0.95]">Billing</h1>
           <p className="mt-2 text-sm font-bold text-text-secondary">
-            Creator payments are secured in escrow until you approve their work. Funds are released automatically on approval.
+            Creator payments are held securely until you approve their work. Funds are released automatically on approval.
           </p>
         </div>
         <Button onClick={handleManageBilling} disabled={openingPortal} variant="outline" size="sm">
@@ -84,8 +84,8 @@ export default function BillingPage() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardContent>
-            <p className="text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Secured in escrow</p>
-            <CountUpMoney cents={inEscrow} className="mt-1 block num text-3xl font-semibold" />
+            <p className="text-[11px] font-medium uppercase tracking-wider text-text-tertiary">On hold</p>
+            <CountUpMoney cents={onHold} className="mt-1 block num text-3xl font-semibold" />
             <p className="mt-1 flex items-center gap-1 text-xs text-text-tertiary">
               <ShieldCheck className="h-3.5 w-3.5 text-money" /> Released on creator approval
             </p>

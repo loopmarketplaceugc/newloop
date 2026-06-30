@@ -4,7 +4,7 @@ import { stripeClient, createGigCheckout } from "@/lib/stripe";
 import { admin, authedUserId } from "@/lib/supabase-admin";
 
 /**
- * Brand funds a gig's escrow. The amount and parties are derived SERVER-SIDE
+ * Brand funds a gig's hold. The amount and parties are derived SERVER-SIDE
  * from the gig row — never trusted from the request body — so a brand can't
  * underpay, overpay, or redirect the payout. Only the gig's own company may
  * fund it, and only while it's awaiting payment.

@@ -4,10 +4,10 @@ import { recordFunding } from "@/lib/ledger";
 import { stripeClient } from "@/lib/stripe";
 
 /**
- * Record that a gig's escrow has been funded by the brand.
+ * Record that a gig's hold has been funded by the brand.
  *
  * - Production (Stripe configured): a paid Checkout `sessionId` is required and
- *   verified against Stripe before any escrow is recorded — so funding can't be
+ *   verified against Stripe before any hold is recorded — so funding can't be
  *   faked without a real charge. The webhook is the primary path; this is the
  *   client's confirm-on-return path. Both are idempotent on (gig_id, fund).
  * - Dev (no Stripe): payments are simulated, so funding is recorded at the gig's
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
 
   const stripe = stripeClient();
 
-  // Production: never record escrow without a verified paid session.
+  // Production: never record a hold without a verified paid session.
   if (stripe) {
     if (!body.sessionId) {
       return NextResponse.json({ error: "Missing payment confirmation" }, { status: 400 });

@@ -316,7 +316,7 @@ export default function LandingPage() {
 
       {/* MARQUEE */}
       <div className="border-y-2 border-ink bg-ink text-[#a8d98a]">
-        <Marquee items={["Stripe payments", "AI scripts", "Escrow protected", "No ghosting", "Auto contracts", "Usage rights tracked"]} />
+        <Marquee items={["Stripe payments", "AI scripts", "Funds held safely", "No ghosting", "Auto contracts", "Usage rights tracked"]} />
       </div>
 
       {/* BRANDS STRIP */}

@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Avatar } from "@/components/ui/avatar";
 import { PlatformIcon } from "@/components/shared/platform-icon";
 import { companyById } from "@/lib/seed";
-import { ACTIVE_STATUSES, AUTO_APPROVE_DAYS, ESCROW_HELD_STATUSES } from "@/lib/gig-machine";
+import { ACTIVE_STATUSES, AUTO_APPROVE_DAYS, HELD_STATUSES } from "@/lib/gig-machine";
 import type { GigStatus } from "@/lib/types";
 import { daysUntil, formatMoney } from "@/lib/format";
 
@@ -29,8 +29,8 @@ export function CompanyDashboard() {
   const past = myGigs
     .filter((g) => PAST_STATUSES.includes(g.status))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const inEscrow = myGigs
-    .filter((g) => ESCROW_HELD_STATUSES.includes(g.status))
+  const onHold = myGigs
+    .filter((g) => HELD_STATUSES.includes(g.status))
     .reduce((s, g) => s + g.priceCents, 0);
   const spent = transactions
     .filter((t) => t.type === "fund" && myGigs.some((g) => g.id === t.gigId))
@@ -48,7 +48,7 @@ export function CompanyDashboard() {
           </h1>
           <p className="mt-2 font-bold text-text-secondary">
             <span className="num">{active.length}</span> active gig{active.length === 1 ? "" : "s"} ·{" "}
-            <span className="num">{formatMoney(inEscrow)}</span> secured
+            <span className="num">{formatMoney(onHold)}</span> on hold
           </p>
         </div>
         <Link
@@ -63,8 +63,8 @@ export function CompanyDashboard() {
       <div className="grid gap-5 sm:grid-cols-3">
         <Card className="bg-[#f2a3df]">
           <CardContent className="text-ink">
-            <span className="sticker bg-ink text-[11px] text-[#f2a3df]">secured</span>
-            <p className="num mt-2 font-serif text-4xl font-extrabold">{formatMoney(inEscrow)}</p>
+            <span className="sticker bg-ink text-[11px] text-[#f2a3df]">on hold</span>
+            <p className="num mt-2 font-serif text-4xl font-extrabold">{formatMoney(onHold)}</p>
             <p className="mt-1 text-xs font-bold opacity-60">creator payments in motion</p>
           </CardContent>
         </Card>

@@ -21,7 +21,7 @@ import { CountUpMoney } from "@/components/shared/count-up";
 import { companyById } from "@/lib/seed";
 import {
   creatorPayoutCents,
-  ESCROW_HELD_STATUSES,
+  HELD_STATUSES,
   USAGE_REMINDER_DAYS,
 } from "@/lib/gig-machine";
 import { daysUntil, formatDate, formatMoney } from "@/lib/format";
@@ -50,7 +50,7 @@ export default function WalletPage() {
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const released = myTx.filter((t) => t.type === "release").reduce((s, t) => s + t.amountCents, 0);
   const pending = myGigs
-    .filter((g) => ESCROW_HELD_STATUSES.includes(g.status))
+    .filter((g) => HELD_STATUSES.includes(g.status))
     .reduce((s, g) => s + creatorPayoutCents(g.priceCents), 0);
   const expiring = myGigs.filter((g) => g.usageExpiresAt && daysUntil(g.usageExpiresAt) > 0);
   const payoutsReady = Boolean(me?.stripePayoutsEnabled);

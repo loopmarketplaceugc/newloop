@@ -11,7 +11,7 @@ import {
 } from "@/lib/gig-machine";
 import {
   dbCancelGig,
-  dbFundEscrow,
+  dbFundHold,
   dbInsertContract,
   dbInsertDeliverable,
   dbInsertGig,
@@ -108,7 +108,7 @@ interface AppState {
   sendMessage: (m: { gigId: string; senderId: string; kind: MessageKind; text?: string; attachmentName?: string; offer?: OfferBody }) => void;
   respondToOffer: (messageId: string, accept: boolean) => void;
   transition: (gigId: string, to: GigStatus, patch?: Partial<Gig>) => boolean;
-  fundEscrow: (gigId: string, opts?: { sessionId?: string | null }) => Promise<void>;
+  fundHold: (gigId: string, opts?: { sessionId?: string | null }) => Promise<void>;
   submitDeliverable: (gigId: string, url: string) => void;
   requestRevision: (gigId: string, comment?: string) => void;
   approveDraft: (gigId: string) => void;
@@ -323,14 +323,14 @@ export const useApp = create<AppState>()(
         return true;
       },
 
-      fundEscrow: async (gigId, opts) => {
+      fundHold: async (gigId, opts) => {
         const gig = get().gigs.find((g) => g.id === gigId);
         if (!gig || !canTransition(gig.status, "FUNDED_IN_ESCROW")) return;
-        // Live: the server verifies the payment and writes escrow durably. We
+        // Live: the server verifies the payment and writes the hold durably. We
         // never persist money state from the client. Throw so the caller can
         // surface the failure; the poll reconciles state either way.
         if (!useSession.getState().isDemo) {
-          const r = await dbFundEscrow({ gigId, sessionId: opts?.sessionId });
+          const r = await dbFundHold({ gigId, sessionId: opts?.sessionId });
           if (!r.ok) throw new Error(r.error ?? "Could not confirm payment.");
         }
         const usageExpiresAt = new Date(Date.now() + gig.usageDays * 86_400_000).toISOString();
@@ -436,13 +436,13 @@ export const useApp = create<AppState>()(
         get().notify({ userId: gig.companyId, title: "Post is live", body: `${gig.title} was published. Approve the live post to release payment.`, href: `/gig/${gigId}` });
       },
 
-      /** Brand approves the live post → server releases escrow (fee + payout), unlocks files. */
+      /** Brand approves the live post → server releases held funds (fee + payout), unlocks files. */
       approveAndRelease: async (gigId) => {
         const gig = get().gigs.find((g) => g.id === gigId);
         if (!gig || !canTransition(gig.status, "COMPLETED")) return;
         // Live: the server is the sole authority for releasing money — it
         // verifies the caller is the brand, derives the payout from the amount
-        // actually escrowed, and writes the ledger + creator balance.
+        // actually held, and writes the ledger + creator balance.
         if (!useSession.getState().isDemo) {
           const r = await dbReleaseFunds(gigId);
           if (!r.ok) throw new Error(r.error ?? "Could not release payment.");

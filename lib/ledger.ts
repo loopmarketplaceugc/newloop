@@ -17,7 +17,7 @@ import type { GigStatus } from "@/lib/types";
  * can never move money twice.
  *
  * Key safety invariant: a creator's payout is derived from the amount that was
- * ACTUALLY collected into escrow (the recorded `fund` transaction), never from
+ * ACTUALLY collected into the hold (the recorded `fund` transaction), never from
  * the gig's current `price_cents`, which is denormalised and (in theory)
  * mutable. Combined with the DB-level `unique(gig_id, type)` constraint and the
  * price-freeze trigger, this makes the payout amount tamper-proof.
@@ -74,7 +74,7 @@ async function hasTx(gigId: string, type: string): Promise<boolean> {
 }
 
 /**
- * Record that a gig's escrow has been funded (called by the Stripe webhook and,
+ * Record that a gig's hold has been funded (called by the Stripe webhook and,
  * in dev mode, by the brand-initiated fund route). Idempotent on (gig_id, fund).
  * `amountCents` is the authoritative amount that was charged.
  */
@@ -171,7 +171,7 @@ export async function payoutOwedBalance(params: {
 }
 
 /**
- * Release escrowed funds to the creator on brand approval. Verified caller must
+ * Release held funds to the creator on brand approval. Verified caller must
  * be the gig's company. Idempotent on (gig_id, release).
  */
 export async function releaseFunds(params: {

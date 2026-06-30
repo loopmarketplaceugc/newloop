@@ -104,7 +104,7 @@ export const KANBAN_LANES: { label: string; statuses: GigStatus[] }[] = [
 ];
 
 /** Payment has been secured in these states. */
-export const ESCROW_HELD_STATUSES: GigStatus[] = [
+export const HELD_STATUSES: GigStatus[] = [
   "FUNDED_IN_ESCROW",
   "PRODUCT_SHIPPED",
   "PRODUCT_DELIVERED",
@@ -128,8 +128,8 @@ export const ACTIVE_STATUSES: GigStatus[] = [
   "PUBLISHED",
 ];
 
-export function isEscrowHeld(gig: Gig): boolean {
-  return ESCROW_HELD_STATUSES.includes(gig.status);
+export function isHeld(gig: Gig): boolean {
+  return HELD_STATUSES.includes(gig.status);
 }
 
 /** Refund rules per stage on cancellation. */

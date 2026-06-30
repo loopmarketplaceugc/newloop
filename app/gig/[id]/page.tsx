@@ -36,7 +36,7 @@ import { CardSkeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 import { StarPicker } from "@/components/shared/star-rating";
 import { PlatformIcon } from "@/components/shared/platform-icon";
-import { EscrowTimeline } from "@/components/gig/escrow-timeline";
+import { HoldTimeline } from "@/components/gig/hold-timeline";
 import { companyById } from "@/lib/seed";
 import { fetchMyWorld, fetchProfileNames, subscribeToGig } from "@/lib/sync";
 import { haptics } from "@/lib/haptics";
@@ -117,13 +117,13 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
       void (async () => {
         try {
           if (!sessionId) throw new Error("Missing Stripe confirmation.");
-          // Server verifies the payment with Stripe and records escrow durably.
+          // Server verifies the payment with Stripe and records the hold durably.
           if (gig.status === "OFFER_ACCEPTED") {
-            await useApp.getState().fundEscrow(gig.id, { sessionId });
+            await useApp.getState().fundHold(gig.id, { sessionId });
           }
           haptics.success();
           toast("Payment secured", {
-            body: "Funds are held in escrow — the creator is cleared to start.",
+            body: "Funds are held securely — the creator is cleared to start.",
             tone: "success",
           });
         } catch (e) {
@@ -596,7 +596,7 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
               <p className="text-[12px] leading-relaxed text-text-secondary">
                 {isCreator
                   ? "The brand is reviewing this gig. They can clear you to publish, or cancel it for a refund."
-                  : "Revisions are exhausted. Resolve it: clear the creator to publish, or cancel and refund the escrow."}
+                  : "Revisions are exhausted. Resolve it: clear the creator to publish, or cancel and refund the held funds."}
               </p>
               {!isCreator && (
                 <div className="flex flex-col gap-2 pt-1">
@@ -617,7 +617,7 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
                       try {
                         await app.cancelGig(gig.id);
                         haptics.success();
-                        toast("Gig cancelled", { body: "The escrow has been refunded per policy.", tone: "info" });
+                        toast("Gig cancelled", { body: "The held funds have been refunded per policy.", tone: "info" });
                       } catch (e) {
                         haptics.error();
                         toast("Couldn’t cancel", { body: e instanceof Error ? e.message : "Try again shortly.", tone: "warning" });
@@ -976,7 +976,7 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
               </div>
               <div>
                 <p className="mb-3 text-[11px] font-medium uppercase tracking-wider text-text-tertiary">Timeline</p>
-                <EscrowTimeline
+                <HoldTimeline
                   gig={
                     shownStatus === "EXPIRED"
                       ? { ...gig, status: "COMPLETED" as const }

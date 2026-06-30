@@ -71,7 +71,7 @@ export default function LegalPage() {
                 <li>Provide, operate, maintain, and improve the platform and its features.</li>
                 <li>Create and manage your account, and verify your identity.</li>
                 <li>Match creators and brands based on niche, platform, follower tier, budget, and other preferences.</li>
-                <li>Facilitate gig creation, contracting, deliverable review, escrow funding, and payouts.</li>
+                <li>Facilitate gig creation, contracting, deliverable review, funding holds, and payouts.</li>
                 <li>Process payments and send payment confirmations, payout notifications, and invoices through Stripe.</li>
                 <li>Send transactional emails including account confirmation, password resets, offer alerts, contract updates, dispute notices, and payout confirmations.</li>
                 <li>Respond to support requests, feedback, and dispute resolutions.</li>
@@ -253,7 +253,7 @@ export default function LegalPage() {
             <div>
               <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">3. Description of the Platform</h2>
               <p>
-                Loop is a two-sided marketplace that facilitates introductions, negotiations, contracting, content delivery, escrow, and payment between content creators (&ldquo;<strong>Creators</strong>&rdquo;) and brands, businesses, and marketing teams (&ldquo;<strong>Brands</strong>&rdquo;). Loop provides the technology infrastructure and support services that enable these interactions but is not a party to any underlying agreement between a Creator and a Brand. Loop does not produce, commission, endorse, or guarantee any content, campaign outcome, return on investment, engagement rate, or other result.
+                Loop is a two-sided marketplace that facilitates introductions, negotiations, contracting, content delivery, funds holding, and payment between content creators (&ldquo;<strong>Creators</strong>&rdquo;) and brands, businesses, and marketing teams (&ldquo;<strong>Brands</strong>&rdquo;). Loop provides the technology infrastructure and support services that enable these interactions but is not a party to any underlying agreement between a Creator and a Brand. Loop does not produce, commission, endorse, or guarantee any content, campaign outcome, return on investment, engagement rate, or other result.
               </p>
               <p className="mt-3">
                 Loop reserves the right, at its sole discretion, to modify, suspend, discontinue, or restrict access to any feature or portion of the Platform at any time, with or without notice, and without liability to you. We are not obligated to provide any specific feature or maintain any feature in its current form.
@@ -281,13 +281,13 @@ export default function LegalPage() {
                 <strong>5.1 All Connections Must Transact Through Loop.</strong> Any connection, introduction, match, or communication between a Creator and a Brand that originates on or through the Platform — including connections made through the Discover feature, Loop-generated proposals, Loop tag scans, messages initiated on the Platform, or any referral or introduction traceable to Loop — must result in all associated paid work, content production, licensing, usage rights, sponsorships, and payments being completed exclusively through the Platform. You may not use the Platform merely to identify counterparties and then conduct business outside of it. Doing so (&ldquo;<strong>circumvention</strong>&rdquo;) is a material breach of these Terms and may result in legal liability.
               </p>
               <p className="mt-3">
-                <strong>5.2 Mandatory Use of Loop Escrow and Payment Systems.</strong> All financial transactions arising from a Creator-Brand relationship that originated on Loop must be funded, held, and released through Loop&rsquo;s escrow and payment infrastructure, powered by Stripe. You may not arrange, accept, request, or facilitate payments outside Loop&rsquo;s payment system for any work that falls within the scope of a Loop-originated relationship, regardless of the medium through which such payments are made (including but not limited to bank transfer, cash, cryptocurrency, gift cards, barter, or third-party payment applications).
+                <strong>5.2 Mandatory Use of Loop Payment and Funds-Hold Systems.</strong> All financial transactions arising from a Creator-Brand relationship that originated on Loop must be funded, held, and released through Loop&rsquo;s payment and funds-hold infrastructure, powered by Stripe. You may not arrange, accept, request, or facilitate payments outside Loop&rsquo;s payment system for any work that falls within the scope of a Loop-originated relationship, regardless of the medium through which such payments are made (including but not limited to bank transfer, cash, cryptocurrency, gift cards, barter, or third-party payment applications).
               </p>
               <p className="mt-3">
                 <strong>5.3 Twelve-Month Non-Circumvention Period.</strong> The prohibition on circumvention applies during the active term of any gig and for a period of <strong>twelve (12) calendar months</strong> following the completion, cancellation, or expiration of the most recent gig between a given Creator and Brand pair. During this period, you may not engage, contract, hire, or otherwise work with any counterparty you first encountered through Loop for any paid content, marketing, or sponsorship work outside of the Platform.
               </p>
               <p className="mt-3">
-                <strong>5.4 Consequences of Circumvention.</strong> If Loop determines, in its reasonable judgment, that circumvention has occurred, Loop may, without limitation: (a) immediately suspend or permanently terminate the accounts of all parties involved; (b) forfeit any escrowed funds in accordance with the applicable cancellation policy; (c) pursue damages, including Loop&rsquo;s lost service fees calculated at the standard rate on the estimated value of the off-platform transaction, plus reasonable attorneys&rsquo; fees; and (d) report the conduct to relevant regulatory or law enforcement authorities where applicable.
+                <strong>5.4 Consequences of Circumvention.</strong> If Loop determines, in its reasonable judgment, that circumvention has occurred, Loop may, without limitation: (a) immediately suspend or permanently terminate the accounts of all parties involved; (b) forfeit any held funds in accordance with the applicable cancellation policy; (c) pursue damages, including Loop&rsquo;s lost service fees calculated at the standard rate on the estimated value of the off-platform transaction, plus reasonable attorneys&rsquo; fees; and (d) report the conduct to relevant regulatory or law enforcement authorities where applicable.
               </p>
               <p className="mt-3">
                 <strong>5.5 Reporting Circumvention.</strong> If you become aware of or are solicited to engage in circumvention, you are encouraged to report it to Loop at <a href="mailto:legal@loop.so" className="underline underline-offset-2">legal@loop.so</a>. Loop will investigate all credible reports and may offer protections to good-faith reporters.
@@ -303,20 +303,20 @@ export default function LegalPage() {
                 <strong>6.2 Mandatory Compliance with Contract Terms.</strong> Both Creators and Brands must comply in full with all terms of their signed Gig Contracts, including but not limited to deliverable specifications, creative brief requirements, timelines and deadlines, revision rounds, post-lifetime requirements, usage rights granted, compensation amounts, and FTC and advertising disclosure obligations. No party may unilaterally modify, waive, or deviate from the signed Gig Contract terms without the express written agreement of the counterparty and acknowledgment by Loop.
               </p>
               <p className="mt-3">
-                <strong>6.3 Contract Formation.</strong> A Gig Contract is formed when: (a) a Brand posts a gig or sends an offer; (b) the Creator accepts the offer within the Platform; and (c) the Brand funds the escrow in full. No Gig Contract is enforceable until all three conditions are met. Loop is not a party to the Gig Contract but provides the technology infrastructure through which it is formed and executed.
+                <strong>6.3 Contract Formation.</strong> A Gig Contract is formed when: (a) a Brand posts a gig or sends an offer; (b) the Creator accepts the offer within the Platform; and (c) the Brand funds the hold in full. No Gig Contract is enforceable until all three conditions are met. Loop is not a party to the Gig Contract but provides the technology infrastructure through which it is formed and executed.
               </p>
               <p className="mt-3">
                 <strong>6.4 Modification of Contract Terms.</strong> Requests to modify a Gig Contract&rsquo;s scope, timeline, or compensation must be initiated and accepted through the Platform&rsquo;s offer amendment features. Verbal or off-platform agreements to modify a Gig Contract are not recognized by Loop and will not affect dispute resolution outcomes.
               </p>
               <p className="mt-3">
-                <strong>6.5 Contract Enforcement.</strong> In the event of a dispute regarding compliance with a Gig Contract, Loop&rsquo;s dispute resolution team will assess the dispute based solely on the written Gig Contract terms and evidence submitted through the Platform. Loop&rsquo;s decision regarding escrow release in a dispute is final and binding. Users are encouraged to document all material communications and deliverable submissions within the Platform.
+                <strong>6.5 Contract Enforcement.</strong> In the event of a dispute regarding compliance with a Gig Contract, Loop&rsquo;s dispute resolution team will assess the dispute based solely on the written Gig Contract terms and evidence submitted through the Platform. Loop&rsquo;s decision regarding release of held funds in a dispute is final and binding. Users are encouraged to document all material communications and deliverable submissions within the Platform.
               </p>
             </div>
 
             <div>
-              <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">7. Payments, Escrow, and Fees</h2>
+              <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">7. Payments, Funds Holds, and Fees</h2>
               <p>
-                <strong>7.1 Escrow Model.</strong> All gig payments are processed through Loop&rsquo;s escrow system. When a Brand funds a gig, the payment is held securely and not released to the Creator until the Brand approves the deliverable or the auto-approval deadline passes without action. This protects both parties: Brands are assured funds are held until work is delivered; Creators are assured payment is secured before production begins.
+                <strong>7.1 Funds-Hold Model.</strong> All gig payments are processed through Loop&rsquo;s funds-hold system. When a Brand funds a gig, the payment is held securely by Loop and not released to the Creator until the Brand approves the deliverable or the auto-approval deadline passes without action. For the avoidance of doubt, Loop is not a bank, trust company, or licensed escrow agent, and the holding of funds described here does not constitute an escrow service in any regulated sense; it is a contractual payment-holding arrangement operated through Loop&rsquo;s payment processor. This protects both parties: Brands are assured funds are held until work is delivered; Creators are assured payment is secured before production begins.
               </p>
               <p className="mt-3">
                 <strong>7.2 Fee Structure.</strong> Loop charges a platform service fee on each transaction. The exact fee amount applicable to your account type and transaction is displayed in full on the deal summary screen before you confirm a gig. Fees are non-refundable except as expressly stated in these Terms or required by applicable law.
@@ -355,8 +355,8 @@ export default function LegalPage() {
               <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">9. Brand Obligations</h2>
               <ul className="ml-5 list-disc space-y-2">
                 <li><strong>Lawful and clear briefs.</strong> Brands must provide creative briefs that are clear, lawful, and free of misleading, defamatory, or illegal content. Briefs may not instruct Creators to make false claims about a product or to omit required disclosures.</li>
-                <li><strong>Timely escrow funding.</strong> Brands must fund escrow in full before a gig enters active production. Loop will not permit production to commence until escrow is fully funded.</li>
-                <li><strong>Timely review.</strong> Brands must review submitted deliverables within the review window specified in the Gig Contract. Failure to approve or request revision within the auto-approval period constitutes acceptance of the deliverable, and the escrowed funds will be released to the Creator.</li>
+                <li><strong>Timely funding.</strong> Brands must fund the hold in full before a gig enters active production. Loop will not permit production to commence until the hold is fully funded.</li>
+                <li><strong>Timely review.</strong> Brands must review submitted deliverables within the review window specified in the Gig Contract. Failure to approve or request revision within the auto-approval period constitutes acceptance of the deliverable, and the held funds will be released to the Creator.</li>
                 <li><strong>Reasonable revision requests.</strong> Revision requests must be materially consistent with the original creative brief. Brands may not use the revision process to impose new requirements not contemplated by the Gig Contract.</li>
                 <li><strong>Accurate brand information.</strong> Brands must provide accurate information about their company, website, and budget range. Misrepresentation of brand identity or intent is a material breach.</li>
                 <li><strong>Non-circumvention.</strong> Brands may not contact, engage, negotiate with, or transact with any Creator they discovered through Loop outside of the Platform during the active gig period or within the 12-month non-circumvention period described in Section 5.</li>
@@ -387,7 +387,7 @@ export default function LegalPage() {
               <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">11. Prohibited Conduct</h2>
               <p className="mb-2">You agree not to:</p>
               <ul className="ml-5 list-disc space-y-1">
-                <li>Circumvent, bypass, or attempt to bypass Loop&rsquo;s payment, escrow, or fee systems in any way.</li>
+                <li>Circumvent, bypass, or attempt to bypass Loop&rsquo;s payment, funds-hold, or fee systems in any way.</li>
                 <li>Take any Loop-originated creator-brand relationship off-platform in violation of Section 5.</li>
                 <li>Post false, misleading, deceptive, or fraudulent information on your profile or in any gig communication.</li>
                 <li>Misrepresent your identity, credentials, audience size, engagement rates, or affiliation with any brand or organization.</li>
@@ -405,7 +405,7 @@ export default function LegalPage() {
                 <li>Use another user&rsquo;s content, profile data, or Loop tag without their consent.</li>
               </ul>
               <p className="mt-3">
-                Violations of this section may result in immediate account suspension or permanent termination, forfeiture of any balance or escrowed funds, civil or criminal liability, and referral to law enforcement where applicable. Loop may pursue all available legal and equitable remedies for prohibited conduct.
+                Violations of this section may result in immediate account suspension or permanent termination, forfeiture of any balance or held funds, civil or criminal liability, and referral to law enforcement where applicable. Loop may pursue all available legal and equitable remedies for prohibited conduct.
               </p>
             </div>
 
@@ -425,10 +425,10 @@ export default function LegalPage() {
                 <strong>13.2 Loop&rsquo;s Role.</strong> Loop will review dispute submissions and may request additional evidence, documentation, or statements from either or both parties. Loop will endeavor to issue a dispute decision within 10 business days of receiving all required information.
               </p>
               <p className="mt-3">
-                <strong>13.3 Finality of Escrow Decisions.</strong> Loop&rsquo;s decision regarding the release, partial release, or return of escrowed funds in a dispute is final and binding on all parties. Loop&rsquo;s liability in any dispute is limited to the amount held in escrow at the time the dispute is initiated.
+                <strong>13.3 Finality of Funds-Hold Decisions.</strong> Loop&rsquo;s decision regarding the release, partial release, or return of held funds in a dispute is final and binding on all parties. Loop&rsquo;s liability in any dispute is limited to the amount held at the time the dispute is initiated.
               </p>
               <p className="mt-3">
-                <strong>13.4 User-to-User Claims.</strong> Any legal claims arising between a Creator and a Brand that go beyond escrow amounts must be pursued independently between those parties. Loop is not a party to Gig Contracts and is not liable for damages arising from a counterparty&rsquo;s breach of a Gig Contract beyond the escrowed amount.
+                <strong>13.4 User-to-User Claims.</strong> Any legal claims arising between a Creator and a Brand that go beyond held amounts must be pursued independently between those parties. Loop is not a party to Gig Contracts and is not liable for damages arising from a counterparty&rsquo;s breach of a Gig Contract beyond the held amount.
               </p>
             </div>
 
