@@ -149,6 +149,10 @@ export function refundPolicy(status: GigStatus): {
     case "APPROVED":
     case "PUBLISHED":
       return { companyRefundPct: 0, note: "No refund after delivery — open a dispute instead." };
+    case "DISPUTED":
+      // Disputes are resolved by Loop, never via a self-serve full refund — otherwise
+      // a brand could dispute already-delivered/published work and claw back 100%.
+      return { companyRefundPct: 0, note: "Disputes are resolved by Loop support." };
     default:
       return { companyRefundPct: 100, note: "No payment captured yet." };
   }

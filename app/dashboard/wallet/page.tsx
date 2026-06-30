@@ -204,10 +204,12 @@ export default function WalletPage() {
     setWSubmitting(true);
     haptics.step();
     try {
+      // One key per submit so an accidental retry of this request can't double-pay.
+      const idempotencyKey = crypto.randomUUID();
       const res = await fetch("/api/wallet/withdraw", {
         method: "POST",
         headers: await authHeaders(),
-        body: JSON.stringify({ amountCents: withdrawAmountCents, method: wMethod, destination: wDest.trim() }),
+        body: JSON.stringify({ amountCents: withdrawAmountCents, method: wMethod, destination: wDest.trim(), idempotencyKey }),
       });
       const d = (await res.json()) as { ok?: boolean; error?: string; balanceCents?: number; automated?: boolean };
       if (!res.ok || !d.ok) throw new Error(d.error ?? "Could not submit your request.");

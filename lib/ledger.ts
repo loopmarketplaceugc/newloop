@@ -23,7 +23,10 @@ import type { GigStatus } from "@/lib/types";
  * price-freeze trigger, this makes the payout amount tamper-proof.
  */
 
-const PRE_FUNDING: GigStatus[] = ["DRAFT", "OFFER_SENT", "OFFER_ACCEPTED"];
+// Funding may only advance a gig that the brand has actually accepted an offer
+// on. DRAFT / OFFER_SENT have no signed contract (and possibly price 0), so a
+// stray funding event must never push them into escrow.
+const PRE_FUNDING: GigStatus[] = ["OFFER_ACCEPTED"];
 // Payment is released only after the creator has PUBLISHED the live post and the
 // brand approves it. Approving the draft (DELIVERED -> APPROVED) and publishing
 // (APPROVED -> PUBLISHED) move no money.
@@ -208,6 +211,10 @@ export async function releaseFunds(params: {
   }
 
   // Move the money for real if Stripe is live and the creator can receive it.
+  // `transferred` tracks whether the payout already left to the creator's bank —
+  // if so we must NOT also credit their withdrawable balance, or they'd be paid
+  // twice (once to bank, again via a manual withdrawal of balance_cents).
+  let transferred = false;
   const stripe = stripeClient();
   if (stripe) {
     const { data: creator } = await sb
@@ -229,6 +236,7 @@ export async function releaseFunds(params: {
           .update({ stripe_ref: transfer.id })
           .eq("gig_id", gigId)
           .eq("type", "release");
+        transferred = true;
       } catch (e) {
         // Roll back the claim so the brand can retry once payouts are fixed.
         await sb.from("transactions").delete().eq("gig_id", gigId).in("type", ["fee", "release"]);
@@ -240,10 +248,13 @@ export async function releaseFunds(params: {
       }
     }
     // If not connected, funds stay in the platform balance and the creator's
-    // `balance_cents` records what they're owed until they onboard payouts.
+    // `balance_cents` records what they're owed until they withdraw it.
   }
 
-  await sb.rpc("credit_balance", { p_uid: gig.creator_id, p_amount: payout });
+  // Only accrue to the withdrawable balance when the money did NOT auto-transfer.
+  if (!transferred) {
+    await sb.rpc("credit_balance", { p_uid: gig.creator_id, p_amount: payout });
+  }
   // Stamp completed_at so the expiry clock (min post lifetime) can start.
   await sb
     .from("gigs")
@@ -273,20 +284,37 @@ export async function recordRefund(params: {
   if (gig.status === "COMPLETED" || gig.status === "CANCELLED") {
     return { ok: false, status: 409, error: "Gig is already closed" };
   }
+  // Disputes are resolved by Loop support, not via a self-serve cancel/refund —
+  // otherwise a brand could dispute already-delivered work and claw back funds.
+  if (gig.status === "DISPUTED") {
+    return { ok: false, status: 409, error: "This gig is in dispute — Loop support will resolve it." };
+  }
 
+  const cancel = () => sb.from("gigs").update({ status: "CANCELLED" }).eq("id", gigId);
   const funded = await fundedAmountCents(gigId);
 
-  // Mark cancelled regardless; refund only if money was collected.
-  await sb.from("gigs").update({ status: "CANCELLED" }).eq("id", gigId);
+  // Nothing was ever charged → safe to cancel immediately.
+  if (funded == null) {
+    await cancel();
+    return { ok: true };
+  }
 
-  if (funded == null) return { ok: true }; // nothing was ever charged
-
-  if (await hasTx(gigId, "refund")) return { ok: true, alreadyDone: true };
+  // Already refunded once → ensure the gig is closed and return idempotently.
+  if (await hasTx(gigId, "refund")) {
+    await cancel();
+    return { ok: true, alreadyDone: true };
+  }
 
   const { companyRefundPct } = refundPolicy(gig.status);
   const refundCents = Math.round((funded * companyRefundPct) / 100);
-  if (refundCents <= 0) return { ok: true, refund: 0 };
 
+  // No refund due (e.g. post-delivery) → just close the gig.
+  if (refundCents <= 0) {
+    await cancel();
+    return { ok: true, refund: 0 };
+  }
+
+  // Claim the refund atomically (unique constraint guards against double refund).
   const { error: insErr } = await sb.from("transactions").insert({
     gig_id: gigId,
     type: "refund",
@@ -294,10 +322,16 @@ export async function recordRefund(params: {
     stripe_ref: `re_${gigId}`,
   });
   if (insErr) {
-    if (insErr.code === UNIQUE_VIOLATION) return { ok: true, alreadyDone: true };
+    if (insErr.code === UNIQUE_VIOLATION) {
+      await cancel();
+      return { ok: true, alreadyDone: true };
+    }
     return { ok: false, status: 400, error: insErr.message };
   }
 
+  // Move the money. Only mark the gig CANCELLED AFTER the refund settles, so a
+  // Stripe failure leaves the gig in its current (refundable) state to retry —
+  // never stranded as CANCELLED-but-unrefunded.
   const stripe = stripeClient();
   if (stripe) {
     const { data: fundTx } = await sb
@@ -330,5 +364,6 @@ export async function recordRefund(params: {
     }
   }
 
+  await cancel();
   return { ok: true, refund: refundCents };
 }

@@ -14,6 +14,8 @@ const schema = z.object({
   amountCents: z.number().int().positive("Enter an amount greater than $0"),
   method: z.enum(["cashapp", "venmo", "zelle", "card"]),
   destination: z.string().trim().max(120).optional().default(""),
+  // Stable per withdrawal attempt (client-generated) so retries can't double-pay.
+  idempotencyKey: z.string().min(8).max(100),
 });
 
 function escapeHtml(v: string) {
@@ -36,7 +38,10 @@ function looksLikeCardNumber(v: string) {
 
 async function sendEmail(to: string, subject: string, html: string) {
   const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey || !to) return { sent: false, reason: "email-not-configured" };
+  if (!apiKey || !to) {
+    console.warn("[withdraw] email skipped — not configured", { hasKey: Boolean(apiKey), to });
+    return { sent: false, reason: "email-not-configured" };
+  }
   const from = process.env.EMAIL_FROM ?? "Loop <onboarding@resend.dev>";
   const replyTo = process.env.EMAIL_REPLY_TO;
   const res = await fetch("https://api.resend.com/emails", {
@@ -44,7 +49,13 @@ async function sendEmail(to: string, subject: string, html: string) {
     headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
     body: JSON.stringify({ from, to, subject, html, ...(replyTo ? { reply_to: replyTo } : {}) }),
   });
-  if (!res.ok) return { sent: false, reason: (await res.text()).slice(0, 300) };
+  if (!res.ok) {
+    const reason = (await res.text()).slice(0, 400);
+    // Common cause: EMAIL_FROM is onboarding@resend.dev (Resend's shared domain),
+    // which can only send to the account owner's address. Verify a domain in Resend.
+    console.error("[withdraw] Resend send failed", { to, from, status: res.status, reason });
+    return { sent: false, reason };
+  }
   return { sent: true, reason: null };
 }
 
@@ -130,9 +141,16 @@ export async function POST(req: Request) {
 
   const { data: profile } = await admin()
     .from("profiles")
-    .select("name, handle, balance_cents, stripe_account_id, stripe_payouts_enabled")
+    .select("role, name, handle, balance_cents, stripe_account_id, stripe_payouts_enabled")
     .eq("id", callerId)
     .single();
+
+  // Only creators withdraw earnings. Brand prepaid top-ups land in the same
+  // balance_cents column but must never be cashable-out (that would be a
+  // card-charge-to-cash laundering path).
+  if ((profile?.role as string | undefined) !== "creator") {
+    return NextResponse.json({ error: "Only creator accounts can withdraw." }, { status: 403 });
+  }
 
   const balance = (profile?.balance_cents as number | undefined) ?? 0;
   if (amountCents > balance) {
@@ -153,6 +171,42 @@ export async function POST(req: Request) {
     }
   }
 
+  // Idempotency claim. A client-stable key means a retried/duplicated submit
+  // can't debit or pay twice. Best-effort: if the withdrawals table isn't
+  // migrated yet we degrade (the Stripe key still dedupes card payouts).
+  const idempotencyKey = parsed.data.idempotencyKey;
+  let withdrawalId: string | null = null;
+  {
+    const { data: wrow, error: wErr } = await admin()
+      .from("withdrawals")
+      .insert({
+        creator_id: callerId,
+        idempotency_key: idempotencyKey,
+        amount_cents: amountCents,
+        method,
+        destination: destination || null,
+        status: "processing",
+      })
+      .select("id")
+      .maybeSingle();
+    if (wErr) {
+      if (wErr.code === "23505") {
+        // Same key already processed → idempotent no-op (never debit/pay twice).
+        return NextResponse.json({ ok: true, duplicate: true });
+      }
+      if (!/withdrawals|schema cache|does not exist|relation/i.test(wErr.message)) {
+        return NextResponse.json({ error: wErr.message }, { status: 400 });
+      }
+      // else: table not migrated yet — proceed without the claim row.
+    } else {
+      withdrawalId = (wrow?.id as string | undefined) ?? null;
+    }
+  }
+
+  const failClaim = async () => {
+    if (withdrawalId) await admin().from("withdrawals").delete().eq("id", withdrawalId);
+  };
+
   // Atomic, guarded debit — only succeeds if the balance is still what we read.
   const { data: debited } = await admin()
     .from("profiles")
@@ -162,11 +216,23 @@ export async function POST(req: Request) {
     .select("balance_cents")
     .maybeSingle();
   if (!debited) {
+    await failClaim();
     return NextResponse.json({ error: "Your balance just changed — refresh and try again." }, { status: 409 });
   }
   const newBalance = debited.balance_cents as number;
 
-  const rollback = () => admin().rpc("credit_balance", { p_uid: callerId, p_amount: amountCents });
+  // Undo both the debit and the idempotency claim so the request can be retried.
+  const rollback = async () => {
+    await admin().rpc("credit_balance", { p_uid: callerId, p_amount: amountCents });
+    await failClaim();
+  };
+  const finalizeClaim = async (stripeRef: string | null) => {
+    if (!withdrawalId) return;
+    await admin()
+      .from("withdrawals")
+      .update({ status: isCard ? "paid" : "requested", ...(stripeRef ? { stripe_ref: stripeRef } : {}) })
+      .eq("id", withdrawalId);
+  };
 
   const methodLabel = METHOD_LABELS[method];
   const amount = money(amountCents);
@@ -181,14 +247,17 @@ export async function POST(req: Request) {
 
   // ── Card: Stripe automation (pays the creator's connected account) ──
   if (isCard) {
+    let stripeRef: string | null = null;
     if (stripe) {
       try {
-        await createBalancePayout(stripe, {
+        const transfer = await createBalancePayout(stripe, {
           amountCents,
           destination: profile!.stripe_account_id as string,
           creatorId: callerId,
-          idempotencyKey: `withdraw_${callerId}_${amountCents}_${new Date().toISOString()}`,
+          // Stable per attempt (client-supplied) so a retry can't pay twice.
+          idempotencyKey,
         });
+        stripeRef = transfer.id;
       } catch (e) {
         await rollback();
         return NextResponse.json(
@@ -198,6 +267,7 @@ export async function POST(req: Request) {
       }
     }
     // Stripe not configured → treated as simulated (dev); balance already deducted.
+    await finalizeClaim(stripeRef);
     if (creatorEmail) {
       await sendEmail(
         creatorEmail,
@@ -209,7 +279,7 @@ export async function POST(req: Request) {
   }
 
   // ── Cash App / Venmo / Zelle: notify the team to pay it out manually ──
-  const teamTo = process.env.PAYOUTS_NOTIFY_EMAIL || process.env.EMAIL_REPLY_TO || "payouts@loop.so";
+  const teamTo = process.env.PAYOUTS_NOTIFY_EMAIL || "loop.marketplace.ugc@gmail.com";
   const team = await sendEmail(
     teamTo,
     `Withdrawal request: ${amount} via ${methodLabel} — ${creatorName}`,
@@ -224,14 +294,24 @@ export async function POST(req: Request) {
     }),
   );
 
-  // If we couldn't notify the team AND email is configured, undo the debit so the
-  // request isn't silently lost. (When email isn't configured at all, we keep the
-  // deduction — the request still shows in the creator's receipt/return value.)
+  // A manual withdrawal must never be silently lost. Roll back the debit unless
+  // the request is durably visible to the team — either the team email actually
+  // sent, OR we have a withdrawals row they can review. If neither (real send
+  // failure, or email unconfigured AND the withdrawals table isn't migrated),
+  // undo the debit so the creator can retry.
   if (!team.sent && team.reason !== "email-not-configured") {
     await rollback();
     return NextResponse.json({ error: "Couldn't submit your request just now — try again shortly." }, { status: 502 });
   }
+  if (!team.sent && !withdrawalId) {
+    await rollback();
+    return NextResponse.json(
+      { error: "Withdrawals aren't fully set up yet — please contact support." },
+      { status: 503 },
+    );
+  }
 
+  await finalizeClaim(null);
   if (creatorEmail) {
     await sendEmail(
       creatorEmail,

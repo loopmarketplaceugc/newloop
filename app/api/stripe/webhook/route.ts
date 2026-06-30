@@ -34,6 +34,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `Webhook signature failed: ${msg}` }, { status: 400 });
   }
 
+  // Idempotency note: gig funding/release are idempotent via unique(gig_id,type),
+  // account.updated via claim_balance, and balance top-ups via credit_balance_once
+  // (which atomically records the event id) — so each handler is individually safe
+  // against Stripe's at-least-once redelivery without a fragile pre-claim here.
   try {
     switch (event.type) {
       case "checkout.session.completed": {
@@ -75,11 +79,25 @@ export async function POST(req: Request) {
         if (kind === "balance_topup") {
           const brandId = pi.metadata?.brandId;
           if (brandId) {
-            // Credit the brand's prepaid balance.
-            await admin().rpc("credit_balance", {
+            // Credit the brand's prepaid balance exactly once per event — atomic
+            // dedup so a redelivered topup can't double-credit.
+            const { error } = await admin().rpc("credit_balance_once", {
               p_uid: brandId,
               p_amount: pi.amount_received ?? pi.amount ?? 0,
+              p_event_key: event.id,
             });
+            if (error) {
+              if (/credit_balance_once|does not exist|schema cache/i.test(error.message)) {
+                // RPC not migrated yet → fall back to the plain credit (degraded).
+                await admin().rpc("credit_balance", {
+                  p_uid: brandId,
+                  p_amount: pi.amount_received ?? pi.amount ?? 0,
+                });
+              } else {
+                // Transient failure → throw so Stripe retries (the RPC is idempotent).
+                throw new Error(`credit_balance_once failed: ${error.message}`);
+              }
+            }
           }
         }
         break;
@@ -129,7 +147,8 @@ export async function POST(req: Request) {
         break;
     }
   } catch (e) {
-    // Log and 500 so Stripe retries — never silently drop a money event.
+    // Log and 500 so Stripe retries — handlers are idempotent, so reprocessing
+    // a redelivered event is safe.
     const msg = e instanceof Error ? e.message : "handler error";
     log.error("webhook.handler", `Handler error for ${event.type}`, { error: e });
     return NextResponse.json({ error: msg }, { status: 500 });

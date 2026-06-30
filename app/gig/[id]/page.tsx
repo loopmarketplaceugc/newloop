@@ -594,8 +594,8 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
               <p className="text-[13px] font-semibold text-red-500">This gig is in dispute</p>
               <p className="text-[12px] leading-relaxed text-text-secondary">
                 {isCreator
-                  ? "The brand is reviewing this gig. They can clear you to publish, or cancel it for a refund."
-                  : "Revisions are exhausted. Resolve it: clear the creator to publish, or cancel and refund the held funds."}
+                  ? "Loop support is reviewing this gig. The brand can clear you to publish, or Loop will resolve it."
+                  : "Loop support resolves disputes — funds can't be self-refunded once work is in dispute. You can clear the creator to publish, or our team will review and decide."}
               </p>
               {!isCreator && (
                 <div className="flex flex-col gap-2 pt-1">
@@ -609,22 +609,11 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
                   >
                     <CheckCircle2 className="h-4 w-4" /> Clear creator to publish
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={async () => {
-                      try {
-                        await app.cancelGig(gig.id);
-                        haptics.success();
-                        toast("Gig cancelled", { body: "The held funds have been refunded per policy.", tone: "info" });
-                      } catch (e) {
-                        haptics.error();
-                        toast("Couldn’t cancel", { body: e instanceof Error ? e.message : "Try again shortly.", tone: "warning" });
-                      }
-                    }}
-                  >
-                    <X className="h-4 w-4" /> Cancel &amp; refund
-                  </Button>
+                  <p className="text-[11px] leading-relaxed text-text-tertiary">
+                    Need a refund instead? Email{" "}
+                    <a href="mailto:legal@loop.so" className="underline underline-offset-2">legal@loop.so</a>{" "}
+                    and Loop will review the dispute.
+                  </p>
                 </div>
               )}
             </div>
