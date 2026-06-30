@@ -24,6 +24,7 @@ import {
   type Platform,
 } from "@/lib/types";
 import { formatMoney } from "@/lib/format";
+import { isSeededCreator } from "@/lib/seeded-creators";
 import { cn } from "@/lib/utils";
 
 export default function DiscoverPage() {
@@ -69,6 +70,8 @@ export default function DiscoverPage() {
     () => {
       const q = search.trim().toLowerCase();
       return creators.filter((c) => {
+        // Seeded supply creators are browsable but never searchable.
+        if (q && isSeededCreator(c)) return false;
         if (q && !c.name.toLowerCase().includes(q) && !c.handle.toLowerCase().includes(q)) return false;
         if (platform && !c.platforms.some((p) => p.platform === platform)) return false;
         if (niche && !c.niches.includes(niche)) return false;
@@ -226,15 +229,18 @@ export default function DiscoverPage() {
             />
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {filtered.map((c) => (
-                <Link key={c.id} href={`/creator/${c.handle}`}>
-                  <Card interactive className="h-full p-4">
+              {filtered.map((c) => {
+                // Seeded supply: shown as a card, but stripped of @handle and not
+                // openable (no link through to a profile).
+                const seeded = isSeededCreator(c);
+                const inner = (
+                  <Card interactive={!seeded} className="h-full p-4">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-3">
                         <Avatar name={c.name} hue={c.avatarHue} src={c.avatarUrl} size="md" />
                         <div>
                           <p className="text-sm font-semibold">{c.name}</p>
-                          <p className="text-xs text-text-tertiary">@{c.handle}</p>
+                          {!seeded && <p className="text-xs text-text-tertiary">@{c.handle}</p>}
                         </div>
                       </div>
                       <StatusDot status={c.status} withLabel={false} />
@@ -263,8 +269,13 @@ export default function DiscoverPage() {
                       ))}
                     </div>
                   </Card>
-                </Link>
-              ))}
+                );
+                return seeded ? (
+                  <div key={c.id}>{inner}</div>
+                ) : (
+                  <Link key={c.id} href={`/creator/${c.handle}`}>{inner}</Link>
+                );
+              })}
             </div>
           )}
 

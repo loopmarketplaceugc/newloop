@@ -13,6 +13,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { CardSkeleton } from "@/components/ui/skeleton";
 import { ReachBadge } from "@/components/shared/reach-badge";
 import { ChannelBento } from "@/components/creator/channel-bento";
+import { isSeededCreator } from "@/lib/seeded-creators";
 import { StatusDot } from "@/components/shared/status-dot";
 import { PlatformIcon } from "@/components/shared/platform-icon";
 import { StarRating } from "@/components/shared/star-rating";
@@ -51,6 +52,13 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
 
   const c = fromStore ?? (fetched === "loading" ? null : fetched);
   const loading = !fromStore && fetched === "loading";
+  const seeded = isSeededCreator(c);
+
+  // Seeded supply creators aren't openable by brands — bounce companies back to
+  // Discover (cards no longer link here, this covers a manually-typed URL).
+  useEffect(() => {
+    if (seeded && role === "company") router.replace("/dashboard/discover");
+  }, [seeded, role, router]);
 
   if (!hydrated || loading) {
     return <div className="mx-auto max-w-3xl p-6"><CardSkeleton /></div>;
@@ -110,7 +118,7 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
         <ArrowLeft className="h-4 w-4" /> Back
       </Link>
 
-      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-8">
+      <div className={seeded ? "" : "lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-8"}>
         <div className="min-w-0">
           <div className="flex flex-wrap items-start gap-5">
         <Avatar name={c.name} hue={c.avatarHue} src={c.avatarUrl} size="xl" />
@@ -120,7 +128,7 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
             <ReachBadge platforms={c.platforms} />
           </div>
           <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-secondary">
-            {c.handle && <span>@{c.handle}</span>}
+            {!seeded && c.handle && <span>@{c.handle}</span>}
             {c.location && (
               <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{c.location}</span>
             )}
@@ -142,8 +150,8 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
         )}
       </div>
 
-      {/* Loop tag + QR — shown to everyone, especially useful for brands scanning creator's code */}
-      {c.loopTag && (
+      {/* Loop tag + QR — a scan-to-open-profile mechanism, so hidden for seeded supply. */}
+      {!seeded && c.loopTag && (
         <div className="mt-6 flex flex-col gap-4 rounded-[20px] border-2 border-ink bg-surface p-5 sm:flex-row sm:items-center">
           <div className="flex-1">
             <p className="text-[10px] font-extrabold uppercase tracking-widest text-text-tertiary">Loop creator tag</p>
@@ -194,7 +202,7 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
                   <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-bold text-text-tertiary">
                     {p.postCount ? <span className="num">{formatCompact(p.postCount)} posts</span> : null}
                     {p.averageViews ? <span className="num">{formatCompact(p.averageViews)} avg views</span> : null}
-                    {p.url ? (
+                    {!seeded && p.url ? (
                       <a href={p.url} target="_blank" rel="noreferrer" className="text-[#d6409f] underline underline-offset-2">
                         open profile
                       </a>
@@ -280,10 +288,13 @@ export default function CreatorPublicPage({ params }: { params: Promise<{ handle
       </div>
         </div>
 
-        {/* Right rail — channel bento with platform switcher + profile links */}
-        <aside className="mt-8 space-y-4 lg:mt-0 lg:sticky lg:top-6">
-          <ChannelBento platforms={c.platforms} />
-        </aside>
+        {/* Right rail — channel bento with platform switcher + profile links.
+            Hidden for seeded supply (no channel embed / outbound links). */}
+        {!seeded && (
+          <aside className="mt-8 space-y-4 lg:mt-0 lg:sticky lg:top-6">
+            <ChannelBento platforms={c.platforms} />
+          </aside>
+        )}
       </div>
     </div>
   );
