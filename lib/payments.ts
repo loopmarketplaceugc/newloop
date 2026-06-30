@@ -64,11 +64,12 @@ export async function refreshPayoutStatus(params: { creatorId: string; accountId
 }
 
 /**
- * Brand funds a gig — redirects to Stripe Checkout. The amount and parties are
- * resolved server-side from the gig row, so only the gig id (plus the caller's
- * auth token) is sent.
+ * Brand funds a gig. Pre-loaded balance is spent first server-side: if it fully
+ * covers the price this returns `{ funded: true }` with NO redirect (caller
+ * refreshes the gig). Otherwise the browser is redirected to Stripe Checkout for
+ * the remaining card charge. Amount + parties are resolved server-side.
  */
-export async function payForGig(params: { gigId: string }) {
+export async function payForGig(params: { gigId: string }): Promise<{ funded: boolean }> {
   if (DEV_PAYMENTS) {
     await sleep(700);
     // Mirror the real Stripe return URL so the gig page's useEffect picks it up normally.
@@ -76,7 +77,7 @@ export async function payForGig(params: { gigId: string }) {
     url.searchParams.set("paid", "1");
     url.searchParams.set("session_id", `dev_session_${Date.now()}`);
     window.location.href = url.toString();
-    return;
+    return { funded: false };
   }
   const { data } = await supabase().auth.getSession();
   const token = data.session?.access_token;
@@ -88,11 +89,13 @@ export async function payForGig(params: { gigId: string }) {
     },
     body: JSON.stringify({ gigId: params.gigId, origin: window.location.origin }),
   });
-  const body = (await res.json()) as { url?: string; error?: string };
-  if (!res.ok || !body.url) {
-    throw new Error(body.error ?? "Could not start checkout.");
-  }
+  const body = (await res.json()) as { url?: string; funded?: boolean; error?: string };
+  if (!res.ok) throw new Error(body.error ?? "Could not start checkout.");
+  // Fully covered by pre-loaded balance — no card charge / redirect.
+  if (body.funded) return { funded: true };
+  if (!body.url) throw new Error(body.error ?? "Could not start checkout.");
   window.location.href = body.url;
+  return { funded: false };
 }
 
 /** Open the Stripe Customer Portal for a brand to manage their payment methods + receipts. */

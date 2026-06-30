@@ -314,7 +314,17 @@ export default function GigWorkspace({ params }: { params: Promise<{ id: string 
           fn: async () => {
             haptics.step();
             try {
-              await payForGig({ gigId: gig.id });
+              const result = await payForGig({ gigId: gig.id });
+              // Fully paid from pre-loaded balance — no redirect happened, so
+              // reflect the funded state locally; the live poll reconciles details.
+              if (result.funded) {
+                app.transition(gig.id, "FUNDED_IN_ESCROW");
+                haptics.success();
+                toast("Payment locked", {
+                  body: "Paid from your Loop balance — the creator is cleared to start.",
+                  tone: "success",
+                });
+              }
             } catch (e) {
               haptics.error();
               toast("Couldn’t start payment", {

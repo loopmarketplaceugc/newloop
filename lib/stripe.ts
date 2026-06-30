@@ -58,10 +58,15 @@ export async function createGigCheckout(
   params: {
     gigId: string;
     title: string;
-    amountCents: number;
+    amountCents: number; // amount to CHARGE the card (gig price minus any applied balance)
     creatorName?: string;
     successUrl: string;
     cancelUrl: string;
+    // How much of the gig price was covered by the brand's pre-loaded balance
+    // (already debited at session creation). Stamped in metadata so the
+    // completion handler records the full price and the expiry handler can
+    // refund this balance if the brand abandons checkout. 0 when none applied.
+    balanceAppliedCents?: number;
   },
 ) {
   const productData: Stripe.Checkout.SessionCreateParams.LineItem.PriceData.ProductData = {
@@ -69,8 +74,15 @@ export async function createGigCheckout(
   };
   if (params.creatorName) productData.description = `Content by ${params.creatorName}`;
 
+  const balanceApplied = String(params.balanceAppliedCents ?? 0);
+  const meta = { gigId: params.gigId, kind: "gig_payment", balanceApplied };
+
   const sessionParams: Stripe.Checkout.SessionCreateParams = {
     mode: "payment",
+    // Expire in 30 min (the minimum Stripe allows) so any pre-loaded balance
+    // applied to this session is released promptly via checkout.session.expired
+    // if the brand abandons checkout — rather than being tied up for 24h.
+    expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
     // Always mint a Customer so the brand's billing portal works on return.
     customer_creation: "always",
     line_items: [
@@ -85,10 +97,8 @@ export async function createGigCheckout(
     ],
     success_url: params.successUrl,
     cancel_url: params.cancelUrl,
-    metadata: { gigId: params.gigId, kind: "gig_payment" },
-    payment_intent_data: {
-      metadata: { gigId: params.gigId, kind: "gig_payment" },
-    },
+    metadata: meta,
+    payment_intent_data: { metadata: meta },
   };
 
   return stripe.checkout.sessions.create(sessionParams);

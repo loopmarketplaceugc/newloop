@@ -4,7 +4,6 @@ import { refundPolicy } from "@/lib/gig-machine";
 import {
   stripeClient,
   createPayoutTransfer,
-  createGigRefund,
   createBalancePayout,
 } from "@/lib/stripe";
 import { log } from "@/lib/log";
@@ -79,7 +78,11 @@ async function hasTx(gigId: string, type: string): Promise<boolean> {
 /**
  * Record that a gig's hold has been funded (called by the Stripe webhook and,
  * in dev mode, by the brand-initiated fund route). Idempotent on (gig_id, fund).
- * `amountCents` is the authoritative amount that was charged.
+ * `amountCents` is advisory; the funded amount is recorded as the gig's frozen
+ * price so the recorded "held" amount can never diverge between the
+ * checkout.session.completed and payment_intent.succeeded handlers (or be less
+ * than the price the creator is owed). The full price is always collected =
+ * card charge + any pre-loaded balance applied, both in Loop's platform balance.
  */
 export async function recordFunding(params: {
   gigId: string;
@@ -92,10 +95,14 @@ export async function recordFunding(params: {
   const gig = await loadGig(gigId);
   if (!gig) return { ok: false, status: 404, error: "Gig not found" };
 
+  // Record the authoritative frozen price (falls back to the passed amount only
+  // if the gig somehow has no price).
+  const fundedCents = gig.price_cents && gig.price_cents > 0 ? gig.price_cents : amountCents;
+
   const { error: insErr } = await sb.from("transactions").insert({
     gig_id: gigId,
     type: "fund",
-    amount_cents: amountCents,
+    amount_cents: fundedCents,
     stripe_ref: stripeRef ?? `fund_${gigId}`,
   });
   if (insErr) {
@@ -329,41 +336,37 @@ export async function recordRefund(params: {
     return { ok: false, status: 400, error: insErr.message };
   }
 
-  // Move the money. Only mark the gig CANCELLED AFTER the refund settles, so a
-  // Stripe failure leaves the gig in its current (refundable) state to retry —
-  // never stranded as CANCELLED-but-unrefunded.
-  const stripe = stripeClient();
-  if (stripe) {
-    const { data: fundTx } = await sb
-      .from("transactions")
-      .select("stripe_ref")
-      .eq("gig_id", gigId)
-      .eq("type", "fund")
-      .maybeSingle();
-    const paymentIntentId = fundTx?.stripe_ref as string | undefined;
-    if (paymentIntentId && paymentIntentId.startsWith("pi_")) {
-      try {
-        const refund = await createGigRefund(stripe, {
-          paymentIntentId,
-          amountCents: refundCents,
-          gigId,
-        });
-        await sb
-          .from("transactions")
-          .update({ stripe_ref: refund.id })
-          .eq("gig_id", gigId)
-          .eq("type", "refund");
-      } catch (e) {
+  // Refunds are issued as Loop balance credit to the brand. The funds are
+  // already in Loop's platform balance whether the gig was paid by card or from
+  // pre-loaded balance, so crediting balance_cents is always covered and avoids
+  // a card/balance split. Brands can't cash out balance (withdrawals are
+  // creator-only), so this is safe store credit they re-spend on gigs.
+  //
+  // Credit via credit_balance_once keyed to `refund_<gigId>` so the credit is
+  // crash-safe and exactly-once even if the claim row is deleted and retried
+  // after a false-negative (the marker, not the deletable claim row, is the guard).
+  const { error: creditErr } = await sb.rpc("credit_balance_once", {
+    p_uid: gig.company_id,
+    p_amount: refundCents,
+    p_event_key: `refund_${gigId}`,
+  });
+  if (creditErr) {
+    if (/credit_balance_once|does not exist|schema cache/i.test(creditErr.message)) {
+      // Degraded (RPC not migrated): fall back to a plain credit.
+      const { error: fbErr } = await sb.rpc("credit_balance", { p_uid: gig.company_id, p_amount: refundCents });
+      if (fbErr) {
         await sb.from("transactions").delete().eq("gig_id", gigId).eq("type", "refund");
-        const msg = e instanceof Error ? e.message : "Stripe refund failed";
-        log.error("ledger.recordRefund", "refund failed; rolled back ledger claim", {
-          gigId, refundCents, error: e,
-        });
-        return { ok: false, status: 502, error: msg };
+        log.error("ledger.recordRefund", "balance credit failed; rolled back refund claim", { gigId, refundCents, error: fbErr });
+        return { ok: false, status: 502, error: fbErr.message };
       }
+    } else {
+      await sb.from("transactions").delete().eq("gig_id", gigId).eq("type", "refund");
+      log.error("ledger.recordRefund", "balance credit failed; rolled back refund claim", { gigId, refundCents, error: creditErr });
+      return { ok: false, status: 502, error: creditErr.message };
     }
   }
 
+  // Only mark CANCELLED after the refund credit settles.
   await cancel();
   return { ok: true, refund: refundCents };
 }

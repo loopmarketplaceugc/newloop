@@ -51,9 +51,11 @@ export async function POST(req: Request) {
       }
       const pi = session.payment_intent;
       const stripeRef = typeof pi === "string" ? pi : pi?.id ?? `sess_${session.id}`;
+      // Full price held = card charge (amount_total) + pre-loaded balance applied.
+      const balanceApplied = parseInt(session.metadata?.balanceApplied ?? "0", 10) || 0;
       const result = await recordFunding({
         gigId: gig.id,
-        amountCents: session.amount_total ?? gig.price_cents,
+        amountCents: (session.amount_total ?? gig.price_cents) + balanceApplied,
         stripeRef,
       });
       if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });

@@ -14,6 +14,15 @@ export const dynamic = "force-dynamic";
  * still moved into the held state here. The signature is verified against
  * STRIPE_WEBHOOK_SECRET so the endpoint can't be spoofed. All handlers are
  * idempotent, so Stripe's at-least-once retries are safe.
+ *
+ * REQUIRED event subscriptions on this endpoint (Stripe Dashboard → Webhooks):
+ *   - checkout.session.completed   (gig funding + balance top-ups)
+ *   - checkout.session.expired     (REFUNDS pre-loaded balance applied to an
+ *                                   abandoned gig checkout — must be enabled or
+ *                                   abandoned partial-funding balance is stranded
+ *                                   until the 30-min session expiry is processed)
+ *   - payment_intent.succeeded     (funding/top-up backstop)
+ *   - account.updated              (creator payout capability)
  */
 export async function POST(req: Request) {
   const stripe = stripeClient();
@@ -42,23 +51,70 @@ export async function POST(req: Request) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
-        if (session.payment_status === "paid") {
-          const gigId = session.metadata?.gigId;
-          if (gigId) {
-            const pi = session.payment_intent;
-            const ref = typeof pi === "string" ? pi : pi?.id ?? `sess_${session.id}`;
-            await recordFunding({
-              gigId,
-              amountCents: session.amount_total ?? 0,
-              stripeRef: ref,
+        if (session.payment_status !== "paid") break;
+
+        // Billing balance top-up via hosted Checkout → credit the brand's balance.
+        if (session.metadata?.kind === "balance_topup") {
+          const brandId = session.metadata?.brandId;
+          if (brandId) {
+            const { error } = await admin().rpc("credit_balance_once", {
+              p_uid: brandId,
+              p_amount: session.amount_total ?? 0,
+              p_event_key: event.id,
             });
-            // Capture the brand's Stripe customer so the billing portal works later.
+            if (error && /credit_balance_once|does not exist|schema cache/i.test(error.message)) {
+              await admin().rpc("credit_balance", { p_uid: brandId, p_amount: session.amount_total ?? 0 });
+            } else if (error) {
+              throw new Error(`credit_balance_once failed: ${error.message}`);
+            }
             const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
-            if (customerId) {
-              const { data: gigRow } = await admin().from("gigs").select("company_id").eq("id", gigId).maybeSingle();
-              if (gigRow?.company_id) {
-                await admin().from("profiles").update({ stripe_customer_id: customerId }).eq("id", gigRow.company_id);
-              }
+            if (customerId) await admin().from("profiles").update({ stripe_customer_id: customerId }).eq("id", brandId);
+          }
+          break;
+        }
+
+        // Gig funding. Record the FULL price held = card charge (amount_total)
+        // plus any pre-loaded balance applied at session creation.
+        const gigId = session.metadata?.gigId;
+        if (gigId) {
+          const balanceApplied = parseInt(session.metadata?.balanceApplied ?? "0", 10) || 0;
+          const pi = session.payment_intent;
+          const ref = typeof pi === "string" ? pi : pi?.id ?? `sess_${session.id}`;
+          await recordFunding({
+            gigId,
+            amountCents: (session.amount_total ?? 0) + balanceApplied,
+            stripeRef: ref,
+          });
+          // Capture the brand's Stripe customer so the billing portal works later.
+          const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
+          if (customerId) {
+            const { data: gigRow } = await admin().from("gigs").select("company_id").eq("id", gigId).maybeSingle();
+            if (gigRow?.company_id) {
+              await admin().from("profiles").update({ stripe_customer_id: customerId }).eq("id", gigRow.company_id);
+            }
+          }
+        }
+        break;
+      }
+
+      // Brand abandoned a gig checkout that had pre-loaded balance applied →
+      // refund that balance (idempotent via the event id).
+      case "checkout.session.expired": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        const balanceApplied = parseInt(session.metadata?.balanceApplied ?? "0", 10) || 0;
+        const gigId = session.metadata?.gigId;
+        if (gigId && balanceApplied > 0) {
+          const { data: gigRow } = await admin().from("gigs").select("company_id").eq("id", gigId).maybeSingle();
+          if (gigRow?.company_id) {
+            const { error } = await admin().rpc("credit_balance_once", {
+              p_uid: gigRow.company_id,
+              p_amount: balanceApplied,
+              p_event_key: event.id,
+            });
+            if (error && /credit_balance_once|does not exist|schema cache/i.test(error.message)) {
+              await admin().rpc("credit_balance", { p_uid: gigRow.company_id, p_amount: balanceApplied });
+            } else if (error) {
+              throw new Error(`credit_balance_once failed: ${error.message}`);
             }
           }
         }
@@ -71,8 +127,14 @@ export async function POST(req: Request) {
         const kind = pi.metadata?.kind;
 
         if (gigId && kind === "gig_payment") {
-          // Backstop in case the Checkout session event is missed.
-          await recordFunding({ gigId, amountCents: pi.amount_received ?? pi.amount ?? 0, stripeRef: pi.id });
+          // Backstop in case the Checkout session event is missed. Record the
+          // full price = card charge + any pre-loaded balance applied.
+          const balanceApplied = parseInt(pi.metadata?.balanceApplied ?? "0", 10) || 0;
+          await recordFunding({
+            gigId,
+            amountCents: (pi.amount_received ?? pi.amount ?? 0) + balanceApplied,
+            stripeRef: pi.id,
+          });
           break;
         }
 
