@@ -65,7 +65,7 @@ export default function WalletPage() {
   const myTx = transactions
     .filter((t) => myGigIds.has(t.gigId) && t.type === "release")
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const released = myTx.filter((t) => t.type === "release").reduce((s, t) => s + t.amountCents, 0);
+  const available = me?.balanceCents ?? 0;
   const pending = myGigs
     .filter((g) => HELD_STATUSES.includes(g.status))
     .reduce((s, g) => s + creatorPayoutCents(g.priceCents), 0);
@@ -164,13 +164,15 @@ export default function WalletPage() {
 
   const withdrawAmountCents = Math.round((parseFloat(wAmount) || 0) * 100);
   const wMethodLabel = WITHDRAW_METHODS.find((m) => m.id === wMethod)!.label;
+  // Card withdrawals run through Stripe automation, so they need a connected payout account.
+  const cardNeedsConnect = wMethod === "card" && !payoutsReady && !DEV_PAYMENTS;
 
   const openWithdraw = () => {
-    if (released <= 0) {
-      toast("Nothing to withdraw yet", { body: "Your approved payouts will show up here to cash out.", tone: "info" });
+    if (available <= 0) {
+      toast("Nothing to withdraw yet", { body: "Approved payouts land in your balance, ready to cash out.", tone: "info" });
       return;
     }
-    setWAmount(String(released / 100));
+    setWAmount(String(available / 100));
     setWDest("");
     setWMethod("cashapp");
     setWithdrawOpen(true);
@@ -181,12 +183,16 @@ export default function WalletPage() {
       toast("Enter an amount", { body: "How much would you like to withdraw?", tone: "warning" });
       return;
     }
-    if (withdrawAmountCents > released) {
-      toast("Amount too high", { body: `You can withdraw up to ${formatMoney(released)}.`, tone: "warning" });
+    if (withdrawAmountCents > available) {
+      toast("Amount too high", { body: `You can withdraw up to ${formatMoney(available)}.`, tone: "warning" });
       return;
     }
-    if (!wDest.trim()) {
+    if (wMethod !== "card" && !wDest.trim()) {
       toast("Add a destination", { body: `Where should we send your ${wMethodLabel} payout?`, tone: "warning" });
+      return;
+    }
+    if (cardNeedsConnect) {
+      toast("Connect payouts first", { body: "Card withdrawals go through Stripe — connect your payout account below.", tone: "warning" });
       return;
     }
     if (isDemo) {
@@ -203,14 +209,20 @@ export default function WalletPage() {
         headers: await authHeaders(),
         body: JSON.stringify({ amountCents: withdrawAmountCents, method: wMethod, destination: wDest.trim() }),
       });
-      const d = (await res.json()) as { ok?: boolean; error?: string };
+      const d = (await res.json()) as { ok?: boolean; error?: string; balanceCents?: number; automated?: boolean };
       if (!res.ok || !d.ok) throw new Error(d.error ?? "Could not submit your request.");
+      // Reflect the server-side deduction immediately.
+      if (typeof d.balanceCents === "number") {
+        useApp.getState().updateCreator(userId, { balanceCents: d.balanceCents });
+      }
       haptics.success();
       setWithdrawOpen(false);
       setWAmount("");
       setWDest("");
       toast("Withdrawal requested", {
-        body: `We got it — your ${wMethodLabel} payout arrives in 1–2 business days. A receipt is on its way to your email.`,
+        body: d.automated
+          ? `${formatMoney(withdrawAmountCents)} is on its way to your payout account via Stripe — arrives in 1–2 business days.`
+          : `We got it — your ${wMethodLabel} payout arrives in 1–2 business days. A receipt is on its way to your email.`,
         tone: "success",
       });
     } catch (e) {
@@ -319,9 +331,9 @@ export default function WalletPage() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Card className="border-ink bg-ink text-[#faf6ef]">
           <CardContent>
-            <span className="sticker bg-[#a8d98a] text-[11px] text-ink">paid out</span>
-            <CountUpMoney cents={released} className="mt-2 block font-serif text-4xl font-extrabold text-[#a8d98a]" />
-            <p className="mt-1 text-xs font-bold text-[#faf6ef]/50">Money already in your pocket</p>
+            <span className="sticker bg-[#a8d98a] text-[11px] text-ink">available</span>
+            <CountUpMoney cents={available} className="mt-2 block font-serif text-4xl font-extrabold text-[#a8d98a]" />
+            <p className="mt-1 text-xs font-bold text-[#faf6ef]/50">Ready to withdraw — tap Withdraw to cash out</p>
           </CardContent>
         </Card>
         <Card className="bg-[#f2a3df]">
@@ -405,11 +417,12 @@ export default function WalletPage() {
         <DialogContent>
           <DialogTitle>Withdraw funds</DialogTitle>
           <DialogDescription>
-            Pick how you want to get paid. Requests are reviewed and paid out in 1–2 business days.
+            Cash App, Venmo, and Zelle are reviewed and paid by our team. Card pays out automatically
+            via Stripe. Either way it arrives in 1–2 business days.
           </DialogDescription>
           <div className="mt-4 space-y-4">
             <div className="rounded-[10px] bg-surface-2 p-3 text-[12px] font-bold text-text-secondary">
-              Available to withdraw: <span className="num text-money">{formatMoney(released)}</span>
+              Available to withdraw: <span className="num text-money">{formatMoney(available)}</span>
             </div>
             <div>
               <Label>Amount (USD)</Label>
@@ -443,21 +456,32 @@ export default function WalletPage() {
                 ))}
               </div>
             </div>
-            <div>
-              <Label>{wMethod === "card" ? "Card details" : "Send to"}</Label>
-              <Input
-                className="mt-1.5"
-                placeholder={WITHDRAW_METHODS.find((m) => m.id === wMethod)!.placeholder}
-                value={wDest}
-                onChange={(e) => setWDest(e.target.value)}
-              />
-              <p className="mt-1.5 text-[11px] text-text-tertiary">
-                Never enter a full card number here — we&apos;ll collect card details securely after you request.
-              </p>
-            </div>
-            <Button className="w-full" onClick={() => void submitWithdraw()} disabled={wSubmitting}>
+            {wMethod === "card" ? (
+              <div className="rounded-[10px] border border-border bg-surface-2 p-3 text-[12px] font-bold text-text-secondary">
+                {cardNeedsConnect ? (
+                  <>Card payouts run through Stripe. Connect your payout account below first, then come back to withdraw.</>
+                ) : (
+                  <>Paid automatically to your connected payout account via Stripe — no details needed here.</>
+                )}
+              </div>
+            ) : (
+              <div>
+                <Label>Send to</Label>
+                <Input
+                  className="mt-1.5"
+                  placeholder={WITHDRAW_METHODS.find((m) => m.id === wMethod)!.placeholder}
+                  value={wDest}
+                  onChange={(e) => setWDest(e.target.value)}
+                />
+              </div>
+            )}
+            <Button
+              className="w-full"
+              onClick={() => void submitWithdraw()}
+              disabled={wSubmitting || cardNeedsConnect}
+            >
               {wSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              {wSubmitting ? "Submitting…" : `Request ${formatMoney(withdrawAmountCents)} payout`}
+              {wSubmitting ? "Submitting…" : `Withdraw ${formatMoney(withdrawAmountCents)}`}
             </Button>
           </div>
         </DialogContent>
