@@ -12,7 +12,7 @@ import { DEMO_CREATOR_ID } from "@/lib/seed";
 import { QrCode } from "@/components/shared/qr-code";
 import { TypeOnce } from "@/components/shared/typewriter";
 import { TikTokLogo, InstagramLogo, YouTubeLogo } from "@/components/shared/brand-logos";
-import { tierForFollowers, TIER_LABELS, type Platform } from "@/lib/types";
+import { tierForFollowers, TIER_LABELS, NICHES, type Platform } from "@/lib/types";
 import { formatCompact } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -24,8 +24,11 @@ const PLATFORMS: { id: Platform; label: string; Logo: typeof TikTokLogo; tint: s
 
 type Step =
   | { kind: "nickname"; q: string; sub: string }
+  | { kind: "bio"; q: string; sub: string }
+  | { kind: "niches"; q: string; sub: string }
   | { kind: "platforms"; q: string; sub: string }
   | { kind: "followers"; platform: Platform; q: string; sub: string }
+  | { kind: "tos"; q: string; sub: string }
   | { kind: "done"; q: string; sub: string };
 
 function numericInput(value: string) {
@@ -44,8 +47,11 @@ export default function CreatorOnboarding() {
   const [dir, setDir] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [nickname, setNickname] = useState("");
+  const [bio, setBio] = useState("");
+  const [creatorNiches, setCreatorNiches] = useState<string[]>([]);
   const [platforms, setPlatforms] = useState<Platform[]>([]);
   const [followers, setFollowers] = useState<Record<Platform, string>>({ tiktok: "", reels: "", shorts: "" });
+  const [tosAgreed, setTosAgreed] = useState(false);
   const [loopTag, setMccTag] = useState<string | null>(null);
   const [origin, setOrigin] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -62,8 +68,18 @@ export default function CreatorOnboarding() {
         sub: "This is how brands and your audience will know you — pick whatever you go by.",
       },
       {
+        kind: "bio",
+        q: `Nice, ${nickname || "creator"}. Give brands your pitch.`,
+        sub: "A short intro — what you make, your style, why brands love working with you.",
+      },
+      {
+        kind: "niches",
+        q: "What do you create?",
+        sub: "Tap everything that fits — this is how brands discover you.",
+      },
+      {
         kind: "platforms",
-        q: `Nice, ${nickname || "creator"}. Where do you post?`,
+        q: "Where do you post?",
         sub: "Tap everything that applies.",
       },
       ...platforms.map((p) => ({
@@ -72,6 +88,11 @@ export default function CreatorOnboarding() {
         q: `How many followers on ${PLATFORMS.find((x) => x.id === p)!.label}?`,
         sub: "Rough number is totally fine — brands care about your content, not just the count.",
       })),
+      {
+        kind: "tos",
+        q: "Almost there.",
+        sub: "Agree to Loop's terms to activate your profile.",
+      },
       {
         kind: "done",
         q: `You're in, ${nickname || "creator"}.`,
@@ -122,6 +143,20 @@ export default function CreatorOnboarding() {
       }
     }
 
+    if (step.kind === "bio") {
+      if (bio.trim().length < 10) {
+        haptics.error();
+        setError("write at least a sentence — brands want to know who they're working with");
+        return;
+      }
+    }
+
+    if (step.kind === "niches" && creatorNiches.length === 0) {
+      haptics.error();
+      setError("pick at least one — this helps brands find you");
+      return;
+    }
+
     if (step.kind === "platforms" && platforms.length === 0) {
       haptics.error();
       setError("pick at least one — this is how brands filter creators");
@@ -133,6 +168,12 @@ export default function CreatorOnboarding() {
         setError("enter your follower count — even an estimate works");
         return;
       }
+    }
+
+    if (step.kind === "tos" && !tosAgreed) {
+      haptics.error();
+      setError("you need to agree to the terms before continuing");
+      return;
     }
 
     if (step.kind === "done") {
@@ -148,7 +189,7 @@ export default function CreatorOnboarding() {
         platforms: platformRows.map((r) => ({ platform: r.platform, url: "", followerCount: r.followerCount })),
       });
       setName(nickname);
-      void saveCreatorNickname({ nickname, platforms: platformRows });
+      void saveCreatorNickname({ nickname, bio: bio.trim(), niches: creatorNiches, platforms: platformRows });
       completeOnboarding();
       router.push("/dashboard");
       return;
@@ -228,6 +269,103 @@ export default function CreatorOnboarding() {
                   className="w-full border-b-4 border-[#faf6ef]/20 bg-transparent pb-3 font-serif text-3xl font-bold text-[#a8d98a] placeholder:text-[#faf6ef]/15 focus:border-[#f2a3df] focus:outline-none sm:text-5xl"
                   style={{ boxShadow: "none", borderRadius: 0 }}
                 />
+              )}
+
+              {/* BIO */}
+              {step.kind === "bio" && (
+                <textarea
+                  value={bio}
+                  placeholder="e.g. I make aesthetic lifestyle content that makes brands feel real. Worked with 30+ brands across beauty, food, and fashion."
+                  onChange={(e) => {
+                    haptics.tap();
+                    setBio(e.target.value);
+                  }}
+                  rows={4}
+                  className="w-full resize-none border-b-4 border-[#faf6ef]/20 bg-transparent pb-3 font-serif text-xl font-bold text-[#a8d98a] placeholder:text-[#faf6ef]/15 focus:border-[#f2a3df] focus:outline-none sm:text-2xl"
+                  style={{ boxShadow: "none", borderRadius: 0 }}
+                />
+              )}
+
+              {/* NICHES */}
+              {step.kind === "niches" && (
+                <div className="flex flex-wrap gap-3">
+                  {NICHES.map((n, i) => {
+                    const on = creatorNiches.includes(n);
+                    return (
+                      <motion.button
+                        key={n}
+                        initial={{ opacity: 0, y: 16 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.03 * i }}
+                        whileHover={{ scale: 1.08, rotate: i % 2 ? 2 : -2 }}
+                        whileTap={{ scale: 0.94 }}
+                        onClick={() => {
+                          haptics.select();
+                          setCreatorNiches((prev) =>
+                            prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n],
+                          );
+                        }}
+                        className={cn(
+                          "rounded-full border-[3px] px-5 py-2.5 font-serif text-lg font-bold transition-colors cursor-pointer",
+                          on
+                            ? "border-transparent bg-[#f2a3df] text-ink"
+                            : "border-[#faf6ef]/20 text-[#faf6ef] hover:border-[#faf6ef]/50",
+                        )}
+                      >
+                        {on && <Check className="mr-1 inline h-4 w-4" />}
+                        {n}
+                      </motion.button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* TERMS OF SERVICE */}
+              {step.kind === "tos" && (
+                <div className="space-y-5">
+                  <div className="rounded-[20px] border-[3px] border-[#faf6ef]/15 bg-[#faf6ef]/[0.04] p-6 space-y-4">
+                    <p className="text-xs font-bold uppercase tracking-widest text-[#faf6ef]/40">Key terms</p>
+                    <ul className="space-y-3 text-sm font-medium text-[#faf6ef]/70">
+                      <li className="flex gap-3">
+                        <span className="text-[#f2a3df] shrink-0 font-bold">→</span>
+                        All connections made through Loop must transact on Loop — taking deals off-platform is a breach of these Terms.
+                      </li>
+                      <li className="flex gap-3">
+                        <span className="text-[#f2a3df] shrink-0 font-bold">→</span>
+                        Every deal signed through Loop is legally binding — both parties must follow the contract terms.
+                      </li>
+                      <li className="flex gap-3">
+                        <span className="text-[#f2a3df] shrink-0 font-bold">→</span>
+                        You must disclose sponsored content per FTC guidelines and own all rights to content you submit.
+                      </li>
+                      <li className="flex gap-3">
+                        <span className="text-[#f2a3df] shrink-0 font-bold">→</span>
+                        Loop holds funds in escrow until deliverables are approved — protecting both sides.
+                      </li>
+                    </ul>
+                    <a href="/legal#terms" target="_blank" className="text-xs font-bold text-[#a8d98a] underline underline-offset-2 hover:text-[#a8d98a]/70 transition-colors">
+                      Read full Terms of Service →
+                    </a>
+                  </div>
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={tosAgreed}
+                      onChange={(e) => {
+                        haptics.tap();
+                        setTosAgreed(e.target.checked);
+                      }}
+                      className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded accent-[#f2a3df]"
+                    />
+                    <span className="text-sm font-medium text-[#faf6ef]/70">
+                      I agree to Loop&apos;s{" "}
+                      <a href="/legal#terms" target="_blank" className="text-[#f2a3df] underline underline-offset-2">
+                        Terms of Service
+                      </a>{" "}
+                      and confirm I&apos;m at least 18 years old.
+                    </span>
+                  </label>
+                </div>
               )}
 
               {/* PLATFORM PICK */}

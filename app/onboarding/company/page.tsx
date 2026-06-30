@@ -45,6 +45,7 @@ type Step =
   | { kind: "niche"; q: string }
   | { kind: "budget"; q: string }
   | { kind: "balance"; q: string; sub: string }
+  | { kind: "tos"; q: string; sub: string }
   | { kind: "done"; q: string };
 
 const BUDGETS = ["under $1k / mo", "$1k–5k / mo", "$5k–20k / mo", "$20k+ / mo"];
@@ -224,6 +225,7 @@ export default function CompanyOnboarding() {
   const [niches, setNiches] = useState<string[]>([]);
   const [budget, setBudget] = useState<string | null>(null);
   const [balance, setBalance] = useState<string | null>(null);
+  const [tosAgreed, setTosAgreed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleBalancePaid = () => {
@@ -246,6 +248,11 @@ export default function CompanyOnboarding() {
         kind: "balance",
         q: "Want to pre-load a balance?",
         sub: "Brands with $250+ loaded get shown 2x more often to creators.",
+      },
+      {
+        kind: "tos",
+        q: "Almost there.",
+        sub: "Agree to Loop's terms to activate your brand account.",
       },
       { kind: "done", q: "You're live on Loop." },
     ],
@@ -281,6 +288,10 @@ export default function CompanyOnboarding() {
     }
     if (step.kind === "balance" && !balance) {
       setError("pick an option to continue");
+      return;
+    }
+    if (step.kind === "tos" && !tosAgreed) {
+      setError("you need to agree to the terms before continuing");
       return;
     }
     if (step.kind === "done") {
@@ -464,6 +475,51 @@ export default function CompanyOnboarding() {
                       </motion.div>
                     )}
                   </AnimatePresence>
+                </div>
+              )}
+
+              {/* TERMS OF SERVICE */}
+              {step.kind === "tos" && (
+                <div className="space-y-5">
+                  <div className="rounded-[20px] border-[3px] border-[#faf6ef]/15 bg-[#faf6ef]/[0.04] p-6 space-y-4">
+                    <p className="text-xs font-bold uppercase tracking-widest text-[#faf6ef]/40">Key terms</p>
+                    <ul className="space-y-3 text-sm font-medium text-[#faf6ef]/70">
+                      <li className="flex gap-3">
+                        <span className="text-[#a8d98a] shrink-0 font-bold">→</span>
+                        All connections made through Loop must transact on Loop — taking deals off-platform is a breach of these Terms.
+                      </li>
+                      <li className="flex gap-3">
+                        <span className="text-[#a8d98a] shrink-0 font-bold">→</span>
+                        Every deal signed through Loop is legally binding — both parties must follow the contract terms in full.
+                      </li>
+                      <li className="flex gap-3">
+                        <span className="text-[#a8d98a] shrink-0 font-bold">→</span>
+                        Brands must fund escrow in full before a gig enters production.
+                      </li>
+                      <li className="flex gap-3">
+                        <span className="text-[#a8d98a] shrink-0 font-bold">→</span>
+                        You may not contact or engage creators outside Loop for any deal that originated on the platform, for 12 months after the gig.
+                      </li>
+                    </ul>
+                    <a href="/legal#terms" target="_blank" className="text-xs font-bold text-[#f2a3df] underline underline-offset-2 hover:text-[#f2a3df]/70 transition-colors">
+                      Read full Terms of Service →
+                    </a>
+                  </div>
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={tosAgreed}
+                      onChange={(e) => setTosAgreed(e.target.checked)}
+                      className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded accent-[#a8d98a]"
+                    />
+                    <span className="text-sm font-medium text-[#faf6ef]/70">
+                      I agree to Loop&apos;s{" "}
+                      <a href="/legal#terms" target="_blank" className="text-[#a8d98a] underline underline-offset-2">
+                        Terms of Service
+                      </a>{" "}
+                      and confirm I&apos;m at least 18 years old and authorised to bind my company to these terms.
+                    </span>
+                  </label>
                 </div>
               )}
 

@@ -170,9 +170,11 @@ export async function certifyCreator(): Promise<string> {
   }
 }
 
-/** Simplified creator save — just nickname + platform follower counts (no URL required). */
+/** Simplified creator save — nickname, bio, niches, and platform follower counts. */
 export async function saveCreatorNickname(p: {
   nickname: string;
+  bio?: string;
+  niches?: string[];
   platforms: { platform: string; followerCount: number }[];
 }): Promise<boolean> {
   const sb = supabase();
@@ -184,8 +186,18 @@ export async function saveCreatorNickname(p: {
     return false;
   }
   const handle = makeHandle(p.nickname, "creator");
-  await sb.from("profiles").upsert({ id: uid, role: "creator", name: p.nickname, handle, status: "open" });
-  await sb.from("creator_details").upsert({ profile_id: uid });
+  await sb.from("profiles").upsert({
+    id: uid,
+    role: "creator",
+    name: p.nickname,
+    handle,
+    status: "open",
+    ...(p.bio ? { bio: p.bio } : {}),
+  });
+  await sb.from("creator_details").upsert({
+    profile_id: uid,
+    ...(p.niches?.length ? { niches: p.niches } : {}),
+  });
   if (p.platforms.length) {
     await sb.from("creator_platforms").upsert(
       p.platforms.map((pl) => ({ creator_id: uid, platform: pl.platform, url: "", follower_count: pl.followerCount })),

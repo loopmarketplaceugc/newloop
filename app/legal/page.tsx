@@ -184,7 +184,7 @@ export default function LegalPage() {
         {/* ── TERMS OF SERVICE ── */}
         <section id="terms" className="scroll-mt-8">
           <h1 className="font-serif text-4xl font-extrabold text-ink">Terms of Service</h1>
-          <p className="mt-2 text-xs font-medium text-ink/40">Last updated: June 28, 2026</p>
+          <p className="mt-2 text-xs font-medium text-ink/40">Last updated: June 30, 2026</p>
 
           <div className="mt-8 space-y-8 text-[14px] leading-relaxed text-ink/80">
 
@@ -315,7 +315,30 @@ export default function LegalPage() {
             </div>
 
             <div>
-              <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">10. Disputes Between Users</h2>
+              <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">10. Platform Transactions and Contract Compliance</h2>
+              <p>
+                Any connection, introduction, or match made through Loop — whether between Creators
+                and Brands or otherwise — must result in all associated work and payments being
+                completed through Loop. Engaging a party you discovered through Loop for paid
+                services outside the platform constitutes circumvention and is a material breach of
+                these Terms.
+              </p>
+              <p className="mt-3">
+                All deals negotiated and contracted through Loop are legally binding on both parties
+                and must comply in full with the terms of the contract signed within the platform.
+                Loop's contract terms govern the rights, obligations, timeline, deliverables,
+                payment amounts, and usage rights for every gig. Neither party may unilaterally
+                modify, waive, or circumvent those contract terms.
+              </p>
+              <p className="mt-3">
+                Violation of this section may result in immediate account suspension, forfeiture of
+                escrowed funds, and legal action for damages including, but not limited to, Loop's
+                lost service fees and any harm caused to the other party.
+              </p>
+            </div>
+
+            <div>
+              <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">11. Disputes Between Users</h2>
               <p>
                 Loop provides a dispute resolution process accessible through the gig workspace.
                 Loop's decision in platform disputes is final with respect to escrow release.
@@ -325,7 +348,7 @@ export default function LegalPage() {
             </div>
 
             <div>
-              <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">11. Disclaimers</h2>
+              <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">13. Disclaimers</h2>
               <p>
                 The platform is provided "<strong>as is</strong>" and "<strong>as available</strong>"
                 without warranties of any kind, express or implied, including fitness for a
@@ -335,7 +358,7 @@ export default function LegalPage() {
             </div>
 
             <div>
-              <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">12. Limitation of Liability</h2>
+              <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">14. Limitation of Liability</h2>
               <p>
                 To the maximum extent permitted by law, Loop's total liability to you for any
                 claim arising out of or relating to these Terms or the platform is limited to the
@@ -346,7 +369,7 @@ export default function LegalPage() {
             </div>
 
             <div>
-              <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">13. Indemnification</h2>
+              <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">15. Indemnification</h2>
               <p>
                 You agree to indemnify and hold Loop, its officers, employees, and agents harmless
                 from any claims, damages, or expenses (including reasonable attorneys' fees)
@@ -355,7 +378,7 @@ export default function LegalPage() {
             </div>
 
             <div>
-              <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">14. Termination</h2>
+              <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">16. Termination</h2>
               <p>
                 You may close your account at any time. Loop may suspend or terminate your account
                 immediately if you breach these Terms or if we are required to do so by law.
@@ -365,7 +388,7 @@ export default function LegalPage() {
             </div>
 
             <div>
-              <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">15. Governing Law and Disputes</h2>
+              <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">17. Governing Law and Disputes</h2>
               <p>
                 These Terms are governed by the laws of the State of Delaware, United States,
                 without regard to conflict-of-law principles. Any dispute that cannot be resolved
@@ -377,7 +400,7 @@ export default function LegalPage() {
             </div>
 
             <div>
-              <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">16. Changes to These Terms</h2>
+              <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">18. Changes to These Terms</h2>
               <p>
                 We may revise these Terms at any time. Material changes will be communicated by
                 email at least 14 days before taking effect. Continued use after the effective date
@@ -386,7 +409,7 @@ export default function LegalPage() {
             </div>
 
             <div>
-              <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">17. Contact</h2>
+              <h2 className="mb-2 font-serif text-xl font-extrabold text-ink">19. Contact</h2>
               <p>
                 Loop · Legal ·{" "}
                 <a href="mailto:legal@loop.so" className="underline underline-offset-2">
