@@ -13,6 +13,7 @@ import {
   useStripe,
 } from "@stripe/react-stripe-js";
 import { useSession } from "@/lib/store/session";
+import { useHydrated } from "@/lib/store/app";
 import { saveCompanyProfile } from "@/lib/auth";
 import { authHeaders } from "@/lib/sync";
 import { DEV_PAYMENTS } from "@/lib/payments";
@@ -211,11 +212,20 @@ function StripeBalanceSection({
 
 export default function CompanyOnboarding() {
   const router = useRouter();
+  const hydrated = useHydrated();
   const session = useSession();
   const completeOnboarding = useSession((s) => s.completeOnboarding);
   const setName = useSession((s) => s.setName);
   const userId = useSession((s) => s.userId);
   const email = useSession((s) => s.email);
+
+  // Guard: block access once onboarded, if wrong role, or if not logged in.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!userId) { router.replace("/signup"); return; }
+    if (session.onboarded) { router.replace("/dashboard"); return; }
+    if (session.role && session.role !== "company") { router.replace("/dashboard"); return; }
+  }, [hydrated, userId, session.onboarded, session.role, router]);
 
   const [stepIdx, setStepIdx] = useState(0);
   const [typed, setTyped] = useState(false);

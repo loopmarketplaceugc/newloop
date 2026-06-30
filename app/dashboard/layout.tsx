@@ -249,7 +249,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </Link>
           <NotificationBell align="right" tone="onLight" />
         </header>
-        <main className="flex-1 px-4 py-4 pb-28 md:px-6 md:pb-10">{children}</main>
+        <main className="flex-1 px-4 py-4 pb-28 md:px-6 md:pb-10">
+          {!onboarded && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[14px] border-2 border-[#f2a3df]/40 bg-[#f2a3df]/10 px-4 py-3">
+              <p className="text-sm font-bold text-text-primary">
+                Your account setup isn&apos;t complete yet.
+              </p>
+              <Link
+                href={role === "company" ? "/onboarding/company" : "/onboarding/creator"}
+                className="rounded-full bg-[#f2a3df] px-4 py-1.5 text-sm font-bold text-ink transition-opacity hover:opacity-80"
+              >
+                Finish setup →
+              </Link>
+            </div>
+          )}
+          {children}
+        </main>
       </div>
 
       {/* Bottom nav — mobile */}

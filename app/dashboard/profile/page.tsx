@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Copy, ExternalLink, Save } from "lucide-react";
 import { useApp, useHydrated } from "@/lib/store/app";
@@ -34,8 +34,35 @@ export default function ProfilePage() {
 
   const [draftBio, setDraftBio] = useState<string | null>(null);
   const [draftRate, setDraftRate] = useState<number | null>(null);
+  // Wait a moment before showing the incomplete-onboarding banner to avoid a
+  // flash on valid users whose creator data hasn't loaded from the DB yet.
+  const [showIncompleteBanner, setShowIncompleteBanner] = useState(false);
+  useEffect(() => {
+    if (!hydrated || me) { setShowIncompleteBanner(false); return; }
+    const t = setTimeout(() => setShowIncompleteBanner(true), 2500);
+    return () => clearTimeout(t);
+  }, [hydrated, me]);
 
-  if (!hydrated || !me) return <CardSkeleton />;
+  if (!hydrated || (!me && !showIncompleteBanner)) return <CardSkeleton />;
+
+  if (!me) {
+    return (
+      <div className="space-y-4">
+        <h1 className="font-serif text-4xl font-extrabold leading-[0.95] sm:text-5xl">Profile</h1>
+        <Card>
+          <CardContent className="flex flex-col items-center gap-4 py-14 text-center">
+            <p className="font-serif text-xl font-bold">Your profile isn&apos;t set up yet.</p>
+            <p className="max-w-sm text-sm text-text-secondary">
+              Finish onboarding to unlock your profile, get discovered by brands, and receive your Loop tag.
+            </p>
+            <Button asChild>
+              <Link href="/onboarding/creator">Complete onboarding →</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const save = () => {
     updateCreator(me.id, {

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, Rocket } from "lucide-react";
 import { useSession } from "@/lib/store/session";
-import { useApp } from "@/lib/store/app";
+import { useApp, useHydrated } from "@/lib/store/app";
 import { saveCreatorNickname, certifyCreator } from "@/lib/auth";
 import { haptics } from "@/lib/haptics";
 import { DEMO_CREATOR_ID } from "@/lib/seed";
@@ -37,10 +37,19 @@ function numericInput(value: string) {
 
 export default function CreatorOnboarding() {
   const router = useRouter();
+  const hydrated = useHydrated();
   const session = useSession();
   const completeOnboarding = useSession((s) => s.completeOnboarding);
   const setName = useSession((s) => s.setName);
   const ensureCreator = useApp((s) => s.ensureCreator);
+
+  // Guard: block access once onboarded, if wrong role, or if not logged in.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!session.userId) { router.replace("/signup"); return; }
+    if (session.onboarded) { router.replace("/dashboard"); return; }
+    if (session.role && session.role !== "creator") { router.replace("/dashboard"); return; }
+  }, [hydrated, session.userId, session.onboarded, session.role, router]);
 
   const [stepIdx, setStepIdx] = useState(0);
   const [typed, setTyped] = useState(false);
