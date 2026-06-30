@@ -243,7 +243,7 @@ export default function WalletPage() {
             Your <span className="text-gradient-ink">money</span>
           </h1>
           <p className="mt-2 text-sm font-bold text-text-secondary">
-            Brand payments land in your bank automatically once approved.
+            Your earnings pay out to your connected card once approved.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -276,19 +276,19 @@ export default function WalletPage() {
             </span>
             <div>
               <p className="font-serif text-lg font-extrabold text-ink">
-                {payoutsReady ? "Payouts connected via Stripe" : "Connect payouts to get paid"}
+                {payoutsReady ? "Card payout connected via Stripe" : "Connect a card to get paid"}
               </p>
               <p className="mt-0.5 max-w-md text-sm font-bold text-ink/70">
                 {payoutsReady
-                  ? "Brand payments hit your bank automatically via Stripe."
-                  : "Connect once — every brand payment goes straight to your bank via Stripe."}
+                  ? "Your earnings pay out to your connected card via Stripe."
+                  : "Connect a card once to get paid out securely via Stripe."}
               </p>
             </div>
           </div>
           {!payoutsReady && !connectInstance && (
             <Button onClick={() => void startEmbeddedConnect()} disabled={connectLoading}>
               {connectLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Landmark className="h-4 w-4" />}
-              {me?.stripeAccountId ? "Finish payout setup" : "Connect bank account"}
+              {me?.stripeAccountId ? "Finish card setup" : "Connect card"}
             </Button>
           )}
           {payoutsReady && me?.stripeAccountId && (
