@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Camera, Check, Trash2, Upload } from "lucide-react";
+import { Camera, Trash2, Upload } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,13 +12,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/toast";
-import { cn } from "@/lib/utils";
-
-/** A handful of ready-to-use demo portraits (randomuser.me — allowed by next.config remotePatterns). */
-const PRESETS: string[] = [
-  ["women", 1], ["men", 5], ["women", 16], ["men", 20], ["women", 30], ["men", 36],
-  ["women", 42], ["men", 48], ["women", 57], ["men", 72], ["women", 79], ["men", 91],
-].map(([g, i]) => `https://randomuser.me/api/portraits/${g}/${i}.jpg`);
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8 MB raw upload ceiling
 const OUTPUT_SIZE = 256; // square px — keeps the stored data URL tiny
@@ -62,7 +55,7 @@ export function AvatarEditor({
   name: string;
   hue: number;
   src?: string;
-  /** Called with the new photo (data URL or preset URL), or `undefined` to clear it. */
+  /** Called with the uploaded photo (data URL), or `undefined` to clear it. */
   onChange: (avatarUrl: string | undefined) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -128,24 +121,23 @@ export function AvatarEditor({
       <DialogContent>
         <DialogTitle>Profile photo</DialogTitle>
         <DialogDescription>
-          Upload your own or pick one of ours. This is what brands see on Discover and your public page.
+          Upload a photo of yourself. This is what brands see on Discover and your public page.
         </DialogDescription>
 
         <div className="mt-5 flex items-center gap-4">
           <Avatar name={name} hue={hue} src={draft} size="xl" />
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" disabled={busy} onClick={() => fileRef.current?.click()}>
-              <Upload className="h-4 w-4" /> {busy ? "Processing…" : "Upload photo"}
-            </Button>
-            {draft && (
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => setDraft(undefined)}
-              >
-                <Trash2 className="h-4 w-4" /> Remove
+          <div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" disabled={busy} onClick={() => fileRef.current?.click()}>
+                <Upload className="h-4 w-4" /> {busy ? "Processing…" : draft ? "Replace photo" : "Upload photo"}
               </Button>
-            )}
+              {draft && (
+                <Button variant="danger" size="sm" onClick={() => setDraft(undefined)}>
+                  <Trash2 className="h-4 w-4" /> Remove
+                </Button>
+              )}
+            </div>
+            <p className="mt-2 text-[11px] text-text-tertiary">JPG, PNG, or WebP · up to 8&nbsp;MB</p>
           </div>
           <input
             ref={fileRef}
@@ -157,34 +149,6 @@ export function AvatarEditor({
               e.target.value = ""; // allow re-selecting the same file
             }}
           />
-        </div>
-
-        <p className="mt-6 mb-2 text-[11px] font-bold uppercase tracking-wider text-text-tertiary">
-          Or choose one
-        </p>
-        <div className="grid grid-cols-6 gap-2">
-          {PRESETS.map((url) => {
-            const active = draft === url;
-            return (
-              <button
-                key={url}
-                type="button"
-                aria-label="Use this photo"
-                onClick={() => setDraft(url)}
-                className={cn(
-                  "relative aspect-square overflow-hidden rounded-full ring-2 transition-all cursor-pointer hover:scale-105",
-                  active ? "ring-text-primary" : "ring-transparent hover:ring-border-bright",
-                )}
-              >
-                <Avatar name={name} hue={hue} src={url} size="lg" className="h-full w-full" />
-                {active && (
-                  <span className="absolute inset-0 flex items-center justify-center bg-text-primary/40">
-                    <Check className="h-4 w-4 text-white" />
-                  </span>
-                )}
-              </button>
-            );
-          })}
         </div>
 
         <div className="mt-6 flex justify-end gap-2">
