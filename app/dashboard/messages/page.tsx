@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Compass, MessageSquare, Zap } from "lucide-react";
+import { Compass, MessageSquare } from "lucide-react";
 import { useApp, useHydrated } from "@/lib/store/app";
 import { useSession } from "@/lib/store/session";
 import { Avatar } from "@/components/ui/avatar";
@@ -84,38 +84,6 @@ export default function MessagesPage() {
 
       {threads.length === 0 ? (
         <div className="mt-2 space-y-4">
-          {/* Feature callouts */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            {[
-              {
-                icon: Zap,
-                color: "#f2a3df",
-                title: "Instant offers",
-                body: "Brands send structured offer cards — price, deliverables, usage rights — all in one tap.",
-              },
-              {
-                icon: MessageSquare,
-                color: "#faf6ef",
-                title: "One thread per gig",
-                body: "Files, revisions, payment status, and chat — no email, no DMs, no lost briefs.",
-              },
-            ].map(({ icon: Icon, color, title, body }) => (
-              <div
-                key={title}
-                className="rounded-[20px] border-2 border-ink bg-surface p-5"
-              >
-                <span
-                  className="mb-3 flex h-10 w-10 items-center justify-center rounded-full"
-                  style={{ background: color }}
-                >
-                  <Icon className="h-5 w-5 text-ink" />
-                </span>
-                <p className="font-serif text-base font-extrabold">{title}</p>
-                <p className="mt-1.5 text-[13px] font-medium leading-relaxed text-text-secondary">{body}</p>
-              </div>
-            ))}
-          </div>
-
           {/* CTA */}
           <div className="flex flex-col items-center gap-4 rounded-[24px] border-[3px] border-ink bg-ink py-10 text-center text-[#faf6ef]">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#f2a3df]">
