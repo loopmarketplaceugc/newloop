@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDownLeft, BadgeCheck, ExternalLink, FileWarning, Landmark, Loader2, Receipt } from "lucide-react";
+import { ArrowDownLeft, BadgeCheck, ExternalLink, FileWarning, Landmark, Loader2, Receipt, Send } from "lucide-react";
 import {
   loadConnectAndInitialize,
   type StripeConnectInstance,
@@ -15,6 +15,8 @@ import { useSession } from "@/lib/store/session";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input, Label } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CardSkeleton } from "@/components/ui/skeleton";
 import { CountUpMoney } from "@/components/shared/count-up";
@@ -29,6 +31,16 @@ import { authHeaders } from "@/lib/sync";
 import { toast } from "@/components/ui/toast";
 import { DEV_PAYMENTS, refreshPayoutStatus, getExpressDashboardUrl } from "@/lib/payments";
 import { haptics } from "@/lib/haptics";
+import { cn } from "@/lib/utils";
+
+type PayoutMethod = "cashapp" | "venmo" | "zelle" | "card";
+
+const WITHDRAW_METHODS: { id: PayoutMethod; label: string; placeholder: string }[] = [
+  { id: "cashapp", label: "Cash App", placeholder: "$cashtag" },
+  { id: "venmo", label: "Venmo", placeholder: "@venmo-username" },
+  { id: "zelle", label: "Zelle", placeholder: "Email or phone for Zelle" },
+  { id: "card", label: "Card", placeholder: "Name on card + last 4 (we'll collect the rest securely)" },
+];
 
 export default function WalletPage() {
   const hydrated = useHydrated();
@@ -40,6 +52,11 @@ export default function WalletPage() {
   const [openingDashboard, setOpeningDashboard] = useState(false);
   const [connectInstance, setConnectInstance] = useState<StripeConnectInstance | null>(null);
   const [connectLoading, setConnectLoading] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [wMethod, setWMethod] = useState<PayoutMethod>("cashapp");
+  const [wDest, setWDest] = useState("");
+  const [wAmount, setWAmount] = useState("");
+  const [wSubmitting, setWSubmitting] = useState(false);
 
   if (!hydrated || !userId) return <CardSkeleton />;
 
@@ -145,6 +162,65 @@ export default function WalletPage() {
     }
   };
 
+  const withdrawAmountCents = Math.round((parseFloat(wAmount) || 0) * 100);
+  const wMethodLabel = WITHDRAW_METHODS.find((m) => m.id === wMethod)!.label;
+
+  const openWithdraw = () => {
+    if (released <= 0) {
+      toast("Nothing to withdraw yet", { body: "Your approved payouts will show up here to cash out.", tone: "info" });
+      return;
+    }
+    setWAmount(String(released / 100));
+    setWDest("");
+    setWMethod("cashapp");
+    setWithdrawOpen(true);
+  };
+
+  const submitWithdraw = async () => {
+    if (withdrawAmountCents <= 0) {
+      toast("Enter an amount", { body: "How much would you like to withdraw?", tone: "warning" });
+      return;
+    }
+    if (withdrawAmountCents > released) {
+      toast("Amount too high", { body: `You can withdraw up to ${formatMoney(released)}.`, tone: "warning" });
+      return;
+    }
+    if (!wDest.trim()) {
+      toast("Add a destination", { body: `Where should we send your ${wMethodLabel} payout?`, tone: "warning" });
+      return;
+    }
+    if (isDemo) {
+      setWithdrawOpen(false);
+      haptics.success();
+      toast("Demo mode", { body: "Sign up for a real account to request a payout.", tone: "info" });
+      return;
+    }
+    setWSubmitting(true);
+    haptics.step();
+    try {
+      const res = await fetch("/api/wallet/withdraw", {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify({ amountCents: withdrawAmountCents, method: wMethod, destination: wDest.trim() }),
+      });
+      const d = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !d.ok) throw new Error(d.error ?? "Could not submit your request.");
+      haptics.success();
+      setWithdrawOpen(false);
+      setWAmount("");
+      setWDest("");
+      toast("Withdrawal requested", {
+        body: `We got it — your ${wMethodLabel} payout arrives in 1–2 business days. A receipt is on its way to your email.`,
+        tone: "success",
+      });
+    } catch (e) {
+      haptics.error();
+      toast("Couldn't submit withdrawal", { body: e instanceof Error ? e.message : "Try again shortly.", tone: "warning" });
+    } finally {
+      setWSubmitting(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -156,20 +232,25 @@ export default function WalletPage() {
             Brand payments land in your bank automatically once approved.
           </p>
         </div>
-        {payoutsReady && me?.stripeAccountId && (
-          <Button
-            variant="moneyOutline"
-            size="sm"
-            onClick={openExpressDashboard}
-            disabled={openingDashboard}
-          >
-            {openingDashboard
-              ? <Loader2 className="h-4 w-4 animate-spin" />
-              : <Landmark className="h-4 w-4" />}
-            {openingDashboard ? "Opening…" : "Manage payouts"}
-            {!openingDashboard && <ExternalLink className="h-3.5 w-3.5 opacity-50" />}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" onClick={openWithdraw}>
+            <Send className="h-4 w-4" /> Withdraw
           </Button>
-        )}
+          {payoutsReady && me?.stripeAccountId && (
+            <Button
+              variant="moneyOutline"
+              size="sm"
+              onClick={openExpressDashboard}
+              disabled={openingDashboard}
+            >
+              {openingDashboard
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : <Landmark className="h-4 w-4" />}
+              {openingDashboard ? "Opening…" : "Manage payouts"}
+              {!openingDashboard && <ExternalLink className="h-3.5 w-3.5 opacity-50" />}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Payout setup / status */}
@@ -318,6 +399,69 @@ export default function WalletPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Withdraw dialog — manual payout request, reviewed + paid by the Loop team */}
+      <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen}>
+        <DialogContent>
+          <DialogTitle>Withdraw funds</DialogTitle>
+          <DialogDescription>
+            Pick how you want to get paid. Requests are reviewed and paid out in 1–2 business days.
+          </DialogDescription>
+          <div className="mt-4 space-y-4">
+            <div className="rounded-[10px] bg-surface-2 p-3 text-[12px] font-bold text-text-secondary">
+              Available to withdraw: <span className="num text-money">{formatMoney(released)}</span>
+            </div>
+            <div>
+              <Label>Amount (USD)</Label>
+              <div className="relative mt-1.5">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-text-tertiary">$</span>
+                <Input
+                  className="num pl-7"
+                  inputMode="decimal"
+                  value={wAmount}
+                  onChange={(e) => setWAmount(e.target.value.replace(/[^0-9.]/g, ""))}
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Payout method</Label>
+              <div className="mt-1.5 grid grid-cols-2 gap-2">
+                {WITHDRAW_METHODS.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setWMethod(m.id)}
+                    className={cn(
+                      "rounded-[8px] border px-3 py-2 text-[13px] font-bold transition-colors cursor-pointer",
+                      wMethod === m.id
+                        ? "border-text-primary bg-text-primary text-bg"
+                        : "border-border text-text-secondary hover:border-border-bright",
+                    )}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label>{wMethod === "card" ? "Card details" : "Send to"}</Label>
+              <Input
+                className="mt-1.5"
+                placeholder={WITHDRAW_METHODS.find((m) => m.id === wMethod)!.placeholder}
+                value={wDest}
+                onChange={(e) => setWDest(e.target.value)}
+              />
+              <p className="mt-1.5 text-[11px] text-text-tertiary">
+                Never enter a full card number here — we&apos;ll collect card details securely after you request.
+              </p>
+            </div>
+            <Button className="w-full" onClick={() => void submitWithdraw()} disabled={wSubmitting}>
+              {wSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {wSubmitting ? "Submitting…" : `Request ${formatMoney(withdrawAmountCents)} payout`}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
